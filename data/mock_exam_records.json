@@ -1,0 +1,96 @@
+[
+  {
+    "subject": "psychology",
+    "subject_name": "心理学综合",
+    "date": "2026-05-27 16:54",
+    "total": 250,
+    "correct": 206,
+    "score": 80.4,
+    "max_score": 100.0,
+    "duration": "69分8秒",
+    "accuracy": "82.4%",
+    "status": "completed",
+    "session_id": "45b2943c",
+    "category_stats": {
+      "人格心理学": {
+        "total": 19,
+        "correct": 15
+      },
+      "社会心理学": {
+        "total": 24,
+        "correct": 16
+      },
+      "情绪调节与压力管理": {
+        "total": 14,
+        "correct": 12
+      },
+      "心理咨询会谈技术": {
+        "total": 29,
+        "correct": 25
+      },
+      "心理危机识别": {
+        "total": 25,
+        "correct": 19
+      },
+      "心理学导论": {
+        "total": 31,
+        "correct": 28
+      },
+      "家庭教育与心理健康科普": {
+        "total": 19,
+        "correct": 19
+      },
+      "异常心理学": {
+        "total": 32,
+        "correct": 20
+      },
+      "咨询心理学": {
+        "total": 21,
+        "correct": 18
+      },
+      "发展心理学": {
+        "total": 24,
+        "correct": 22
+      },
+      "心理咨询专业伦理与相关法律规范": {
+        "total": 12,
+        "correct": 12
+      }
+    }
+  },
+  {
+    "subject": "counseling",
+    "subject_name": "咨询实务",
+    "date": "2026-05-28 17:11",
+    "total": 200,
+    "correct": 170,
+    "score": 77.0,
+    "max_score": 100.0,
+    "duration": "62分9秒",
+    "accuracy": "85.0%",
+    "status": "completed",
+    "session_id": "46501c44",
+    "category_stats": {
+      "家庭教育与心理健康科普": {
+        "total": 40,
+        "correct": 33
+      },
+      "情绪调节与压力管理": {
+        "total": 40,
+        "correct": 32
+      },
+      "心理咨询专业伦理与相关法律规范": {
+        "total": 40,
+        "correct": 40
+      },
+      "心理咨询会谈技术": {
+        "total": 40,
+        "correct": 35
+      },
+      "心理危机识别": {
+        "total": 40,
+        "correct": 30
+      }
+    }
+  }
+]

@@ -1,0 +1,20 @@
+{
+  "study_per_round": 50,
+  "study_single_count": 20,
+  "study_multi_count": 10,
+  "study_judge_count": 10,
+  "spec_per_round": 60,
+  "spec_single_count": 30,
+  "spec_multi_count": 20,
+  "spec_judge_count": 10,
+  "comp_per_round": 60,
+  "comp_single_count": 30,
+  "comp_multi_count": 20,
+  "comp_judge_count": 10,
+  "exam_time_minutes": 90,
+  "exam_single_count": 20,
+  "exam_multi_count": 20,
+  "exam_judge_count": 20,
+  "wrongbook_extract_count": 50,
+  "last_import_files": []
+}
