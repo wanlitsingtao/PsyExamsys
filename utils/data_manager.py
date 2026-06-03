@@ -789,10 +789,17 @@ def _priority_sample(question_list, count, wrong_ids=None, stats=None):
     """
     按优先级从题目列表中抽取 count 道题
     优先级规则（tier 主导，与错题本规则一致）：
-      1. 答错过(tier0) > 从未答过(tier1) > 答对过(tier2)
-         ——答错（wrong>=correct）最高；只要还有未做题，绝不抽答对题(correct>wrong)
-      2. 同层级内按 (答错-答对) 净差值降序，净值越高越优先
-      3. 同净值内：答错次数高的优先，其余随机
+      tier0（答错过）> tier1（新题+可能猜对题）> tier2（稳定掌握题）
+      tier1 包含：
+        - 从未答过的题目（wrong=0, correct=0）
+        - 答对但从未答错，且尝试次数≤2 的题目（可能猜对，需要重测）
+      tier2 仅包含：多次答对且正确率>50%（已稳定掌握，仅用于补齐）
+
+    tier0/tier1/tier2 内部排序：
+      1. 正确率升序（低正确率优先）
+      2. 同等正确率时：尝试次数升序（答题次数少=可能蒙对，优先复检）
+      3. 同等尝试次数时：wrong 次数降序（曾经错过更多次的优先）
+      4. 其余随机打散
     """
     if not question_list or count <= 0:
         return []
@@ -808,25 +815,31 @@ def _priority_sample(question_list, count, wrong_ids=None, stats=None):
         s = stats.get(qid, {"correct_count": 0, "wrong_count": 0})
         wrong = s.get("wrong_count", 0)
         correct = s.get("correct_count", 0)
-        diff = wrong - correct  # 核心排序值
 
         # 层级（与错题本规则一致）：
-        #   0=答错过(wrong>0且wrong>=correct)  ——仍在错题本
-        #   1=从未答过(wrong==0且correct==0)
-        #   2=答对过(correct>wrong)            ——已移出错题本，仅用于补齐
+        #   0=答错过(wrong>0且wrong>=correct)     ——仍在错题本，最高优先
+        #   1=新题或可能猜对(wrong==0, correct<=2) ——从未答过或仅答对1-2次从未答错
+        #   2=稳定掌握(correct>wrong, wrong>0 或 correct>2) ——已移出错题本，仅用于补齐
         if wrong > 0 and wrong >= correct:
             tier = 0  # 最高优先：答错过
         elif correct == 0:
-            tier = 1  # 次优先：从未答过
+            tier = 1  # 新题：从未答过
+        elif wrong == 0 and correct <= 2:
+            tier = 1  # 可能猜对：答对1-2次但从未答错，需重测
         else:
-            tier = 2  # 最低：答对过（correct>wrong，含答错过但净值为正）
+            tier = 2  # 稳定掌握：多次正确或有过错后正确率>50%
 
-        scored.append((tier, -diff, wrong, random.random(), q))
+        # 内部排序指标：正确率（升序=低正确率优先）
+        # tier0/tier1/tier2 的 accuracy 参与 tier 内同层排序
+        total_ans = wrong + correct
+        accuracy = correct / total_ans if total_ans > 0 else 0.0
 
-    # 排序：tier 升序(主), diff 降序, wrong 降序, random 升序
-    scored.sort(key=lambda x: (x[0], x[1], -x[2], x[3]))
+        scored.append((tier, accuracy, total_ans, -wrong, random.random(), q))
 
-    return [q for _, _, _, _, q in scored[:count]]
+    # 排序：tier升序 → accuracy升序 → total_ans升序 → wrong降序 → random
+    scored.sort(key=lambda x: (x[0], x[1], x[2], x[3], x[4]))
+
+    return [q for _, _, _, _, _, q in scored[:count]]
 
 
 def _balanced_sample_by_type(questions_by_cat, total_count, wrong_ids=None, stats=None):

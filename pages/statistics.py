@@ -183,11 +183,20 @@ def _show_wrong_stats(questions, wrong_list, wrong_stats):
         cat_wrong[cat]["total_wrong"] += ws.get("wrong_count", 0)
 
     if cat_wrong:
+        # 统计每个知识板块的题目总数
+        cat_total = {}
+        for q in questions:
+            cat = q.get("category", "未知")
+            cat_total[cat] = cat_total.get(cat, 0) + 1
+
         cat_data = []
         for cat, stats_data in sorted(cat_wrong.items(), key=lambda x: x[1]["count"], reverse=True):
+            total_q = cat_total.get(cat, 0)
+            ratio = stats_data["count"] / total_q * 100 if total_q > 0 else 0
             cat_data.append({
                 "知识板块": cat,
                 "错题数": stats_data["count"],
+                "错题比率": f"{ratio:.1f}%",
                 "累计答错次数": stats_data["total_wrong"],
                 "平均答错次数": f"{stats_data['total_wrong']/stats_data['count']:.1f}",
             })

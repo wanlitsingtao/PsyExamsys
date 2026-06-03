@@ -176,7 +176,7 @@ def _render_analysis_detail(item, idx, total):
     st.markdown("---")
     st.markdown(f"**📝 题目：** {item['question']}")
 
-    # 全部选项（正确答案用绿色标注）
+    # 全部选项（正确答案用深绿色标注）
     st.markdown("**选项：**")
     options = item["options"]
     opt_keys = sorted(options.keys())
@@ -185,14 +185,19 @@ def _render_analysis_detail(item, idx, total):
     for k in opt_keys:
         is_correct = k in correct_ans
         if is_correct:
-            st.markdown(f'<p style="color:green;font-weight:bold;">✅ {k}: {options[k]}</p>',
+            st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]}</p>',
                         unsafe_allow_html=True)
         else:
             st.markdown(f'{k}: {options[k]}')
 
     # 正确答案
     correct_display = get_answer_display(item["type"], correct_ans, options)
-    st.info(f"**✅ 正确答案**：{correct_display}")
+    st.markdown(
+        f'<div style="background:#e8f5e9;border-left:4px solid #1b5e20;padding:8px 12px;'
+        f'border-radius:4px;margin:4px 0;">'
+        f'<span style="color:#1b5e20;font-weight:bold;">✅ 正确答案：{correct_display}</span></div>',
+        unsafe_allow_html=True,
+    )
 
     # 解析
     explanation = item.get("explanation", "")
@@ -346,31 +351,34 @@ def _show_wrong_practice():
 
             if q["type"] == "multi":
                 if is_selected and is_correct_key:
-                    st.markdown(f'<p style="color:green;font-weight:bold;">✅ {k}: {options[k]}</p>',
+                    st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]}</p>',
                                 unsafe_allow_html=True)
                 elif is_selected and not is_correct_key:
-                    st.markdown(f'<p style="color:red;font-weight:bold;">❌ {k}: {options[k]}</p>',
-                                unsafe_allow_html=True)
+                    st.markdown(f'{k}: {options[k]}')
                 elif not is_selected and is_correct_key:
-                    st.markdown(f'<p style="color:green;">{k}: {options[k]} (漏选)</p>',
+                    st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]} (漏选)</p>',
                                 unsafe_allow_html=True)
                 else:
                     st.markdown(f'{k}: {options[k]}')
             else:
                 if is_selected and is_correct_key:
-                    st.markdown(f'<p style="color:green;font-weight:bold;">✅ {k}: {options[k]}</p>',
+                    st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]}</p>',
                                 unsafe_allow_html=True)
                 elif is_selected and not is_correct_key:
-                    st.markdown(f'<p style="color:red;font-weight:bold;">❌ {k}: {options[k]}</p>',
-                                unsafe_allow_html=True)
+                    st.markdown(f'{k}: {options[k]}')
                 elif not is_selected and is_correct_key:
-                    st.markdown(f'<p style="color:green;font-weight:bold;">✅ {k}: {options[k]}</p>',
+                    st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]}</p>',
                                 unsafe_allow_html=True)
                 else:
                     st.markdown(f'{k}: {options[k]}')
 
         correct_display = get_answer_display(q["type"], q["answer"], options)
-        st.info(f"**正确答案**: {q['answer']} - {correct_display}")
+        st.markdown(
+            f'<div style="background:#e8f5e9;border-left:4px solid #1b5e20;padding:8px 12px;'
+            f'border-radius:4px;margin:4px 0;">'
+            f'<span style="color:#1b5e20;font-weight:bold;">✅ 正确答案：{q["answer"]} - {correct_display}</span></div>',
+            unsafe_allow_html=True,
+        )
 
         if q.get("explanation"):
             with st.expander("📖 查看解析", expanded=True):
@@ -494,8 +502,8 @@ def _show_wrong_practice():
 
             if is_submitted:
                 is_correct_q = st.session_state.wb_results.get(q_id, {}).get("correct", False)
-                bg = "#2e7d32" if is_correct_q else "#c62828"
-                text_color = "white"
+                bg = "#c8e6c9" if is_correct_q else "#ffcdd2"
+                text_color = "#1b5e20" if is_correct_q else "#b71c1c"
             else:
                 if q_id in st.session_state.wb_answers:
                     bg = "#f9a825"

@@ -10,7 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 st.set_page_config(
-    page_title="心理咨询师考试背题系统",
+#    page_title="心理咨询师考试背题系统",
     page_icon="📚",
     layout="centered",
     initial_sidebar_state="expanded",
@@ -35,7 +35,7 @@ if "questions" not in st.session_state:
 # 侧边栏导航（自定义，不使用 Streamlit 默认多页面标签）
 # ============================
 
-st.sidebar.markdown("## 📚 心理咨询师考试背题系统")
+#st.sidebar.markdown("## 📚 心理咨询师考试背题系统")
 st.sidebar.markdown("---")
 
 if len(st.session_state.questions) == 0:

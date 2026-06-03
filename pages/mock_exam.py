@@ -150,6 +150,7 @@ def _start_subject(subject_key):
     st.session_state.mock_questions = selected
     st.session_state.mock_current = 0
     st.session_state.mock_answers = {}
+    st.session_state.mock_marked = set()
     st.session_state.mock_start_time = time.time()
     st.session_state.mock_end_time = time.time() + cfg["time_minutes"] * 60
     st.session_state.mock_confirm_submit = False
@@ -263,9 +264,27 @@ def _show_exam_subject(subject_key):
 
     # 题目显示
     type_labels = {"single": "🔵 单选题", "multi": "🟢 多选题", "judge": "🟠 判断题", "indefinite": "🟣 不定项选择题"}
+    
     st.markdown(f"### 第 {idx+1}/{total_q} 题")
-    st.markdown(f"**{type_labels.get(q['type'], q['type'])}**"
-                f"{' · 📂 ' + q.get('category', infer_category(q.get('source_file', ''))) if q.get('category') or q.get('source_file') else ''}")
+    
+    category = q.get('category', infer_category(q.get('source_file', '')))
+    
+    title_col1, title_col2 = st.columns([8, 2])
+    with title_col1:
+        st.markdown(f"**{type_labels.get(q['type'], q['type'])}**"
+                    f"{' · 📂 ' + category if category else ''}")
+    with title_col2:
+        marked = qid in st.session_state.mock_marked
+        if st.button("⭐ 标记" if marked else "☆ 标记",
+                     key=f"mock_mark_{qid}",
+                     help="取消标记" if marked else "标记此题",
+                     use_container_width=True):
+            if qid in st.session_state.mock_marked:
+                st.session_state.mock_marked.discard(qid)
+            else:
+                st.session_state.mock_marked.add(qid)
+            st.rerun()
+    
     st.markdown(f"**{q['question']}**")
 
     # 获取本题历史答题统计
@@ -336,7 +355,12 @@ def _show_exam_subject(subject_key):
         st.rerun()
     if showing:
         correct_display = get_answer_display(q["type"], q["answer"], options)
-        st.info(f"**正确答案**: {q['answer']} - {correct_display}")
+        st.markdown(
+            f'<div style="background:#e8f5e9;border-left:4px solid #1b5e20;padding:8px 12px;'
+            f'border-radius:4px;margin:4px 0;">'
+            f'<span style="color:#1b5e20;font-weight:bold;">✅ 正确答案：{q["answer"]} - {correct_display}</span></div>',
+            unsafe_allow_html=True,
+        )
         if q.get("explanation"):
             with st.expander("📖 查看解析", expanded=True):
                 st.markdown(q["explanation"])
@@ -355,53 +379,89 @@ def _show_exam_subject(subject_key):
     st.markdown("---")
     st.markdown("#### 📌 答题卡")
 
-    st.progress(answered / total_q, text=f"已答 {answered}/{total_q}")
+    # 筛选按钮
+    filter_key = "mock_card_filter"
+    if filter_key not in st.session_state:
+        st.session_state[filter_key] = "all"
+
+    fc1, fc2, fc3, fc4 = st.columns(4)
+    if fc1.button("📋 全部", key="mock_filter_all", use_container_width=True,
+                  type="primary" if st.session_state[filter_key] == "all" else "secondary"):
+        st.session_state[filter_key] = "all"
+        st.rerun()
+    if fc2.button("✅ 已答", key="mock_filter_answered", use_container_width=True,
+                  type="primary" if st.session_state[filter_key] == "answered" else "secondary"):
+        st.session_state[filter_key] = "answered"
+        st.rerun()
+    if fc3.button("⬜ 未答", key="mock_filter_unanswered", use_container_width=True,
+                  type="primary" if st.session_state[filter_key] == "unanswered" else "secondary"):
+        st.session_state[filter_key] = "unanswered"
+        st.rerun()
+    if fc4.button("⭐ 已标记", key="mock_filter_marked", use_container_width=True,
+                  type="primary" if st.session_state[filter_key] == "marked" else "secondary"):
+        st.session_state[filter_key] = "marked"
+        st.rerun()
+
+    filter_mode = st.session_state[filter_key]
+    marked_count = len(st.session_state.mock_marked)
+    st.progress(answered / total_q, text=f"已答 {answered}/{total_q}" + (f" · 已标记 {marked_count}" if marked_count else ""))
 
     cols_per_row = 10
     rows = (total_q + cols_per_row - 1) // cols_per_row
 
-    nav_html = '<div style="display:flex;flex-direction:column;gap:2px;">'
     for row in range(rows):
-        nav_html += '<div style="display:flex;gap:2px;">'
+        cols = st.columns(cols_per_row)
         for col_idx in range(cols_per_row):
             q_idx = row * cols_per_row + col_idx
-            if q_idx >= total_q:
-                nav_html += '<div style="flex:1;min-width:0;"></div>'
-                continue
-            q_item = eq[q_idx]
-            q_id = q_item["id"]
+            with cols[col_idx]:
+                if q_idx >= total_q:
+                    st.empty()
+                    continue
+                q_item = eq[q_idx]
+                q_id = q_item["id"]
 
-            bg = "#f9a825" if q_id in st.session_state.mock_answers else "#ffffff"
-            border = "2px solid #1976d2" if q_idx == idx else "1px solid #ddd"
-            text_color = "#333" if bg == "#ffffff" else "white"
+                # 筛选逻辑
+                show = True
+                if filter_mode == "answered" and q_id not in st.session_state.mock_answers:
+                    show = False
+                if filter_mode == "unanswered" and q_id in st.session_state.mock_answers:
+                    show = False
+                if filter_mode == "marked" and q_id not in st.session_state.mock_marked:
+                    show = False
 
-            nav_html += f'''
-            <div style="flex:1;min-width:0;">
-                <span onclick="var p=new URLSearchParams(window.location.search);p.set('nav_mock_to','{q_idx}');window.location.search=p.toString();"
-                   style="display:block;width:100%;background:{bg};color:{text_color};border:{border};
-                          border-radius:3px;font-size:12px;min-height:30px;line-height:30px;
-                          text-align:center;text-decoration:none;cursor:pointer;">
-                    {q_idx + 1}
-                </span>
-            </div>'''
-        nav_html += '</div>'
-    nav_html += '</div>'
+                if not show:
+                    st.empty()
+                    continue
 
-    st.markdown(nav_html, unsafe_allow_html=True)
+                is_answered = q_id in st.session_state.mock_answers
+                is_marked = q_id in st.session_state.mock_marked
+                is_current = q_idx == idx
 
-    # 用 query params 做导航
-    params = st.query_params
-    nav_target = params.get("nav_mock_to")
-    if nav_target is not None:
-        try:
-            target_idx = int(nav_target)
-            if 0 <= target_idx < total_q and target_idx != idx:
-                st.session_state.mock_current = target_idx
-                del params["nav_mock_to"]
-                st.query_params = params
-                st.rerun()
-        except (ValueError, KeyError):
-            pass
+                label = str(q_idx + 1)
+
+                btn_type = "primary" if is_answered else "secondary"
+
+                # 当前题高亮
+                if is_current:
+                    st.markdown(
+                        '<div style="border:2px solid #1565c0;border-radius:6px;background:#e3f2fd;padding:1px 2px;">',
+                        unsafe_allow_html=True
+                    )
+
+                badge_color = "#ff9800" if is_marked else "transparent"
+                badge_char = "★" if is_marked else "&nbsp;"
+                st.markdown(
+                    f'<div style="text-align:right;font-size:10px;color:{badge_color};'
+                    f'height:14px;line-height:14px;margin-bottom:-4px;">{badge_char}</div>',
+                    unsafe_allow_html=True
+                )
+
+                if st.button(label, key=f"mock_nav_{q_idx}", use_container_width=True, type=btn_type):
+                    st.session_state.mock_current = q_idx
+                    st.rerun()
+
+                if is_current:
+                    st.markdown('</div>', unsafe_allow_html=True)
 
 
 def _finish_subject(subject_key):
@@ -600,25 +660,24 @@ def _show_subject_result(subject_key):
 
                     if d["type"] in ("multi", "indefinite"):
                         if is_user_selected and is_correct_key:
-                            st.markdown(f'<p style="color:green;font-weight:bold;">✅ {k}: {options[k]}</p>',
+                            st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]}</p>',
                                         unsafe_allow_html=True)
                         elif is_user_selected and not is_correct_key:
-                            st.markdown(f'<p style="color:red;font-weight:bold;">❌ {k}: {options[k]}</p>',
+                            st.markdown(f'<p style="color:#b71c1c;font-weight:bold;">❌️ {k}: {options[k]} (错选)</p>',
                                         unsafe_allow_html=True)
                         elif not is_user_selected and is_correct_key:
-                            st.markdown(f'<p style="color:green;">{k}: {options[k]} (漏选)</p>',
+                            st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]} (漏选)</p>',
                                         unsafe_allow_html=True)
                         else:
                             st.markdown(f'{k}: {options[k]}')
                     else:
                         if is_user_selected and is_correct_key:
-                            st.markdown(f'<p style="color:green;font-weight:bold;">✅ {k}: {options[k]}</p>',
+                            st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]}</p>',
                                         unsafe_allow_html=True)
                         elif is_user_selected and not is_correct_key:
-                            st.markdown(f'<p style="color:red;font-weight:bold;">❌ {k}: {options[k]}</p>',
-                                        unsafe_allow_html=True)
+                            st.markdown(f'{k}: {options[k]}')
                         elif not is_user_selected and is_correct_key:
-                            st.markdown(f'<p style="color:green;font-weight:bold;">✅ {k}: {options[k]}</p>',
+                            st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]}</p>',
                                         unsafe_allow_html=True)
                         else:
                             st.markdown(f'{k}: {options[k]}')
@@ -632,7 +691,12 @@ def _show_subject_result(subject_key):
 
                 # 正确答案（含选项内容）
                 correct_display = get_answer_display(d["type"], correct_ans, options)
-                st.info(f"**正确答案**：{correct_display}")
+                st.markdown(
+                    f'<div style="background:#e8f5e9;border-left:4px solid #1b5e20;padding:8px 12px;'
+                    f'border-radius:4px;margin:4px 0;">'
+                    f'<span style="color:#1b5e20;font-weight:bold;">✅ 正确答案：{correct_display}</span></div>',
+                    unsafe_allow_html=True,
+                )
 
                 # 解析（直接跟在正确答案后面）
                 explanation = d.get("explanation", "")
@@ -664,13 +728,20 @@ def _show_subject_result(subject_key):
             q_item = eq[q_idx]
             d = details_by_idx.get(q_item["index"], {})
             is_correct = d.get("is_correct", False)
-            bg = "#2e7d32" if is_correct else "#c62828"
+            bg = "#c8e6c9" if is_correct else "#ffcdd2"
+            tc = "#1b5e20" if is_correct else "#b71c1c"
+            
+            # 标记题角标
+            is_marked = q_item["id"] in st.session_state.mock_marked
+            marker = '<sup style="font-size:8px;">⭐</sup>' if is_marked else ''
+            border_style = "2px solid #ff9800" if is_marked else "1px solid #ddd"
+            
             nav_html += f'''
             <div style="flex:1;min-width:0;">
-                <div style="display:block;width:100%;background:{bg};color:white;border:1px solid #555;
+                <div style="display:block;width:100%;background:{bg};color:{tc};border:{border_style};
                           border-radius:3px;font-size:12px;min-height:30px;line-height:30px;
-                          text-align:center;">
-                    {q_idx + 1}
+                          text-align:center;position:relative;">
+                    {q_idx + 1}{marker}
                 </div>
             </div>'''
         nav_html += '</div>'

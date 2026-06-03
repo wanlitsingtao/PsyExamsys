@@ -18,17 +18,21 @@ from utils.data_manager import (
 
 
 def show_specialized():
-    st.markdown("# 🎯 专项训练")
-    st.markdown("---")
-
     questions = st.session_state.questions
     if not questions:
+        st.markdown("# 🎯 专项训练")
+        st.markdown("---")
         st.warning("⚠️ 题库为空，请先在配置管理中导入题库！")
         return
 
     # 初始化状态
     if "spec_state" not in st.session_state:
         st.session_state.spec_state = "idle"
+
+    # 只在非答题状态显示总标题
+    if st.session_state.spec_state != "running":
+        st.markdown("# 🎯 专项训练")
+        st.markdown("---")
 
     # ======== 状态路由 ========
     if st.session_state.spec_state == "idle":
@@ -217,6 +221,7 @@ def _start_comprehensive(questions):
     st.session_state.spec_questions = selected
     st.session_state.spec_current = 0
     st.session_state.spec_answers = {}
+    st.session_state.spec_marked = set()
     st.session_state.spec_state = "running"
     st.session_state.spec_session_id = session_id
     st.session_state.spec_category = "综合训练"
@@ -259,6 +264,7 @@ def _start_specialized(questions, category):
     st.session_state.spec_questions = selected
     st.session_state.spec_current = 0
     st.session_state.spec_answers = {}
+    st.session_state.spec_marked = set()
     st.session_state.spec_state = "running"
     st.session_state.spec_session_id = session_id
     st.session_state.spec_category = category
@@ -348,7 +354,7 @@ def _show_spec_running():
     # 获取本题答题统计（从缓存读取，避免每次渲染读文件）
     q_stats = st.session_state.spec_stats_cache.get(qid, {"correct_count": 0, "wrong_count": 0, "last_answer_time": None, "last_correct": None})
 
-    # 题号行：左侧题号，右侧历史统计 + 上次对错
+    # 题号行：左侧题号，右侧历史统计
     title_cols = st.columns([1, 2])
     with title_cols[0]:
         st.markdown(f"### 第 {idx+1}/{total_q} 题")
@@ -364,8 +370,23 @@ def _show_spec_running():
         if stats_parts:
             st.markdown(f"<div style='text-align:right;padding-top:0.5em;color:#888;font-size:16px;'>{'&nbsp;&nbsp;|&nbsp;&nbsp;'.join(stats_parts)}</div>", unsafe_allow_html=True)
 
-    st.markdown(f"**{type_labels[q['type']]}**"
-                f" · 📂 {q.get('category', category)}")
+    # 题型标签 + 标记按钮同行
+    type_col1, type_col2 = st.columns([8, 2])
+    with type_col1:
+        st.markdown(f"**{type_labels[q['type']]}**"
+                    f" · 📂 {q.get('category', category)}")
+    with type_col2:
+        marked = qid in st.session_state.spec_marked
+        if st.button("⭐ 标记" if marked else "☆ 标记",
+                     key=f"spec_mark_{qid}",
+                     help="取消标记" if marked else "标记此题",
+                     use_container_width=True):
+            if qid in st.session_state.spec_marked:
+                st.session_state.spec_marked.discard(qid)
+            else:
+                st.session_state.spec_marked.add(qid)
+            st.rerun()
+    
     st.markdown(f"**{q['question']}**")
 
     options = q["options"]
@@ -428,7 +449,12 @@ def _show_spec_running():
     st.button(btn_label, key=btn_key, use_container_width=False, on_click=_toggle_answer)
     if showing:
         correct_display = get_answer_display(q["type"], q["answer"], options)
-        st.info(f"**正确答案**: {q['answer']} - {correct_display}")
+        st.markdown(
+            f'<div style="background:#e8f5e9;border-left:4px solid #1b5e20;padding:8px 12px;'
+            f'border-radius:4px;margin:4px 0;">'
+            f'<span style="color:#1b5e20;font-weight:bold;">✅ 正确答案：{q["answer"]} - {correct_display}</span></div>',
+            unsafe_allow_html=True,
+        )
         if q.get("explanation"):
             with st.expander("📖 查看解析", expanded=True):
                 st.markdown(q["explanation"])
@@ -453,53 +479,89 @@ def _show_spec_running():
     st.markdown("---")
     st.markdown("#### 📌 答题卡")
 
-    st.progress(answered / total_q, text=f"已答 {answered}/{total_q}")
+    # 筛选按钮
+    filter_key = "spec_card_filter"
+    if filter_key not in st.session_state:
+        st.session_state[filter_key] = "all"
+
+    fc1, fc2, fc3, fc4 = st.columns(4)
+    if fc1.button("📋 全部", key="spec_filter_all", use_container_width=True,
+                  type="primary" if st.session_state[filter_key] == "all" else "secondary"):
+        st.session_state[filter_key] = "all"
+        st.rerun()
+    if fc2.button("✅ 已答", key="spec_filter_answered", use_container_width=True,
+                  type="primary" if st.session_state[filter_key] == "answered" else "secondary"):
+        st.session_state[filter_key] = "answered"
+        st.rerun()
+    if fc3.button("⬜ 未答", key="spec_filter_unanswered", use_container_width=True,
+                  type="primary" if st.session_state[filter_key] == "unanswered" else "secondary"):
+        st.session_state[filter_key] = "unanswered"
+        st.rerun()
+    if fc4.button("⭐ 已标记", key="spec_filter_marked", use_container_width=True,
+                  type="primary" if st.session_state[filter_key] == "marked" else "secondary"):
+        st.session_state[filter_key] = "marked"
+        st.rerun()
+
+    filter_mode = st.session_state[filter_key]
+    marked_count = len(st.session_state.spec_marked)
+    st.progress(answered / total_q, text=f"已答 {answered}/{total_q}" + (f" · 已标记 {marked_count}" if marked_count else ""))
 
     cols_per_row = 10
     rows = (total_q + cols_per_row - 1) // cols_per_row
 
-    nav_html = '<div style="display:flex;flex-direction:column;gap:2px;">'
     for row in range(rows):
-        nav_html += '<div style="display:flex;gap:2px;">'
+        cols = st.columns(cols_per_row)
         for col_idx in range(cols_per_row):
             q_idx = row * cols_per_row + col_idx
-            if q_idx >= total_q:
-                nav_html += '<div style="flex:1;min-width:0;"></div>'
-                continue
-            q_item = sq[q_idx]
-            q_id = q_item["id"]
+            with cols[col_idx]:
+                if q_idx >= total_q:
+                    st.empty()
+                    continue
+                q_item = sq[q_idx]
+                q_id = q_item["id"]
 
-            bg = "#f9a825" if q_id in st.session_state.spec_answers else "#ffffff"
-            border = "2px solid #1976d2" if q_idx == idx else "1px solid #ddd"
-            text_color = "#333" if bg == "#ffffff" else "white"
+                # 筛选逻辑
+                show = True
+                if filter_mode == "answered" and q_id not in st.session_state.spec_answers:
+                    show = False
+                if filter_mode == "unanswered" and q_id in st.session_state.spec_answers:
+                    show = False
+                if filter_mode == "marked" and q_id not in st.session_state.spec_marked:
+                    show = False
 
-            nav_html += f'''
-            <div style="flex:1;min-width:0;">
-                <span onclick="var p=new URLSearchParams(window.location.search);p.set('nav_spec_to','{q_idx}');window.location.search=p.toString();"
-                   style="display:block;width:100%;background:{bg};color:{text_color};border:{border};
-                          border-radius:3px;font-size:12px;min-height:30px;line-height:30px;
-                          text-align:center;text-decoration:none;cursor:pointer;">
-                    {q_idx + 1}
-                </span>
-            </div>'''
-        nav_html += '</div>'
-    nav_html += '</div>'
+                if not show:
+                    st.empty()
+                    continue
 
-    st.markdown(nav_html, unsafe_allow_html=True)
+                is_answered = q_id in st.session_state.spec_answers
+                is_marked = q_id in st.session_state.spec_marked
+                is_current = q_idx == idx
 
-    # query params 导航
-    params = st.query_params
-    nav_target = params.get("nav_spec_to")
-    if nav_target is not None:
-        try:
-            target_idx = int(nav_target)
-            if 0 <= target_idx < total_q and target_idx != idx:
-                st.session_state.spec_current = target_idx
-                del params["nav_spec_to"]
-                st.query_params = params
-                st.rerun()
-        except (ValueError, KeyError):
-            pass
+                label = str(q_idx + 1)
+
+                btn_type = "primary" if is_answered else "secondary"
+
+                # 当前题高亮
+                if is_current:
+                    st.markdown(
+                        '<div style="border:2px solid #1565c0;border-radius:6px;background:#e3f2fd;padding:1px 2px;">',
+                        unsafe_allow_html=True
+                    )
+
+                badge_color = "#ff9800" if is_marked else "transparent"
+                badge_char = "★" if is_marked else "&nbsp;"
+                st.markdown(
+                    f'<div style="text-align:right;font-size:10px;color:{badge_color};'
+                    f'height:14px;line-height:14px;margin-bottom:-4px;">{badge_char}</div>',
+                    unsafe_allow_html=True
+                )
+
+                if st.button(label, key=f"spec_nav_{q_idx}", use_container_width=True, type=btn_type):
+                    st.session_state.spec_current = q_idx
+                    st.rerun()
+
+                if is_current:
+                    st.markdown('</div>', unsafe_allow_html=True)
 
 
 def _finish_specialized():
@@ -648,12 +710,48 @@ def _show_spec_result():
         )
         with st.expander(f"{i+1}. {status_icon} [{tp_label}] {d['question'][:60]}...", expanded=not d["is_correct"]):
             st.markdown(f"**题目**: {d['question']}")
-            # 显示所有选项
+            # 显示所有选项，用颜色标记
             options = d.get("options", {})
+            user_ans = d.get("user_answer", "") or ""
+            correct_ans = d.get("correct_answer", "")
             for k, v in sorted(options.items()):
-                st.markdown(f"{k}: {v}")
-            st.markdown(f"**你的答案**: {user_label}")
-            st.markdown(f"**正确答案**: {d['correct_answer']} - {correct_display}")
+                is_user_selected = k in user_ans
+                is_correct_key = k in correct_ans
+
+                if d["type"] in ("multi", "indefinite"):
+                    if is_user_selected and is_correct_key:
+                        st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {v}</p>',
+                                    unsafe_allow_html=True)
+                    elif is_user_selected and not is_correct_key:
+                            st.markdown(f'<p style="color:#b71c1c;font-weight:bold;">❌️ {k}: {v} (错选)</p>',
+                                        unsafe_allow_html=True)
+                    elif not is_user_selected and is_correct_key:
+                        st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {v} (漏选)</p>',
+                                    unsafe_allow_html=True)
+                    else:
+                        st.markdown(f'{k}: {v}')
+                else:
+                    if is_user_selected and is_correct_key:
+                        st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {v}</p>',
+                                    unsafe_allow_html=True)
+                    elif is_user_selected and not is_correct_key:
+                            st.markdown(f'<p style="color:#b71c1c;font-weight:bold;">❌️ {k}: {v} (错选)</p>',
+                                        unsafe_allow_html=True)
+                    elif not is_user_selected and is_correct_key:
+                        st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {v}</p>',
+                                    unsafe_allow_html=True)
+                    else:
+                        st.markdown(f'{k}: {v}')
+            if d["is_correct"]:
+                st.markdown(f"**你的答案**: {user_label}")
+            else:
+                st.markdown(f'<p style="color:red;font-weight:bold;">你的答案: {user_label}</p>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div style="background:#e8f5e9;border-left:4px solid #1b5e20;padding:8px 12px;'
+                f'border-radius:4px;margin:4px 0;">'
+                f'<span style="color:#1b5e20;font-weight:bold;">✅ 正确答案：{d["correct_answer"]} - {correct_display}</span></div>',
+                unsafe_allow_html=True,
+            )
             # 解析（直接跟在正确答案后面）
             explanation = d.get("explanation", "")
             if explanation:
@@ -683,13 +781,19 @@ def _show_spec_result():
             q_item = sq[q_idx]
             d = details_by_idx.get(q_item["index"], {})
             is_correct = d.get("is_correct", False)
-            bg = "#2e7d32" if is_correct else "#c62828"
+            bg = "#c8e6c9" if is_correct else "#ffcdd2"
+            tc = "#1b5e20" if is_correct else "#b71c1c"
+            
+            is_marked = q_item["id"] in st.session_state.get("spec_marked", set())
+            marker = '<sup style="font-size:8px;">⭐</sup>' if is_marked else ''
+            border_style = "2px solid #ff9800" if is_marked else "1px solid #ddd"
+            
             nav_html += f'''
             <div style="flex:1;min-width:0;">
-                <div style="display:block;width:100%;background:{bg};color:white;border:1px solid #555;
+                <div style="display:block;width:100%;background:{bg};color:{tc};border:{border_style};
                           border-radius:3px;font-size:12px;min-height:30px;line-height:30px;
-                          text-align:center;">
-                    {q_idx + 1}
+                          text-align:center;position:relative;">
+                    {q_idx + 1}{marker}
                 </div>
             </div>'''
         nav_html += '</div>'
