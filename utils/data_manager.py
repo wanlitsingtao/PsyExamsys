@@ -1,5 +1,6 @@
 """
 数据管理器 - 管理题库、错题库、配置、答题记录、考试记录的JSON持久化
+            自 v2.4 起，I/O 操作通过 DataAccess 抽象层，支持 JSON/SQLite 切换
 """
 import json
 import random
@@ -7,6 +8,19 @@ import shutil
 import time
 from pathlib import Path
 from datetime import datetime
+
+from utils.data_access import get_data_access
+
+# 延迟初始化的 DAO 对象
+_dao = None
+
+
+def _get_dao():
+    """获取 data_access 对象（延迟初始化）"""
+    global _dao
+    if _dao is None:
+        _dao = get_data_access()
+    return _dao
 
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -95,19 +109,13 @@ def ensure_dirs():
 # ============================
 
 def load_questions():
-    """加载题库"""
-    ensure_dirs()
-    if QUESTIONS_FILE.exists():
-        with open(QUESTIONS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
+    """加载题库（通过 DataAccess 抽象层）"""
+    return _get_dao().load_questions()
 
 
 def save_questions(questions):
-    """保存题库"""
-    ensure_dirs()
-    with open(QUESTIONS_FILE, "w", encoding="utf-8") as f:
-        json.dump(questions, f, ensure_ascii=False, indent=2)
+    """保存题库（通过 DataAccess 抽象层）"""
+    _get_dao().save_questions(questions)
 
 
 def get_question_count(exam_type=None):
@@ -180,19 +188,13 @@ def dedup_import(existing_questions, new_questions):
 # ============================
 
 def load_wrong_questions():
-    """加载错题库"""
-    ensure_dirs()
-    if WRONG_FILE.exists():
-        with open(WRONG_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
+    """加载错题库（通过 DataAccess 抽象层）"""
+    return _get_dao().load_wrong_questions()
 
 
 def save_wrong_questions(wrong_list):
-    """保存错题库"""
-    ensure_dirs()
-    with open(WRONG_FILE, "w", encoding="utf-8") as f:
-        json.dump(wrong_list, f, ensure_ascii=False, indent=2)
+    """保存错题库（通过 DataAccess 抽象层）"""
+    _get_dao().save_wrong_questions(wrong_list)
 
 
 def add_wrong_record(question_id, user_answer):
@@ -201,34 +203,7 @@ def add_wrong_record(question_id, user_answer):
     新规则：答错次数 >= 答对次数 才记入错题本
     错题库仅存储 question_id 列表，统计数字统一从 question_stats.json 读取
     """
-    now = datetime.now().isoformat()
-
-    # 1. 更新题目答题统计（答错+1）
-    stats = load_question_stats()
-    if question_id not in stats:
-        stats[question_id] = {
-            "correct_count": 0,
-            "wrong_count": 0,
-            "last_answer_time": None,
-            "last_correct": None,
-        }
-    stats[question_id]["wrong_count"] += 1
-    stats[question_id]["last_correct"] = False
-    stats[question_id]["last_answer_time"] = now
-    save_question_stats(stats)
-
-    s = stats[question_id]
-
-    # 2. 新规则：答错次数 >= 答对次数（且至少答过一次）→ 加入错题本
-    wc, cc = s["wrong_count"], s["correct_count"]
-    wrong_qids = _extract_qids_from_wrong_list(load_wrong_questions())
-    if wc >= cc and (wc > 0 or cc > 0):
-        if question_id not in wrong_qids:
-            wrong_qids.append(question_id)
-    elif question_id in wrong_qids:
-        if question_id in wrong_qids:
-            wrong_qids.remove(question_id)
-    save_wrong_questions(wrong_qids)
+    _get_dao().add_wrong_record(question_id, user_answer)
 
 
 def add_correct_record(question_id):
@@ -428,34 +403,9 @@ def _recalc_mastery_fields(stats_entry):
 
 def batch_add_answer_records(records):
     """
-    批量追加答题过程记录（单次读+单次写）
-    - records: list of dict，每项包含 question_id, user_answer, is_correct, mode, session_id
+    批量追加答题过程记录（通过 DataAccess 抽象层）
     """
-    existing = load_answer_records()
-    now = datetime.now().isoformat()
-
-    # 获取题目信息（只需加载一次）
-    questions = load_questions()
-    q_map = {q["id"]: q for q in questions}
-
-    for rec in records:
-        qid = rec.get("question_id", "")
-        q_info = q_map.get(qid)
-        category = "未知"
-        if q_info:
-            category = q_info.get("category", infer_category(q_info.get("source_file", "")))
-
-        existing.append({
-            "question_id": qid,
-            "user_answer": rec.get("user_answer", ""),
-            "is_correct": rec.get("is_correct", False),
-            "mode": rec.get("mode", "mock_exam"),
-            "session_id": rec.get("session_id", ""),
-            "category": category,
-            "timestamp": rec.get("timestamp", now),
-        })
-
-    save_answer_records(existing)
+    _get_dao().batch_add_answer_records(records)
 
 
 def get_top_wrong_questions(count=50, exam_type=None):
@@ -574,20 +524,36 @@ def get_all_wrong_with_stats(exam_type=None):
 # ============================
 
 def load_config():
-    """加载配置"""
-    ensure_dirs()
-    if CONFIG_FILE.exists():
-        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-            return {**DEFAULT_CONFIG, **json.load(f)}
-    save_config(DEFAULT_CONFIG)
-    return dict(DEFAULT_CONFIG)
+    """加载配置（通过 DataAccess 抽象层）"""
+    return _get_dao().load_config()
 
 
 def save_config(config):
-    """保存配置"""
-    ensure_dirs()
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(config, f, ensure_ascii=False, indent=2)
+    """保存配置（通过 DataAccess 抽象层）
+
+    注意：data_source 是启动配置，必须在任何模式下都同步到 config.json，
+    以确保重启后 get_data_access() 能读到正确的数据源类型。
+    """
+    # data_source 需要始终同步到 config.json（启动配置，不能依赖 DAO 读取）
+    if "data_source" in config:
+        _sync_data_source_to_json(config["data_source"])
+    _get_dao().save_config(config)
+
+
+def _sync_data_source_to_json(data_source: str) -> None:
+    """将 data_source 同步写入 config.json，确保重启后能读到正确值"""
+    try:
+        if CONFIG_FILE.exists():
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                existing = json.load(f)
+        else:
+            existing = {}
+    except (json.JSONDecodeError, IOError):
+        existing = {}
+    if existing.get("data_source") != data_source:
+        existing["data_source"] = data_source
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(existing, f, ensure_ascii=False, indent=2)
 
 
 # ============================
@@ -711,57 +677,26 @@ def get_category_training_stats(questions):
 # ============================
 
 def load_answer_records():
-    """加载答题过程记录"""
-    ensure_dirs()
-    if ANSWER_RECORDS_FILE.exists():
-        with open(ANSWER_RECORDS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
+    """加载答题过程记录（通过 DataAccess 抽象层）"""
+    return _get_dao().load_answer_records()
 
 
 def save_answer_records(records):
-    """保存答题过程记录"""
-    ensure_dirs()
-    with open(ANSWER_RECORDS_FILE, "w", encoding="utf-8") as f:
-        json.dump(records, f, ensure_ascii=False, indent=2)
+    """保存答题过程记录（通过 DataAccess 抽象层）"""
+    _get_dao().save_answer_records(records)
 
 
 def add_answer_record(question_id, user_answer, is_correct, mode="study", session_id=""):
     """
-    记录每次答题的过程，无论对错
-    - question_id: 题目ID
-    - user_answer: 用户选择的答案
-    - is_correct: 是否正确
-    - mode: 答题模式 (study/exam/wrongbook)
-    - session_id: 会话ID，用于关联同一次答题
+    记录每次答题的过程，无论对错（通过 DataAccess 抽象层）
     """
-    records = load_answer_records()
-    now = datetime.now().isoformat()
-
-    # 获取题目信息（含知识板块）
-    questions = load_questions()
-    q_info = None
-    for q in questions:
-        if q["id"] == question_id:
-            q_info = q
-            break
-
-    category = "未知"
-    if q_info:
-        category = q_info.get("category", infer_category(q_info.get("source_file", "")))
-
-    record = {
+    _get_dao().batch_add_answer_records([{
         "question_id": question_id,
         "user_answer": user_answer,
         "is_correct": is_correct,
         "mode": mode,
         "session_id": session_id,
-        "category": category,
-        "timestamp": now,
-    }
-    records.append(record)
-    save_answer_records(records)
-    return record
+    }])
 
 
 # ============================
@@ -769,20 +704,13 @@ def add_answer_record(question_id, user_answer, is_correct, mode="study", sessio
 # ============================
 
 def load_exam_records():
-    """加载考试记录"""
-    ensure_dirs()
-    if EXAM_RECORDS_FILE.exists():
-        with open(EXAM_RECORDS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
+    """加载考试记录（通过 DataAccess 抽象层）"""
+    return _get_dao().load_exam_records()
 
 
 def save_exam_record(record):
-    """保存一条考试记录"""
-    records = load_exam_records()
-    records.append(record)
-    with open(EXAM_RECORDS_FILE, "w", encoding="utf-8") as f:
-        json.dump(records, f, ensure_ascii=False, indent=2)
+    """保存一条考试记录（通过 DataAccess 抽象层）"""
+    _get_dao().append_exam_record(record)
 
 
 # ============================
@@ -790,40 +718,23 @@ def save_exam_record(record):
 # ============================
 
 def load_study_records():
-    """加载背题历史记录"""
-    ensure_dirs()
-    if STUDY_RECORDS_FILE.exists():
-        with open(STUDY_RECORDS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
+    """加载背题历史记录（通过 DataAccess 抽象层）"""
+    return _get_dao().load_study_records()
 
 
 def save_study_record(record):
-    """保存一条背题历史记录（追加）"""
-    records = load_study_records()
-    records.append(record)
-    with open(STUDY_RECORDS_FILE, "w", encoding="utf-8") as f:
-        json.dump(records, f, ensure_ascii=False, indent=2)
+    """保存一条背题历史记录（通过 DataAccess 抽象层）"""
+    _get_dao().append_study_record(record)
 
 
 def update_study_record(session_id, update_data):
-    """更新指定背题会话的记录（如进度、答案等）"""
-    records = load_study_records()
-    for rec in records:
-        if rec.get("session_id") == session_id:
-            rec.update(update_data)
-            break
-    with open(STUDY_RECORDS_FILE, "w", encoding="utf-8") as f:
-        json.dump(records, f, ensure_ascii=False, indent=2)
+    """更新指定背题会话的记录（通过 DataAccess 抽象层）"""
+    _get_dao().update_study_record(session_id, update_data)
 
 
 def find_study_record(session_id):
-    """查找指定会话的背题记录"""
-    records = load_study_records()
-    for rec in records:
-        if rec.get("session_id") == session_id:
-            return rec
-    return None
+    """查找指定会话的背题记录（通过 DataAccess 抽象层）"""
+    return _get_dao().find_study_record(session_id)
 
 
 # ============================
@@ -834,20 +745,13 @@ MOCK_EXAM_RECORDS_FILE = DATA_DIR / "mock_exam_records.json"
 
 
 def load_mock_exam_records():
-    """加载模拟考试记录"""
-    ensure_dirs()
-    if MOCK_EXAM_RECORDS_FILE.exists():
-        with open(MOCK_EXAM_RECORDS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
+    """加载模拟考试记录（通过 DataAccess 抽象层）"""
+    return _get_dao().load_mock_exam_records()
 
 
 def save_mock_exam_record(record):
-    """保存一条模拟考试记录"""
-    records = load_mock_exam_records()
-    records.append(record)
-    with open(MOCK_EXAM_RECORDS_FILE, "w", encoding="utf-8") as f:
-        json.dump(records, f, ensure_ascii=False, indent=2)
+    """保存一条模拟考试记录（通过 DataAccess 抽象层）"""
+    _get_dao().append_mock_exam_record(record)
 
 
 # ============================
@@ -1037,34 +941,13 @@ QUESTION_STATS_FILE = DATA_DIR / "question_stats.json"
 
 
 def load_question_stats():
-    """加载题目答题统计（retention_due 动态计算，不依赖写盘快照）"""
-    ensure_dirs()
-    if QUESTION_STATS_FILE.exists():
-        with open(QUESTION_STATS_FILE, "r", encoding="utf-8") as f:
-            raw = json.load(f)
-    else:
-        return {}
-
-    # 动态计算 retention_due（仅依赖 last_correct + last_answer_time，不依赖快照）
-    now = datetime.now()
-    for s in raw.values():
-        if s.get("last_correct") is True and s.get("last_answer_time"):
-            try:
-                last_time = datetime.fromisoformat(s["last_answer_time"])
-                days_since = (now - last_time).days
-                s["retention_due"] = days_since > _RETENTION_DAYS_THRESHOLD
-            except (ValueError, TypeError):
-                s["retention_due"] = False
-        else:
-            s["retention_due"] = False
-    return raw
+    """加载题目答题统计（通过 DataAccess 抽象层）"""
+    return _get_dao().load_question_stats()
 
 
 def save_question_stats(stats):
-    """保存题目答题统计"""
-    ensure_dirs()
-    with open(QUESTION_STATS_FILE, "w", encoding="utf-8") as f:
-        json.dump(stats, f, ensure_ascii=False, indent=2)
+    """保存题目答题统计（通过 DataAccess 抽象层）"""
+    _get_dao().save_question_stats(stats)
 
 def get_question_stats(question_id):
     """获取某道题的答题统计"""
@@ -1255,49 +1138,18 @@ def _ensure_drafts_dir():
 
 
 def save_draft(prefix, draft_id, data):
-    """
-    保存/覆盖答题草稿
-    - prefix: 草稿类型前缀（"mock"/"spec"/"consol"/"wrongbook"）
-    - draft_id: 草稿唯一标识
-    - data: 草稿数据 dict（将顶层字段与草稿元数据合并存储）
-    """
-    _ensure_drafts_dir()
-    filepath = DRAFTS_DIR / f"{prefix}_{draft_id}.json"
-    record = {
-        **data,
-        "draft_id": draft_id,
-        "saved_at": datetime.now().isoformat(),
-    }
-    with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(record, f, ensure_ascii=False, indent=2)
+    """保存/覆盖答题草稿（通过 DataAccess 抽象层）"""
+    _get_dao().save_draft(prefix, draft_id, data)
 
 
 def load_drafts(prefix):
-    """
-    加载指定前缀的所有草稿（按保存时间降序排列）
-    - prefix: 草稿类型前缀
-    返回: list[dict]
-    """
-    _ensure_drafts_dir()
-    drafts = []
-    for f in sorted(DRAFTS_DIR.glob(f"{prefix}_*.json"), reverse=True):
-        try:
-            with open(f, "r", encoding="utf-8") as fh:
-                drafts.append(json.load(fh))
-        except (json.JSONDecodeError, IOError):
-            pass  # 忽略损坏的草稿文件
-    return drafts
+    """加载指定前缀的所有草稿（通过 DataAccess 抽象层）"""
+    return _get_dao().load_drafts(prefix)
 
 
 def delete_draft(prefix, draft_id):
-    """
-    删除指定草稿
-    - prefix: 草稿类型前缀
-    - draft_id: 草稿标识
-    """
-    filepath = DRAFTS_DIR / f"{prefix}_{draft_id}.json"
-    if filepath.exists():
-        filepath.unlink()
+    """删除指定草稿（通过 DataAccess 抽象层）"""
+    _get_dao().delete_draft(prefix, draft_id)
 
 
 # ============================
