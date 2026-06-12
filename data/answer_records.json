@@ -65821,5 +65821,1805 @@
     "category": "异常心理学",
     "timestamp": "2026-06-12T14:41:13.810565",
     "is_uncertain": false
+  },
+  {
+    "question_id": "c0e68a11bf2c",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "f971e923098f",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "7e8f8d475124",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "0c8bcd893b72",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "00a3dbadb723",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "3c027abf805a",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "23b7445c215d",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "84d0e7236e95",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "6accd45db0d2",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "317449d5e833",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "3249ee218a2b",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "d3e9089332fc",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "c86fedb99101",
+    "user_answer": "A",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "3be85a423e21",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "a11b9c098cab",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "4af429a0a279",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "91579c986767",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "a3238d9a5acd",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "d14fb820f137",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "d1a20ff3ca59",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "a5a9f6e3fa8e",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "7e9dddbc2be4",
+    "user_answer": "B",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "1d67ff90c1f0",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "c8dd6e584045",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "28b2a03d615d",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "424cd70eeed1",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "c6ad53675ee8",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "3686b5675f98",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "c350d9accb64",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "d6bd2b6091bb",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "ba2f580eacd5",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "a5d26a2d76fe",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "a114f97aea5e",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "fae3f28908af",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "24385f21f166",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "e54620834b3f",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "742082f69753",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "c7347912f3a8",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "cc13c820bf8e",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "daa6ad79ee91",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "c88d467bb7a4",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "69aa0ece170d",
+    "user_answer": "C",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "959f7fb5de73",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "615e5661cdba",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "8bee637154b9",
+    "user_answer": "B",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "1f789bccc60d",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "ab951bbad2df",
+    "user_answer": "B",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "e17e86ffaf2a",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "b32e17d042d1",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "5b1bac420ee0",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "e3322674e0bd",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "76782bdb3024",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "13464d58816a",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "555584286a8b",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "8014f65a1516",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "147008f1c724",
+    "user_answer": "B",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "1dafab423cc2",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "a8e0355f0145",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "7b47299dbe04",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "75cfe5d0d3a9",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "c3d40aacfe9f",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "34cef222fe1c",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "67970ba587cf",
+    "user_answer": "B",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "18a0f301d9e5",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "547ebfa92ee7",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "15b50ed6d63e",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "621af65a1868",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "3b56b9f7c560",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "48af509f0ddc",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "8e303108dc22",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "163a94295895",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "f71c11f001b9",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "e2a5c0d0686a",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "367f5a68bf76",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "8a75a0ab0d8b",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "d7dcbf317c65",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "11e25fa5c17a",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "6e2875c7c78d",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "c37547e99aff",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "98afe884c2b1",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "333dd7b74aec",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "160bf442a205",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "3d755747b99a",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "e34a49d38386",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "5ed44fabfc7c",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "461858e19713",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "85a46664726a",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "5f7b55f60087",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "202b74813010",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "856119bc54d1",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "37285b157227",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "832d78957f91",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "e9cd871a0a96",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "41fe0b58f3ed",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "a9babb3f2531",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "fb6a00385e37",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "e4b6771e97c9",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "b183cdbec0e9",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "f67e89750d04",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "dadfda736bec",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "c17577d396d4",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "3eed12286738",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "77f0e291c2e5",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "72d127d52186",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "8dffc6059109",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "f91401cb1391",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "f4fc6de416c1",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "363d8775e6b9",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "0f315eb92213",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "df69c75e9de1",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "858a3ba7ea0f",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "812730636754",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "54f3fb6d08ba",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "3584fb23031a",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "05b83e10bf69",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "e003fc5a835b",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "74a59506eea8",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "903a61bfb6e7",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "728e602c89d5",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "c4e80c3b8e00",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "4af6a817ce3f",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "6b095c82242b",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "ee87f10a4db8",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "409d4913467d",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "47c81da5ad18",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "7c9afdf9d5dc",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "6a9d53236173",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "a41a1700436f",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "52b768b649f4",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "26ca347ea62b",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "192a23da11ac",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "008114df9a8d",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "4384de0b1c37",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "bb13cb573f7d",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "65de94c8b939",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "94b80df1197a",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "963b900af389",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "3f82ea7f8f50",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "762881f989f1",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "22e16550a2fe",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "0c8e87ccc45a",
+    "user_answer": "ABD",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "f922b44813a0",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "b960197b06f9",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "6fbe9b8a061b",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "ea466ea3dbae",
+    "user_answer": "ABCD",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "8d432014459a",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "edf76ad548b9",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "270447f8b8b5",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "648b7a897453",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "94a9faa2e409",
+    "user_answer": "BCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "ddac245becf0",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "79871d6bdb9d",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "453f56607679",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "167cb5ce205d",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "f16c5047961c",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "7f1adb346c8c",
+    "user_answer": "ABCDE",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "643a0663e51c",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "5378f7e9254f",
+    "user_answer": "ABCDE",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "a278e5987092",
+    "user_answer": "ABCDE",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "0ea80d2535a9",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "5e1c7419d01c",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "8232cbe7e919",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "e26a81d54434",
+    "user_answer": "ABCDEF",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "b0438b0cc750",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "3f4d491541ae",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "b088e26af687",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "e83e60548ab4",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "d964661976a1",
+    "user_answer": "ABCD",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "d9f6ae3ec6a6",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "306b134942b7",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "f3e8c3dd3d97",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "3a8ed3560df4",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "7a081c5ead94",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "5524468c733b",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "2f4aa78d9775",
+    "user_answer": "ABCD",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "3596a8d33354",
+    "user_answer": "ABC",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "d8788ae662cd",
+    "user_answer": "ABCDE",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "726095fb98d9",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "dc7049fa6ad3",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "542ebeeb4b79",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "c14eb5d6570c",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "caacaaf74818",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "c7cad6c91cd1",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "fa60d84e6640",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "4ba885bec605",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "48fed061dab5",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "554fc251a3d8",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "df4acd4b76f8",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "ea4a39d6f1b7",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "8db57e88d8ee",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "156602467ef0",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "b85d75aaf440",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "3282141a0f31",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "e4c33ab3a206",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "5a0c8b94bd5e",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "732b855701c7",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "586fa2a690f1",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "1afe23c26071",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "d8a3a5cb375c",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "25657325d878",
+    "user_answer": "ABC",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "6ed07c61",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-12T21:42:28.904899"
   }
 ]

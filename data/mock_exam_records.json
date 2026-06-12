@@ -579,5 +579,40 @@
         "correct": 30
       }
     }
+  },
+  {
+    "subject": "counseling",
+    "subject_name": "咨询实务",
+    "date": "2026-06-12 21:42",
+    "total": 200,
+    "correct": 187,
+    "score": 85.6,
+    "max_score": 100.0,
+    "duration": "0分22秒",
+    "accuracy": "93.5%",
+    "status": "completed",
+    "session_id": "6ed07c61",
+    "category_stats": {
+      "心理危机识别": {
+        "total": 47,
+        "correct": 41
+      },
+      "心理咨询会谈技术": {
+        "total": 57,
+        "correct": 55
+      },
+      "家庭教育与心理健康科普": {
+        "total": 43,
+        "correct": 40
+      },
+      "情绪调节与压力管理": {
+        "total": 41,
+        "correct": 39
+      },
+      "心理咨询专业伦理与相关法律规范": {
+        "total": 12,
+        "correct": 12
+      }
+    }
   }
 ]
