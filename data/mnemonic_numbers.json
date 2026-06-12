@@ -1,0 +1,263 @@
+{
+  "total": 31,
+  "by_category": {
+    "心理咨询会谈技术": 5,
+    "情绪调节与压力管理": 1,
+    "心理危机识别": 13,
+    "家庭教育与心理健康科普": 1,
+    "人格心理学": 2,
+    "发展心理学": 6,
+    "异常心理学": 2,
+    "咨询心理学": 1
+  },
+  "items": [
+    {
+      "id": "90e58669c719",
+      "question": "西雅将单次会谈过程划分为（    ）个阶段。",
+      "answer": "B",
+      "answer_text": "5个",
+      "num": "5",
+      "category": "心理咨询会谈技术"
+    },
+    {
+      "id": "64af505a3d6b",
+      "question": "钱铭怡将完整咨询会谈过程划分为（    ）个阶段。",
+      "answer": "A",
+      "answer_text": "3个",
+      "num": "3",
+      "category": "心理咨询会谈技术"
+    },
+    {
+      "id": "4d42d009f08b",
+      "question": "研究表明，心理咨询会谈中，非言语信息传递信息的比例约为（    ）。",
+      "answer": "C",
+      "answer_text": "65%",
+      "num": "65",
+      "category": "心理咨询会谈技术"
+    },
+    {
+      "id": "46ededfb5285",
+      "question": "一般而言，个体咨询会谈的适宜时长为（    ）。",
+      "answer": "B",
+      "answer_text": "50分钟左右",
+      "num": "50",
+      "category": "心理咨询会谈技术"
+    },
+    {
+      "id": "b399893c554e",
+      "question": "家庭咨询会谈的适宜时长通常为（    ）。",
+      "answer": "C",
+      "answer_text": "90~120分钟",
+      "num": "90",
+      "category": "心理咨询会谈技术"
+    },
+    {
+      "id": "7623eb3017e0",
+      "question": "格罗斯（Gross）提出的情绪调节过程模型将情绪过程划分阶段为（    ）。",
+      "answer": "C",
+      "answer_text": "5个",
+      "num": "5",
+      "category": "情绪调节与压力管理"
+    },
+    {
+      "id": "147008f1c724",
+      "question": "自杀可能性量表条目数量是（    ）。",
+      "answer": "C",
+      "answer_text": "36个",
+      "num": "36",
+      "category": "心理危机识别"
+    },
+    {
+      "id": "c0e68a11bf2c",
+      "question": "斯坦福急性应激反应问卷条目数量是（    ）。",
+      "answer": "C",
+      "answer_text": "30个",
+      "num": "30",
+      "category": "心理危机识别"
+    },
+    {
+      "id": "d8530f1d2e50",
+      "question": "症状自评量表条目数是（    ）。",
+      "answer": "C",
+      "answer_text": "90个",
+      "num": "90",
+      "category": "心理危机识别"
+    },
+    {
+      "id": "f971e923098f",
+      "question": "抑郁自评量表条目数是（    ）。",
+      "answer": "B",
+      "answer_text": "20个",
+      "num": "20",
+      "category": "心理危机识别"
+    },
+    {
+      "id": "587dfc08ac7f",
+      "question": "抑郁自评量表，总分乘以乘数后取整数得到标准分，这个乘数是？（    ）。",
+      "answer": "B",
+      "answer_text": "1.25",
+      "num": "1",
+      "category": "心理危机识别"
+    },
+    {
+      "id": "b103b424413e",
+      "question": "汉密尔顿抑郁量表最新版本条目数量是（    ）。",
+      "answer": "C",
+      "answer_text": "24个",
+      "num": "24",
+      "category": "心理危机识别"
+    },
+    {
+      "id": "b3dec47fff67",
+      "question": "焦虑自评量表低于标准分属于正常状态，按照我国常模标准，标准分为（    ）。",
+      "answer": "B",
+      "answer_text": "50分",
+      "num": "50",
+      "category": "心理危机识别"
+    },
+    {
+      "id": "a06dce6a9f91",
+      "question": "汉密尔顿焦虑量表条目数为（    ）。",
+      "answer": "B",
+      "answer_text": "14个",
+      "num": "14",
+      "category": "心理危机识别"
+    },
+    {
+      "id": "8c309cbcfb3f",
+      "question": "青少年生活事件量表条目数是（    ）。",
+      "answer": "B",
+      "answer_text": "27个",
+      "num": "27",
+      "category": "心理危机识别"
+    },
+    {
+      "id": "e2b56672351b",
+      "question": "应对方式问卷条目数是（    ）。",
+      "answer": "C",
+      "answer_text": "39个",
+      "num": "39",
+      "category": "心理危机识别"
+    },
+    {
+      "id": "d6bd2b6091bb",
+      "question": "简易应对方式问卷设计维度有（    ）。",
+      "answer": "B",
+      "answer_text": "2个",
+      "num": "2",
+      "category": "心理危机识别"
+    },
+    {
+      "id": "58ec3499431b",
+      "question": "领悟社会支持量表条目数是（    ）。",
+      "answer": "B",
+      "answer_text": "12个",
+      "num": "12",
+      "category": "心理危机识别"
+    },
+    {
+      "id": "409d4913467d",
+      "question": "社会支持评定量表评估维度有（    ）。",
+      "answer": "B",
+      "answer_text": "3个",
+      "num": "3",
+      "category": "心理危机识别"
+    },
+    {
+      "id": "a66d9e46f2aa",
+      "question": "青春期的年龄阶段是（    ）。",
+      "answer": "C",
+      "answer_text": "10-18岁",
+      "num": "10",
+      "category": "家庭教育与心理健康科普"
+    },
+    {
+      "id": "2487eea27737",
+      "question": "埃里克森将人格发展划分为（    ）个阶段。",
+      "answer": "C",
+      "answer_text": "8",
+      "num": "8",
+      "category": "人格心理学"
+    },
+    {
+      "id": "14b343a9a6cc",
+      "question": "根据埃里克森的人格发展理论，“完善对绝望”出现在的年龄段是（    ）。",
+      "answer": "C",
+      "answer_text": "65岁以上",
+      "num": "65",
+      "category": "人格心理学"
+    },
+    {
+      "id": "82560305a3da",
+      "question": "形式运算阶段始于（    ）。",
+      "answer": "C",
+      "answer_text": "11或12岁",
+      "num": "11",
+      "category": "发展心理学"
+    },
+    {
+      "id": "16230438a246",
+      "question": "智力低下的智商标准是低于（    ）。",
+      "answer": "C",
+      "answer_text": "70",
+      "num": "70",
+      "category": "发展心理学"
+    },
+    {
+      "id": "040d2fbd4faa",
+      "question": "儿童掌握“数量守恒”平均年龄是（    ）。",
+      "answer": "B",
+      "answer_text": "6-7岁",
+      "num": "6",
+      "category": "发展心理学"
+    },
+    {
+      "id": "0ada030a496e",
+      "question": "元语言意识显著增强的年龄是（    ）。",
+      "answer": "C",
+      "answer_text": "7-8岁",
+      "num": "7",
+      "category": "发展心理学"
+    },
+    {
+      "id": "b02751e73039",
+      "question": "托马斯和切斯将儿童气质分为（    ）种类型。",
+      "answer": "C",
+      "answer_text": "4",
+      "num": "4",
+      "category": "发展心理学"
+    },
+    {
+      "id": "743ce0c17840",
+      "question": "心理理论发展的关键年龄是（    ）。",
+      "answer": "C",
+      "answer_text": "4岁",
+      "num": "4",
+      "category": "发展心理学"
+    },
+    {
+      "id": "cde5f8bad3dc",
+      "question": "双相障碍患者约多少比例曾被误诊（    ）。",
+      "answer": "C",
+      "answer_text": "70%",
+      "num": "70",
+      "category": "异常心理学"
+    },
+    {
+      "id": "d7e5758cfb6c",
+      "question": "CBTI治疗周期一般为（    ）。",
+      "answer": "B",
+      "answer_text": "6-8周",
+      "num": "6",
+      "category": "异常心理学"
+    },
+    {
+      "id": "e87ad7facc13",
+      "question": "团体咨询的活动时长一般为（    ）。",
+      "answer": "C",
+      "answer_text": "90-120分钟",
+      "num": "90",
+      "category": "咨询心理学"
+    }
+  ]
+}
