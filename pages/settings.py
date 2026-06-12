@@ -268,6 +268,19 @@ def _show_tab_config():
     )
 
     st.markdown("---")
+    st.markdown("**数据源设置**")
+
+    data_source = st.selectbox(
+        "数据源类型",
+        options=["json", "sqlite"],
+        index=0 if config.get("data_source", "json") == "json" else 1,
+        help="json: 使用 JSON 文件存储（默认，兼容性好）\n\n"
+             "sqlite: 使用 SQLite 数据库存储（查询更快，支持大数据量）\n\n"
+             "切换后需重启程序生效",
+        key="cfg_data_source",
+    )
+
+    st.markdown("---")
     st.markdown("**错题本设置**")
 
     wrong_count = st.number_input(
@@ -281,6 +294,7 @@ def _show_tab_config():
 
     if st.button("💾 保存设置", use_container_width=True, type="primary"):
         config.update({
+            "data_source": data_source,
             "spec_per_round": spec_per_round,
             "spec_single_count": spec_single,
             "spec_multi_count": spec_multi,
@@ -293,7 +307,7 @@ def _show_tab_config():
         })
         save_config(config)
         st.session_state.config = config
-        st.success("✅ 设置已保存！")
+        st.success("✅ 设置已保存！切换数据源后需重启程序生效。")
 
     # 数据备份
     st.markdown("---")
