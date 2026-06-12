@@ -1,18 +1,26 @@
 """
-错题本 v2.2 - 双入口模式
+错题本 v2.3 - 双入口模式 + 统一答题界面
   1. 错题解析：按易错程度排序，左侧列表 + 右侧逐条解析
-  2. 做错题：统一提交答题模式（原错题本功能）
+  2. 做错题：统一提交答题模式，操作元素与其他答题页面一致
 """
 import streamlit as st
 import uuid
+import time
 from datetime import datetime
+
 from utils.data_manager import (
     get_top_wrong_questions, check_answer, get_answer_display,
     add_wrong_record, add_correct_record, add_answer_record,
     remove_wrong_question, clear_all_wrong, get_wrong_stats,
-    load_questions, infer_category, get_question_stats,
-    get_all_wrong_with_stats,
+    load_questions, load_question_stats, infer_category,
+    get_all_wrong_with_stats, save_exam_record, save_draft,
 )
+
+
+def _get_cached_qstats(qid):
+    """从 session_state 缓存获取题目统计，带默认值"""
+    cache = st.session_state.get("wb_stats_cache", {})
+    return cache.get(qid, {"correct_count": 0, "wrong_count": 0, "last_answer_time": None, "last_correct": None})
 
 
 def show_wrongbook():
@@ -35,18 +43,17 @@ def _show_wrongbook_home():
     st.markdown("# 📕 错题本")
     st.markdown("---")
 
+    # ---- 错题本状态 ----
     wrong_stats = get_wrong_stats(st.session_state.get("exam_type"))
 
     if wrong_stats["total"] == 0:
         # 清空练习模式缓存
-        for key in ["wb_questions", "wb_wrong_counts", "wb_answers", "wb_submitted", "wb_results"]:
+        for key in ["wb_questions", "wb_wrong_counts", "wb_answers", "wb_submitted", "wb_results", "wb_marked", "wb_uncertain"]:
             st.session_state.pop(key, None)
         st.success("🎉 太棒了！错题本为空，继续加油！")
         return
 
-    st.markdown(f"错题总数：**{wrong_stats['total']}**  |  最高答错次数：**{wrong_stats['most_wrong']}** 次")
-    st.markdown("---")
-
+    # ---- 错题解析 ----
     st.markdown("### 📖 错题解析")
     st.markdown(
         "按易错程度（答错次数 - 答对次数）由高到低排序，"
@@ -78,6 +85,10 @@ def _show_wrongbook_home():
 
 def _show_wrong_analysis():
     st.markdown("# 📖 错题解析")
+
+    # 缓存答题统计（避免每题渲染时重复读盘）
+    if "wb_stats_cache" not in st.session_state:
+        st.session_state.wb_stats_cache = load_question_stats()
 
     all_wrong = get_all_wrong_with_stats(st.session_state.get("exam_type"))
 
@@ -223,21 +234,18 @@ def _render_analysis_detail(item, idx, total):
 # ============================
 
 def _show_wrong_practice():
-    st.markdown("# ✏️ 做错题")
+    # 缓存答题统计（避免每题渲染时重复读盘）
+    if "wb_stats_cache" not in st.session_state:
+        st.session_state.wb_stats_cache = load_question_stats()
 
     wrong_stats = get_wrong_stats(st.session_state.get("exam_type"))
     config = st.session_state.config
 
     if wrong_stats["total"] == 0:
-        for key in ["wb_questions", "wb_wrong_counts", "wb_answers", "wb_submitted", "wb_results"]:
+        for key in ["wb_questions", "wb_wrong_counts", "wb_answers", "wb_submitted", "wb_results", "wb_marked", "wb_uncertain"]:
             st.session_state.pop(key, None)
         st.success("🎉 太棒了！错题本为空，继续加油！")
         return
-
-    # 返回按钮
-    top_cols = st.columns([1])
-    with top_cols[0]:
-        st.markdown(f"错题总数: **{wrong_stats['total']}**  |  最高答错次数: **{wrong_stats['most_wrong']}** 次")
 
     # 检测文件数据是否已变化（其他模块可能已更新错题库）
     cached_total = st.session_state.get("wb_cached_total", -1)
@@ -257,10 +265,14 @@ def _show_wrong_practice():
         st.session_state.wb_wrong_counts = {item[0]["id"]: item[1] for item in top_wrong}
         st.session_state.wb_current = 0
         st.session_state.wb_answers = {}
+        st.session_state.wb_marked = set()
+        st.session_state.wb_uncertain = set()
         st.session_state.wb_submitted = False
         st.session_state.wb_results = {}
         st.session_state.wb_regenerate = False
         st.session_state.wb_cached_total = wrong_stats["total"]
+        st.session_state.wb_confirm_submit = False
+        st.session_state.wb_last_auto_save = time.time()  # 自动保存计时起点
 
     wq = st.session_state.wb_questions
     if not wq:
@@ -272,43 +284,44 @@ def _show_wrong_practice():
     q = wq[idx]
     qid = q["id"]
     is_submitted = st.session_state.wb_submitted
-
-    # ---- 顶部信息 ----
+    # ---- 自动保存：每 5 分钟静默保存（仅答题中） ----
+    if not is_submitted:
+        if "wb_last_auto_save" not in st.session_state:
+            st.session_state.wb_last_auto_save = time.time()
+        _now = time.time()
+        if _now - st.session_state.wb_last_auto_save >= 300:
+            _save_wrongbook_draft(auto_save=True)
+            st.session_state.wb_last_auto_save = _now
     wrong_count = st.session_state.wb_wrong_counts.get(qid, 0)
-    answered = len(st.session_state.wb_answers)
-    correct_count = sum(1 for v in st.session_state.wb_results.values() if v.get("correct"))
+    correct_count = sum(1 for v in st.session_state.wb_results.values() if v.get("correct", False))
 
-    progress = answered / total_q if total_q > 0 else 0
-    st.progress(progress, text=f"进度: {answered}/{total_q}")
+    # 确保 wb_marked / wb_uncertain 始终存在（从草稿恢复时可能缺失）
+    if "wb_marked" not in st.session_state:
+        st.session_state.wb_marked = set()
+    if "wb_uncertain" not in st.session_state:
+        st.session_state.wb_uncertain = set()
 
-    meta_cols = st.columns([1, 1, 1, 2])
-    meta_cols[0].markdown(f"**进度**: {answered}/{total_q}")
+    # ---- 标题行 + 返回（保存按钮已移至导航行） ----
     if is_submitted:
-        meta_cols[1].markdown(f"**正确**: {correct_count}")
-        meta_cols[2].markdown(f"**正确率**: {correct_count/max(answered,1)*100:.1f}%")
+        title_col, back_col = st.columns([5, 1])
+        with title_col:
+            st.markdown(f"## ✏️ 做错题 — 结果")
     else:
-        meta_cols[1].markdown(f"**已答**: {answered}")
-        meta_cols[2].markdown(f"**未答**: {total_q - answered}")
+        title_col, back_col = st.columns([5, 1])
+        with title_col:
+            st.markdown("## ✏️ 做错题")
 
-    with meta_cols[3]:
-        col_r1, col_r2 = st.columns(2)
-        if col_r1.button("🔄 重新组卷", use_container_width=True, disabled=not is_submitted):
-            st.session_state.wb_regenerate = True
+    with back_col:
+        if st.button("返回", key="wb_back_practice", use_container_width=True):
+            for key in ["wb_mode", "wb_questions", "wb_wrong_counts", "wb_answers", "wb_submitted", "wb_results",
+                         "wb_marked", "wb_uncertain", "wb_current", "wb_regenerate", "wb_confirm_submit", "wb_confirm_clear",
+                         "wb_card_filter"]:
+                st.session_state.pop(key, None)
             st.rerun()
-        if col_r2.button("🗑️ 清空错题", use_container_width=True, disabled=not is_submitted):
-            st.session_state.wb_confirm_clear = True
 
-    if st.session_state.get("wb_confirm_clear"):
-        st.warning("⚠️ 确认清空所有错题吗？此操作不可恢复！")
-        c1, c2 = st.columns(2)
-        if c1.button("✅ 确认清空", use_container_width=True):
-            clear_all_wrong()
-            st.session_state.wb_questions = []
-            st.session_state.wb_confirm_clear = False
-            st.rerun()
-        if c2.button("❌ 取消", use_container_width=True):
-            st.session_state.wb_confirm_clear = False
-            st.rerun()
+    # 保存成功提示
+    if st.session_state.pop("wb_draft_saved", False):
+        st.success("✅ 进度已保存，下次可在首页继续作答。", icon="💾")
 
     st.markdown("---")
 
@@ -318,13 +331,13 @@ def _show_wrong_practice():
         correct = result.get("correct", False)
 
         type_labels = {"single": "🔵 单选题", "multi": "🟢 多选题", "judge": "🟠 判断题"}
-        st.markdown(f"### 第 {idx+1}/{total_q} 题  |  ⚠️ 答错 {wrong_count} 次")
+        st.markdown(f"##### 第 {idx+1}/{total_q} 题  |  ⚠️ 答错 {wrong_count} 次")
         st.markdown(f"**{type_labels[q['type']]}**"
                     f"{' · 📂 ' + q.get('category', infer_category(q.get('source_file', ''))) if q.get('category') or q.get('source_file') else ''}")
         st.markdown(f"**{q['question']}**")
 
         # 获取本题完整历史答题统计
-        q_stats = get_question_stats(qid)
+        q_stats = _get_cached_qstats(qid)
         stats_parts = []
         if q_stats["correct_count"] > 0 or q_stats["wrong_count"] > 0:
             stats_parts.append(f"答对 {q_stats['correct_count']} 次 / 答错 {q_stats['wrong_count']} 次")
@@ -333,6 +346,15 @@ def _show_wrong_practice():
             stats_parts.append("🟢 上次答对")
         elif last_correct is False:
             stats_parts.append("🔴 上次答错")
+        # 掌握状态标签
+        if q_stats.get("retention_due"):
+            stats_parts.append("⏰ 遗忘预警")
+        if q_stats.get("unstable"):
+            history = q_stats.get("answer_history", [])
+            if history and not history[-1]:
+                stats_parts.append("⚠️ 消退型")
+            else:
+                stats_parts.append("⚠️ 波动型")
         if stats_parts:
             st.caption("📊 " + " · ".join(stats_parts))
 
@@ -397,13 +419,59 @@ def _show_wrong_practice():
     else:
         # ======== 未提交状态：答题模式 ========
         type_labels = {"single": "🔵 单选题", "multi": "🟢 多选题", "judge": "🟠 判断题"}
-        st.markdown(f"### 第 {idx+1}/{total_q} 题  |  ⚠️ 答错 {wrong_count} 次")
-        st.markdown(f"**{type_labels[q['type']]}**"
-                    f"{' · 📂 ' + q.get('category', infer_category(q.get('source_file', ''))) if q.get('category') or q.get('source_file') else ''}")
-        st.markdown(f"**{q['question']}**")
 
-        # 获取本题完整历史答题统计
-        q_stats = get_question_stats(qid)
+        # 获取答题统计（提前到不确定开关之前）
+        q_stats = _get_cached_qstats(qid)
+        total_answers = q_stats["correct_count"] + q_stats["wrong_count"]
+
+        # 题型标签 + 不确定按钮 + 标记按钮 同行
+        title_col1, title_col2, title_col3 = st.columns([6, 2, 2])
+        with title_col1:
+            st.markdown(f"##### 第 {idx+1}/{total_q} 题  |  ⚠️ 答错 {wrong_count} 次")
+            st.markdown(f"**{type_labels[q['type']]}**"
+                        f"{' · 📂 ' + q.get('category', infer_category(q.get('source_file', ''))) if q.get('category') or q.get('source_file') else ''}")
+        with title_col2:
+            if total_answers >= 3:
+                if "wb_uncertain" not in st.session_state:
+                    st.session_state.wb_uncertain = set()
+
+                toggle_key = f"wb_uncertain_toggle_{qid}"
+                if toggle_key not in st.session_state:
+                    st.session_state[toggle_key] = qid in st.session_state.wb_uncertain
+
+                def _on_wb_uncertain_toggle():
+                    if st.session_state[toggle_key]:
+                        st.session_state.wb_uncertain.add(qid)
+                    else:
+                        st.session_state.wb_uncertain.discard(qid)
+
+                st.toggle("不确定",
+                          key=toggle_key,
+                          value=qid in st.session_state.wb_uncertain,
+                          help="标记此题为不确定",
+                          on_change=_on_wb_uncertain_toggle)
+        with title_col3:
+            marked = qid in st.session_state.get("wb_marked", set())
+            if st.button("⭐ 标记" if marked else "☆ 标记",
+                         key=f"wb_mark_{qid}",
+                         help="取消标记" if marked else "标记此题",
+                         use_container_width=True):
+                if "wb_marked" not in st.session_state:
+                    st.session_state.wb_marked = set()
+                if qid in st.session_state.wb_marked:
+                    st.session_state.wb_marked.discard(qid)
+                else:
+                    st.session_state.wb_marked.add(qid)
+                st.rerun()
+        st.markdown(f"**{q['question']}**")
+        # 正文区按钮字号与不确定开关一致（答题卡区有 10px 覆盖）
+        st.markdown("""
+        <style>
+        div.stButton > button {
+            font-size: 13px !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
         stats_parts = []
         if q_stats["correct_count"] > 0 or q_stats["wrong_count"] > 0:
             stats_parts.append(f"答对 {q_stats['correct_count']} 次 / 答错 {q_stats['wrong_count']} 次")
@@ -412,6 +480,15 @@ def _show_wrong_practice():
             stats_parts.append("🟢 上次答对")
         elif last_correct is False:
             stats_parts.append("🔴 上次答错")
+        # 掌握状态标签
+        if q_stats.get("retention_due"):
+            stats_parts.append("⏰ 遗忘预警")
+        if q_stats.get("unstable"):
+            history = q_stats.get("answer_history", [])
+            if history and not history[-1]:
+                stats_parts.append("⚠️ 消退型")
+            else:
+                stats_parts.append("⚠️ 波动型")
         if stats_parts:
             st.caption("📊 " + " · ".join(stats_parts))
 
@@ -462,85 +539,134 @@ def _show_wrong_practice():
 
     st.markdown("---")
 
-    # ---- 操作按钮 ----
-    nav_cols = st.columns([1, 1, 1])
+    # ---- 导航按钮（上一题、下一题、保存、提交按钮同行） ----
+    nav_cols = st.columns([1, 1, 1, 1])
 
-    if not is_submitted:
-        if nav_cols[0].button("📤 提交全部答案", type="primary", use_container_width=True):
-            _submit_wrongbook()
-            st.rerun()
-    else:
-        if nav_cols[0].button("🔄 重新组卷", use_container_width=True):
-            st.session_state.wb_regenerate = True
-            st.rerun()
-
-    if nav_cols[1].button("◀ 上一题", use_container_width=True, disabled=(idx == 0)):
+    if nav_cols[0].button("◀ 上一题", use_container_width=True, disabled=(idx == 0)):
         st.session_state.wb_current = idx - 1
         st.rerun()
 
-    if nav_cols[2].button("下一题 ▶", use_container_width=True, disabled=(idx >= total_q - 1)):
+    if nav_cols[1].button("下一题 ▶", use_container_width=True, disabled=(idx >= total_q - 1)):
         st.session_state.wb_current = idx + 1
         st.rerun()
 
-    # ---- 底部导航网格 ----
+    if not is_submitted:
+        if nav_cols[2].button("💾 保存", use_container_width=True):
+            _save_wrongbook_draft()
+
+        if nav_cols[3].button("📤 提交全部答案", use_container_width=True, type="primary"):
+            st.session_state.wb_confirm_submit = True
+
+    if st.session_state.get("wb_confirm_submit"):
+        unanswered = total_q - len(st.session_state.wb_answers)
+        st.warning(f"⚠️ 还有 {unanswered} 题未答，确认提交吗？未答题将计为错误。")
+        col_c1, col_c2 = st.columns(2)
+        if col_c1.button("✅ 确认提交", use_container_width=True):
+            _submit_wrongbook()
+            st.rerun()
+        if col_c2.button("❌ 继续答题", use_container_width=True):
+            st.session_state.wb_confirm_submit = False
+            st.rerun()
+
+    # ---- 答题卡 ----
     st.markdown("---")
-    st.markdown("#### 📌 题目导航")
+    st.markdown("#### 📌 答题卡" + ("（🟢=正确 🔴=错误/漏答）" if is_submitted else ""))
 
-    cols_per_row = 10
-    rows = (total_q + cols_per_row - 1) // cols_per_row
+    # 筛选 + 进度（仅答题中出现）
+    if not is_submitted:
+        filter_key = "wb_card_filter"
+        if filter_key not in st.session_state:
+            st.session_state[filter_key] = "all"
 
-    nav_html = '<div style="display:flex;flex-direction:column;gap:2px;">'
-    for row in range(rows):
-        nav_html += '<div style="display:flex;gap:2px;">'
-        for col_idx in range(cols_per_row):
-            q_idx = row * cols_per_row + col_idx
-            if q_idx >= total_q:
-                nav_html += '<div style="flex:1;min-width:0;"></div>'
-                continue
-            q_item = wq[q_idx]
-            q_id = q_item["id"]
+        fc1, fc2, fc3, fc4, fc5 = st.columns(5)
+        if fc1.button("📋 全部", key="wb_filter_all", use_container_width=True,
+                      type="primary" if st.session_state[filter_key] == "all" else "secondary"):
+            st.session_state[filter_key] = "all"
+            st.rerun()
+        if fc2.button("✅ 已答", key="wb_filter_answered", use_container_width=True,
+                      type="primary" if st.session_state[filter_key] == "answered" else "secondary"):
+            st.session_state[filter_key] = "answered"
+            st.rerun()
+        if fc3.button("⬜ 未答", key="wb_filter_unanswered", use_container_width=True,
+                      type="primary" if st.session_state[filter_key] == "unanswered" else "secondary"):
+            st.session_state[filter_key] = "unanswered"
+            st.rerun()
+        if fc4.button("⭐ 已标记", key="wb_filter_marked", use_container_width=True,
+                      type="primary" if st.session_state[filter_key] == "marked" else "secondary"):
+            st.session_state[filter_key] = "marked"
+            st.rerun()
+        if fc5.button("不确定", key="wb_filter_uncertain", use_container_width=True,
+                      type="primary" if st.session_state[filter_key] == "uncertain" else "secondary"):
+            st.session_state[filter_key] = "uncertain"
+            st.rerun()
 
-            if is_submitted:
-                is_correct_q = st.session_state.wb_results.get(q_id, {}).get("correct", False)
-                bg = "#c8e6c9" if is_correct_q else "#ffcdd2"
-                text_color = "#1b5e20" if is_correct_q else "#b71c1c"
-            else:
-                if q_id in st.session_state.wb_answers:
-                    bg = "#f9a825"
-                    text_color = "white"
+        filter_mode = st.session_state[filter_key]
+        answered = len(st.session_state.wb_answers)
+        marked_count = len(st.session_state.get("wb_marked", set()))
+        uncertain_count = len(st.session_state.get("wb_uncertain", set()))
+        st.progress(answered / total_q, text=f"已答 {answered}/{total_q}"
+            + (f" · 已标记 {marked_count}" if marked_count else "")
+            + (f" · 不确定 {uncertain_count}" if uncertain_count else ""))
+    else:
+        filter_mode = "all"
+
+    # ======== 答题卡网格（Streamlit 原生按钮，不会打开新标签页）========
+    st.markdown("""
+    <style>
+    div.stButton > button {
+        font-size: 10px !important; white-space: nowrap !important;
+        padding-left: 0px !important; padding-right: 0px !important;
+        min-height: 22px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    _cols = 10
+    for _row in range((total_q + _cols - 1) // _cols):
+        _rcols = st.columns(_cols)
+        for _ci in range(_cols):
+            _qi = _row * _cols + _ci
+            with _rcols[_ci]:
+                if _qi >= total_q:
+                    st.markdown("&nbsp;", unsafe_allow_html=True)
+                    continue
+                _qit = wq[_qi]
+                _qid = _qit["id"]
+
+                _vis = True
+                if filter_mode == "answered" and _qid not in st.session_state.wb_answers:
+                    _vis = False
+                if filter_mode == "unanswered" and _qid in st.session_state.wb_answers:
+                    _vis = False
+                if filter_mode == "marked" and _qid not in st.session_state.get("wb_marked", set()):
+                    _vis = False
+                if filter_mode == "uncertain" and _qid not in st.session_state.get("wb_uncertain", set()):
+                    _vis = False
+                if not _vis:
+                    st.markdown("&nbsp;", unsafe_allow_html=True)
+                    continue
+
+                _answered = _qid in st.session_state.wb_answers
+                _marked = _qid in st.session_state.get("wb_marked", set())
+                _uncertain = _qid in st.session_state.get("wb_uncertain", set())
+                _current = _qi == idx
+                _is_correct = st.session_state.wb_results.get(_qid, {}).get("correct", False)
+
+                _label = str(_qi + 1)
+                if _uncertain and not is_submitted:
+                    _label = f"?{_label}"
+                elif _marked:
+                    _label = f"\u2605{_label}"
+                if _current:
+                    _label = f"\u25b6{_label}"
+
+                if is_submitted:
+                    _btype = "primary" if _is_correct else "secondary"
                 else:
-                    bg = "#ffffff"
-                    text_color = "#333"
-
-            border = "2px solid #1976d2" if q_idx == idx else "1px solid #ddd"
-
-            nav_html += f'''
-            <div style="flex:1;min-width:0;">
-                <span onclick="var p=new URLSearchParams(window.location.search);p.set('nav_wb_to','{q_idx}');window.location.search=p.toString();"
-                   style="display:block;width:100%;background:{bg};color:{text_color};border:{border};
-                          border-radius:3px;font-size:12px;min-height:30px;line-height:30px;
-                          text-align:center;text-decoration:none;cursor:pointer;">
-                    {q_idx + 1}
-                </span>
-            </div>'''
-        nav_html += '</div>'
-    nav_html += '</div>'
-
-    st.markdown(nav_html, unsafe_allow_html=True)
-
-    # 用 query params 做导航
-    params = st.query_params
-    nav_target = params.get("nav_wb_to")
-    if nav_target is not None:
-        try:
-            target_idx = int(nav_target)
-            if 0 <= target_idx < total_q and target_idx != idx:
-                st.session_state.wb_current = target_idx
-                del params["nav_wb_to"]
-                st.query_params = params
-                st.rerun()
-        except (ValueError, KeyError):
-            pass
+                    _btype = "primary" if _answered else "secondary"
+                if st.button(_label, key=f"wb_card_{_qi}",
+                             use_container_width=True, type=_btype):
+                    st.session_state.wb_current = _qi
+                    st.rerun()
 
     # 完成提示
     if is_submitted and total_q > 0:
@@ -551,6 +677,47 @@ def _show_wrong_practice():
             st.success(f"🎉 **错题复习完成！** 正确率: {pct:.1f}%")
         else:
             st.info(f"📖 **错题复习完成！** 正确率: {pct:.1f}%。继续加油！")
+
+        # 操作按钮
+        op_col1, op_col2 = st.columns(2)
+        if op_col1.button("🔄 重新组卷", key="wb_regenerate_btn", use_container_width=True, type="primary"):
+            st.session_state.wb_regenerate = True
+            st.rerun()
+        if op_col2.button("🗑️ 清空错题", key="wb_clear_btn", use_container_width=True):
+            st.session_state.wb_confirm_clear = True
+
+    # 清空确认
+    if st.session_state.get("wb_confirm_clear"):
+        st.warning("⚠️ 确认清空所有错题吗？此操作不可恢复！")
+        c1, c2 = st.columns(2)
+        if c1.button("✅ 确认清空", use_container_width=True):
+            clear_all_wrong()
+            st.session_state.wb_questions = []
+            st.session_state.wb_confirm_clear = False
+            st.rerun()
+        if c2.button("❌ 取消", use_container_width=True):
+            st.session_state.wb_confirm_clear = False
+            st.rerun()
+
+
+def _save_wrongbook_draft(auto_save: bool = False):
+    """保存错题练习草稿
+    
+    auto_save=True: 后台静默保存，不显示提示
+    """
+    draft_id = st.session_state.get("wb_session_id", str(uuid.uuid4()))
+    if "wb_session_id" not in st.session_state:
+        st.session_state.wb_session_id = draft_id
+    save_draft("wrongbook", draft_id, {
+        "questions": st.session_state.wb_questions,
+        "current": st.session_state.wb_current,
+        "answers": st.session_state.wb_answers,
+        "marked": list(st.session_state.wb_marked),
+        "uncertain": list(st.session_state.wb_uncertain),
+        "wrong_counts": st.session_state.wb_wrong_counts,
+    })
+    if not auto_save:
+        st.session_state.wb_draft_saved = True
 
 
 def _submit_wrongbook():
@@ -564,6 +731,7 @@ def _submit_wrongbook():
         qid = q["id"]
         user_ans = answers.get(qid, "")
         is_correct = check_answer(q["type"], user_ans, q["answer"])
+        is_uncertain = qid in st.session_state.get("wb_uncertain", set())
 
         results[qid] = {"correct": is_correct}
 
@@ -573,12 +741,28 @@ def _submit_wrongbook():
             is_correct=is_correct,
             mode="wrongbook",
             session_id=session_id,
+            is_uncertain=is_uncertain,
         )
 
         if is_correct:
-            add_correct_record(qid)
+            add_correct_record(qid, is_uncertain)
         else:
-            add_wrong_record(qid, user_ans)
+            add_wrong_record(qid, user_ans, is_uncertain)
 
     st.session_state.wb_results = results
     st.session_state.wb_submitted = True
+
+    # 标记数据已变更，触发首页统计缓存刷新
+    st.session_state._data_version = st.session_state.get("_data_version", 0) + 1
+    # 清除错题本自身的统计缓存
+    st.session_state.pop("wb_stats_cache", None)
+
+    # 保存考试记录到 exam_records.json
+    correct_count = sum(1 for v in results.values() if v.get("correct"))
+    save_exam_record({
+        "type": "wrongbook",
+        "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "total": len(wq),
+        "correct": correct_count,
+        "accuracy": f"{correct_count/len(wq)*100:.1f}%" if len(wq) > 0 else "0%",
+    })

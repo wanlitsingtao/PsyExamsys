@@ -106,6 +106,7 @@ def _show_tab_questions():
 
                 save_questions(merged)
                 st.session_state.questions = merged
+                st.session_state._data_version = st.session_state.get("_data_version", 0) + 1
 
                 progress_bar.empty()
                 log_area.empty()
@@ -167,6 +168,7 @@ def _show_tab_questions():
                     merged, added, skipped, logs = dedup_import(existing, all_new)
                     save_questions(merged)
                     st.session_state.questions = merged
+                    st.session_state._data_version = st.session_state.get("_data_version", 0) + 1
 
                     st.success(f"✅ 上传导入完成！新增 {added} 题，跳过 {skipped} 题（重复）")
                     backup_data()
@@ -200,6 +202,7 @@ def _show_tab_questions():
         if cc1.button("✅ 确认清空", use_container_width=True):
             save_questions([])
             st.session_state.questions = []
+            st.session_state._data_version = st.session_state.get("_data_version", 0) + 1
             st.session_state.confirm_clear_questions = False
             st.success("✅ 题库已清空")
             st.rerun()

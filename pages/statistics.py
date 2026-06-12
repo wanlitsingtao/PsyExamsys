@@ -4,153 +4,83 @@
 """
 import streamlit as st
 import pandas as pd
-from pathlib import Path
 from utils.data_manager import (
-    load_questions, load_wrong_questions, get_wrong_stats,
-    load_exam_records, load_study_records, load_mock_exam_records,
+    load_wrong_questions, get_wrong_stats,
+    load_exam_records, load_mock_exam_records,
     load_answer_records, load_question_stats,
-    get_all_categories, get_category_count, _extract_qids_from_wrong_list,
+    _extract_qids_from_wrong_list,
+    get_mastery_distribution, MASTERY_LABELS,
 )
+
+
+def _get_cached_stats(exam_type):
+    """缓存所有统计数据，仅在 _data_version 变化或 exam_type 变化时重新加载（减少 8→1 次 JSON 读取）"""
+    version = st.session_state.get("_data_version", 0)
+    cache = st.session_state.get("_stats_cache", {})
+    if cache.get("_version") == version and cache.get("_exam_type") == exam_type:
+        return (
+            cache["wrong_list"], cache["wrong_stats"],
+            cache["exam_records"], cache["mock_records"],
+            cache["answer_records"], cache["question_stats"],
+        )
+
+    # 版本过期，重新加载所有数据（1 次批量 I/O）
+    wrong_list = load_wrong_questions()
+    wrong_stats = get_wrong_stats(exam_type)
+    exam_records = load_exam_records()
+    mock_records = load_mock_exam_records()
+    answer_records = load_answer_records()
+    question_stats = load_question_stats()
+
+    st.session_state._stats_cache = {
+        "_version": version,
+        "_exam_type": exam_type,
+        "wrong_list": wrong_list,
+        "wrong_stats": wrong_stats,
+        "exam_records": exam_records,
+        "mock_records": mock_records,
+        "answer_records": answer_records,
+        "question_stats": question_stats,
+    }
+    return wrong_list, wrong_stats, exam_records, mock_records, answer_records, question_stats
 
 
 def show_statistics():
     st.markdown("# 📊 数据统计")
     st.markdown("---")
 
-    # 加载所有数据
+    # 加载所有数据（使用缓存，仅在版本变化时重新读盘）
     exam_type = st.session_state.get("exam_type")
     questions = st.session_state.questions
-    wrong_list = load_wrong_questions()
-    wrong_stats = get_wrong_stats(exam_type)
-    exam_records = load_exam_records()
-    study_records = load_study_records()
-    mock_records = load_mock_exam_records()
-    answer_records = load_answer_records()
-    question_stats = load_question_stats()
+    wrong_list, wrong_stats, exam_records, mock_records, answer_records, question_stats = \
+        _get_cached_stats(exam_type)
 
     # 使用 Tab 组织各类统计
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "📚 题库统计", "📕 错题统计", "📝 答题统计",
-        "📋 考试记录", "📖 学习记录"
+        "📕 错题统计", "🧠 知识掌握情况分析",
+        "📝 答题统计", "📈 相关性分析", "📋 考试记录"
     ])
 
     with tab1:
-        _show_question_stats(questions)
+        _show_wrong_stats(questions, wrong_list, wrong_stats, question_stats)
 
     with tab2:
-        _show_wrong_stats(questions, wrong_list, wrong_stats)
+        _show_mastery_analysis(questions, exam_type)
 
     with tab3:
-        _show_answer_stats(questions, answer_records, question_stats)
+        _show_answer_stats(questions, answer_records, question_stats, exam_type)
 
     with tab4:
-        _show_exam_stats(exam_records, mock_records)
+        from pages.correlation import show_correlation
+        show_correlation()
 
     with tab5:
-        _show_study_stats(study_records)
+        _show_exam_stats(exam_records, mock_records)
 
 
-def _show_question_stats(questions):
-    """题库统计"""
-    st.markdown("### 📚 题库总览")
-
-    if not questions:
-        st.info("📢 题库为空，请在配置管理中导入题库。")
-        return
-
-    # 总体统计
-    total = len(questions)
-    single_c = sum(1 for q in questions if q["type"] == "single")
-    multi_c = sum(1 for q in questions if q["type"] == "multi")
-    judge_c = sum(1 for q in questions if q["type"] == "judge")
-    indefinite_c = sum(1 for q in questions if q["type"] == "indefinite")
-
-    col1, col2, col3, col4, col5 = st.columns(5)
-    col1.metric("📚 总题数", total)
-    col2.metric("📝 单选题", single_c)
-    col3.metric("📋 多选题", multi_c)
-    col4.metric("⭕ 判断题", judge_c)
-    if indefinite_c > 0:
-        col5.metric("🟣 不定项", indefinite_c)
-
-    st.markdown("---")
-
-    # 知识板块分布
-    cat_counts = get_category_count()
-    if cat_counts:
-        st.markdown("### 📂 知识板块分布")
-
-        # 按指定顺序展示
-        cat_order = [
-            "心理学导论", "社会心理学", "人格心理学",
-            "发展心理学", "异常心理学", "咨询心理学",
-            "心理咨询会谈技术", "情绪调节与压力管理",
-            "心理危机识别", "家庭教育与心理健康科普",
-            "心理咨询专业伦理与相关法律规范",
-        ]
-        available_cats = [c for c in cat_order if c in cat_counts]
-        for c in sorted(cat_counts.keys()):
-            if c not in available_cats:
-                available_cats.append(c)
-
-        # 表格展示
-        data = []
-        for cat in available_cats:
-            cnt = cat_counts[cat]
-            # 统计该板块的题型分布
-            single = sum(1 for q in questions if q.get("category", "") == cat and q["type"] == "single")
-            multi = sum(1 for q in questions if q.get("category", "") == cat and q["type"] == "multi")
-            judge = sum(1 for q in questions if q.get("category", "") == cat and q["type"] == "judge")
-            data.append({
-                "知识板块": cat,
-                "总题数": cnt,
-                "单选": single,
-                "多选": multi,
-                "判断": judge,
-            })
-
-        df = pd.DataFrame(data)
-        st.dataframe(df, use_container_width=True, hide_index=True)
-
-        # 饼图/条形图展示
-        st.markdown("#### 📊 各板块题量对比")
-        cat_data = pd.DataFrame({
-            "知识板块": list(available_cats),
-            "题数": [cat_counts[c] for c in available_cats],
-        })
-        st.bar_chart(cat_data.set_index("知识板块"))
-
-    st.markdown("---")
-
-    # 题库来源文件统计
-    st.markdown("### 📂 题库来源文件")
-
-    files = {}
-    for q in questions:
-        fname = q.get("source_file", "未知")
-        if fname not in files:
-            files[fname] = {"single": 0, "multi": 0, "judge": 0, "total": 0}
-        files[fname][q["type"]] = files[fname].get(q["type"], 0) + 1
-        files[fname]["total"] += 1
-
-    file_data = []
-    for fname, stats in sorted(files.items()):
-        file_data.append({
-            "文件名": fname,
-            "总题数": stats["total"],
-            "单选": stats.get("single", 0),
-            "多选": stats.get("multi", 0),
-            "判断": stats.get("judge", 0),
-        })
-
-    df_files = pd.DataFrame(file_data)
-    st.dataframe(df_files, use_container_width=True, hide_index=True)
-
-
-def _show_wrong_stats(questions, wrong_list, wrong_stats):
+def _show_wrong_stats(questions, wrong_list, wrong_stats, question_stats):
     """错题统计 — 统计数字统一从 question_stats.json 读取"""
     st.markdown("### 📕 错题统计")
-    question_stats = load_question_stats()
     wrong_qids = _extract_qids_from_wrong_list(wrong_list)
 
     if wrong_stats["total"] == 0:
@@ -235,7 +165,7 @@ def _show_wrong_stats(questions, wrong_list, wrong_stats):
         st.info("暂无错题数据")
 
 
-def _show_answer_stats(questions, answer_records, question_stats):
+def _show_answer_stats(questions, answer_records, question_stats, exam_type=None):
     """答题统计"""
     st.markdown("### 📝 答题统计")
 
@@ -257,44 +187,76 @@ def _show_answer_stats(questions, answer_records, question_stats):
 
     st.markdown("---")
 
-    # 按答题模式统计
-    st.markdown("### 📋 各模式答题统计")
+    # 按训练类型统计（仅展示三种类型；综合训练合并 exam + study；隐藏 wrongbook/consolidation）
+    st.markdown("### 🗂️ 各训练类型统计")
 
-    mode_stats = {}
+    MODE_LABELS = {
+        "specialized": "专项训练",
+        "mock_exam": "模拟考试",
+        "comprehensive": "综合训练",
+    }
+
+    from collections import defaultdict
+
+    # 一次遍历收集所有统计：按 mode，以及 specialized 各 category
+    mode_stats = defaultdict(lambda: {"sessions": set(), "total": 0, "correct": 0})
+    spec_cat_stats = defaultdict(lambda: {"sessions": set(), "total": 0, "correct": 0})
     for r in answer_records:
-        mode = r.get("mode", "unknown")
-        if mode not in mode_stats:
-            mode_stats[mode] = {"total": 0, "correct": 0}
+        mode = r.get("mode", "未知")
+        sid = r.get("session_id", "")
+        mode_stats[mode]["sessions"].add(sid)
         mode_stats[mode]["total"] += 1
         if r.get("is_correct"):
             mode_stats[mode]["correct"] += 1
+        # 专项训练按知识板块细分
+        if mode == "specialized":
+            cat = r.get("category", "未知")
+            spec_cat_stats[cat]["sessions"].add(sid)
+            spec_cat_stats[cat]["total"] += 1
+            if r.get("is_correct"):
+                spec_cat_stats[cat]["correct"] += 1
 
-    mode_names = {
-        "study": "背题系统",
-        "exam": "综合训练",
-        "specialized": "专项训练",
-        "comprehensive": "综合训练",
-        "mock_exam": "模拟考试",
-        "wrongbook": "错题本",
-    }
+    # 合并：exam + study → comprehensive
+    for src_mode in ("exam", "study"):
+        if src_mode in mode_stats:
+            s = mode_stats[src_mode]
+            mode_stats["comprehensive"]["sessions"].update(s["sessions"])
+            mode_stats["comprehensive"]["total"] += s["total"]
+            mode_stats["comprehensive"]["correct"] += s["correct"]
+            del mode_stats[src_mode]
 
-    if mode_stats:
-        mode_data = []
-        for mode, stats in sorted(mode_stats.items()):
-            pct = stats["correct"] / stats["total"] * 100 if stats["total"] > 0 else 0
-            mode_data.append({
-                "答题模式": mode_names.get(mode, mode),
-                "答题次数": stats["total"],
-                "答对次数": stats["correct"],
-                "正确率": f"{pct:.1f}%",
-            })
-        df = pd.DataFrame(mode_data)
-        st.dataframe(df, use_container_width=True, hide_index=True)
+    def _row(label, s, indent=False):
+        t = s["total"]
+        c = s["correct"]
+        sessions = len(s["sessions"])
+        pct = c / t * 100 if t > 0 else 0
+        prefix = "　↳ " if indent else ""
+        return {
+            "训练类型": prefix + label,
+            "训练次数": sessions,
+            "答题总数": t,
+            "答对数": c,
+            "答错数": t - c,
+            "正确率": f"{pct:.1f}%",
+        }
+
+    mode_data = []
+    for mode in ["specialized", "mock_exam", "comprehensive"]:
+        if mode not in mode_stats:
+            continue
+        mode_data.append(_row(MODE_LABELS[mode], mode_stats[mode]))
+        # 专项训练后展开各知识板块子行
+        if mode == "specialized" and spec_cat_stats:
+            for cat in sorted(spec_cat_stats.keys(), key=lambda k: spec_cat_stats[k]["total"], reverse=True):
+                mode_data.append(_row(cat, spec_cat_stats[cat], indent=True))
+
+    if mode_data:
+        df_mode = pd.DataFrame(mode_data)
+        st.dataframe(df_mode, use_container_width=True, hide_index=True)
 
     st.markdown("---")
 
     # 按知识板块统计答题情况
-    st.markdown("### 📂 各知识板块答题统计")
 
     cat_answer_stats = {}
     for r in answer_records:
@@ -318,80 +280,195 @@ def _show_answer_stats(questions, answer_records, question_stats):
         df = pd.DataFrame(cat_data)
         st.dataframe(df, use_container_width=True, hide_index=True)
 
-    # 最近答题记录
+
+def _show_mastery_analysis(questions, exam_type=None):
+    """
+    掌握度分析看板
+    - 掌握度等级：0=未学习 1=初识 2=学习中 3=基本掌握 4=掌握 5=熟练
+    - 置信度：0.0-1.0，低样本量或走势波动 → 低置信度
+    - 不牢靠：答对过又答错（消退型）或交替答对答错（波动型）
+    - 遗忘预警：上次答对后 >5天（即 >=6天），提示需要复习
+    """
+    st.markdown("### 🧠 知识掌握情况分析")
+
+    mastery_data = get_mastery_distribution(questions, exam_type)
+    by_cat = mastery_data["by_category"]
+    retention_list = mastery_data["retention_list"]
+    unstable_list = mastery_data.get("unstable_list", [])
+
+    if not by_cat:
+        st.info("📢 暂无掌握度数据，开始答题后这里将展示分析。")
+        return
+
+    # ---- 全局概览 ----
+    all_counts = [0] * 6
+    total_qs = 0
+    total_retention = 0
+    total_unstable = 0
+    for d in by_cat.values():
+        mc = d["mastery_counts"]
+        for i in range(6):
+            all_counts[i] += mc[i]
+        total_qs += d["total"]
+        total_retention += d["retention_due"]
+        total_unstable += d.get("unstable", 0)
+
+    studied = sum(all_counts[1:])
+    m5_m4 = all_counts[5] + all_counts[4]
+    # 低置信度题数：confidence < 0.5
+    low_conf_count = len([item for item in unstable_list if item["confidence"] < 0.5])
+
+    col1, col2, col3, col4, col5 = st.columns(5)
+    col1.metric("📚 总题数", total_qs)
+    col2.metric("📖 已学题数", studied,
+                help="掌握等级 ≥ 1（至少答过一次）")
+    col3.metric("✅ 掌握/熟练题数", m5_m4,
+                help="掌握等级 4（掌握）或 5（熟练）")
+    col4.metric("⚠️ 不牢靠", total_unstable,
+                help=f"其中低置信度(conf<0.5) {low_conf_count} 题")
+    col5.metric("⏰ 需要复习", total_retention,
+                help="上次答对后超过7天，建议复习")
+
     st.markdown("---")
-    st.markdown("### 📋 最近答题记录")
 
-    if answer_records:
-        recent = answer_records[-50:]
-        recent.reverse()
+    # ---- 各知识板块掌握度明细表 ----
+    st.markdown("#### 📊 各知识板块掌握度分布")
 
-        q_map = {q["id"]: q for q in questions}
-        recent_data = []
-        for r in recent:
-            qid = r.get("question_id", "")
-            q = q_map.get(qid)
-            question_text = q.get("question", "")[:40] + "..." if q else f"(ID: {qid})"
-            recent_data.append({
-                "时间": r.get("timestamp", "")[11:19],
-                "题目": question_text,
-                "结果": "✅" if r.get("is_correct") else "❌",
-                "模式": mode_names.get(r.get("mode", ""), r.get("mode", "")),
-                "知识板块": r.get("category", ""),
+    LEVEL_NAMES = ["未学习", "初识", "学习中", "基本掌握", "掌握", "熟练"]
+    cat_rows = []
+    for cat, d in by_cat.items():
+        mc = d["mastery_counts"]
+        total = d["total"]
+        studied_n = sum(mc[1:])
+        row = {
+            "知识板块": cat,
+            "总题数": total,
+            "已学率": f"{d['studied_rate']:.0f}%",
+            "未学习": mc[0],
+            "初识": mc[1],
+            "学习中": mc[2],
+            "基本掌握": mc[3],
+            "掌握": mc[4],
+            "熟练": mc[5],
+            "平均等级": f"{d['avg_mastery']:.1f}",
+            "⚠️不牢靠": d.get("unstable", 0),
+            "⏰需复习": d.get("retention_due", 0),
+        }
+        cat_rows.append(row)
+
+    if cat_rows:
+        df_cat = pd.DataFrame(cat_rows)
+        st.dataframe(df_cat, use_container_width=True, hide_index=True)
+
+    # ---- 掌握度等级说明 ----
+    with st.expander("📖 等级 & 置信度说明"):
+        st.markdown("""
+| 等级 | 标签 | 判断条件 |
+|------|------|---------|
+| 0 | 未学习 | 从未答过 |
+| 1 | 初识 | 答题≤2次 且 正确率<60% |
+| 2 | 学习中 | 答题>2次 且 正确率<60% |
+| 3 | 基本掌握 | 正确率 60%–79% |
+| 4 | 掌握 | 正确率 ≥80% 且 答题≥3次 |
+| 5 | 熟练 | 正确率 ≥90% 且 答题≥5次 且 最近3次全对 |
+
+**📊 置信度 (confidence)**：0.0–1.0，衡量等级的可靠程度。
+- 答题次数越多、走势越稳定 → 置信度越高
+- 只答过 1–2 次，即使全对，置信度也很低（可能是蒙的）
+
+**⚠️ 不牢靠 (unstable)**：两种触发类型：
+- **消退型**：曾经答对过，最近一次却答错了 → 知识遗忘/混淆
+- **波动型**：答题历史出现 2 次以上对错交替 → 掌握不稳定
+
+**⏰ 需要复习**：上次答对后超过 **7天** 未练习。
+""")
+
+    # ---- 遗忘预警列表 ----
+    if retention_list:
+        st.markdown("---")
+        st.markdown(f"#### ⏰ 遗忘预警题目（共 {len(retention_list)} 题）")
+        st.caption("以下题目上次答对后已超过7天，建议优先复习。")
+
+        ret_data = []
+        for item in retention_list[:30]:
+            ret_data.append({
+                "知识板块": item["category"],
+                "题目": item["question"] + ("..." if len(item["question"]) >= 50 else ""),
+                "距上次答对(天)": item["days_since_correct"],
+                "当前等级": f"{item['mastery_level']} {MASTERY_LABELS.get(item['mastery_level'], '')}",
             })
+        df_ret = pd.DataFrame(ret_data)
+        st.dataframe(df_ret, use_container_width=True, hide_index=True)
 
-        if recent_data:
-            df_recent = pd.DataFrame(recent_data)
-            st.dataframe(df_recent, use_container_width=True, hide_index=True)
+    # ---- 不牢靠题目列表 ----
+    if unstable_list:
+        st.markdown("---")
+        st.markdown(f"#### ⚠️ 掌握不牢靠题目（共 {total_unstable} 题）")
+        st.caption("答对过又答错（消退型）或反复波动（波动型），建议加强练习。按置信度从低到高排列。")
+
+        uns_data = []
+        for item in unstable_list[:30]:
+            history_str = "→".join(["✅" if h else "❌" for h in item["history"]])
+            uns_data.append({
+                "知识板块": item["category"],
+                "题目": item["question"] + ("..." if len(item["question"]) >= 50 else ""),
+                "类型": item["unstable_type"],
+                "答题序列": history_str,
+                "置信度": f"{item['confidence']:.2f}",
+                "当前等级": f"{item['mastery_level']} {MASTERY_LABELS.get(item['mastery_level'], '')}",
+            })
+        df_uns = pd.DataFrame(uns_data)
+        st.dataframe(df_uns, use_container_width=True, hide_index=True)
 
 
 def _show_exam_stats(exam_records, mock_records):
-    """考试记录统计"""
-    st.markdown("### 📋 综合训练记录")
+    """考试记录统计 — 四类记录：专项训练、模拟考试、巩固练习、错题练习"""
 
-    # 综合训练记录（从 exam_records 中筛选 practice 模式）
-    practice_records = [r for r in exam_records if r.get("mode") != "mock_exam"]
+    TYPE_LABELS = {
+        "exam": "综合训练",
+        "specialized": "专项训练",
+        "comprehensive": "综合训练",
+        "consolidation": "巩固练习",
+        "wrongbook": "错题练习",
+        "study": "背题",
+    }
 
-    if not practice_records:
-        st.info("暂无综合训练记录。")
-    else:
-        cols = st.columns(3)
-        cols[0].metric("📋 总训练次数", len(practice_records))
-        avg_accuracy = sum(
-            float(r.get("accuracy", "0%").replace("%", ""))
-            for r in practice_records if r.get("accuracy")
-        ) / len(practice_records) if practice_records else 0
-        cols[1].metric("📊 平均正确率", f"{avg_accuracy:.1f}%")
-        best = max(
-            (float(r.get("accuracy", "0%").replace("%", "")) for r in practice_records if r.get("accuracy")),
-            default=0
-        )
-        cols[2].metric("🏆 最高正确率", f"{best:.1f}%")
+    # 给旧记录（无 type 字段）补上 type="exam"
+    for r in exam_records:
+        if "type" not in r:
+            r["type"] = "exam"
 
-        # 最近记录
-        st.markdown("#### 最近训练记录")
-        recent = practice_records[-10:]
-        recent.reverse()
+    # 全局表格样式（mock + 其他三类共用）
+    st.markdown("""
+    <style>
+    .exam-records-table { width:100%; border-collapse:collapse; font-size:15px; }
+    .exam-records-table th {
+        background:#f3f4f6; color:#374151; font-weight:600;
+        padding:12px 16px; text-align:left; border-bottom:2px solid #e5e7eb;
+        white-space:nowrap;
+    }
+    .exam-records-table td { border-bottom:1px solid #f3f4f6; }
+    .exam-records-table tr:hover td { background:#f9fafb; }
+    </style>
+    """, unsafe_allow_html=True)
 
-        practice_data = []
-        for r in recent:
-            practice_data.append({
-                "日期": r.get("date", "")[:16],
-                "正确": f"{r.get('correct', 0)}/{r.get('total', 0)}",
-                "正确率": r.get("accuracy", ""),
-                "用时": r.get("duration", ""),
-            })
-        if practice_data:
-            df = pd.DataFrame(practice_data)
-            st.dataframe(df, use_container_width=True, hide_index=True)
+    # ================================================================
+    #  1. 专项训练记录（包含综合训练记录）
+    # ================================================================
+    st.markdown("### 🎯 专项训练记录（含综合训练）")
 
+    spec_records = [r for r in exam_records if r.get("type") in ("exam", "specialized", "comprehensive")]
+    _render_record_section(spec_records, TYPE_LABELS, default_label="综合训练")
+
+    # ================================================================
+    #  2. 模拟考试记录
+    # ================================================================
     st.markdown("---")
-    st.markdown("### 🎯 模拟考试记录")
+    st.markdown("### 📝 模拟考试记录")
 
     if not mock_records:
         st.info("暂无模拟考试记录。")
     else:
-        # 按考试分组（一次完整考试=心理学综合+咨询实务）
         exam_sessions = {}
         for r in mock_records:
             sid = r.get("session_id", "")
@@ -403,108 +480,140 @@ def _show_exam_stats(exam_records, mock_records):
         cols[0].metric("🎯 模拟考试次数", len(exam_sessions))
         cols[1].metric("📋 科目记录数", len(mock_records))
 
-        # 最近考试
-        st.markdown("#### 最近模拟考试记录")
         recent_sessions = sorted(
             exam_sessions.items(),
             key=lambda x: max(r.get("date", "") for r in x[1]),
             reverse=True
         )[:5]
 
-        session_data = []
-        for sid, records in recent_sessions:
-            date = max(r.get("date", "") for r in records)
-            psy = next((r for r in records if r.get("subject") == "psychology"), None)
-            cou = next((r for r in records if r.get("subject") == "counseling"), None)
+        if recent_sessions:
+            rows_html = ""
+            for sid, records in recent_sessions:
+                date = max(r.get("date", "") for r in records)
+                psy = next((r for r in records if r.get("subject") == "psychology"), None)
+                cou = next((r for r in records if r.get("subject") == "counseling"), None)
 
-            psy_str = f"{psy.get('score', 0):.0f}/{psy.get('max_score', 0):.0f}" if psy else "未考"
-            cou_str = f"{cou.get('score', 0):.0f}/{cou.get('max_score', 0):.0f}" if cou else "未考"
+                types = []
+                if psy:
+                    types.append("心理学综合")
+                if cou:
+                    types.append("咨询实务")
+                type_str = " + ".join(types) if types else "—"
 
-            total_score = (psy.get('score', 0) if psy else 0) + (cou.get('score', 0) if cou else 0)
-            total_max = (psy.get('max_score', 0) if psy else 0) + (cou.get('max_score', 0) if cou else 0)
+                total_score = (psy.get("score", 0) if psy else 0) + (cou.get("score", 0) if cou else 0)
+                total_max = (psy.get("max_score", 0) if psy else 0) + (cou.get("max_score", 0) if cou else 0)
+                pct = total_score / total_max * 100 if total_max else 0
+                color = "#22c55e" if pct >= 60 else "#ef4444"
+                total_html = (
+                    f'<div style="display:flex;align-items:center;gap:8px;">'
+                    f'<span style="font-weight:700;font-size:16px;min-width:42px;">{total_score:.0f}</span>'
+                    f'<span style="color:#999;">/ {total_max:.0f}</span>'
+                    f'<div style="flex:1;background:#e5e7eb;border-radius:4px;height:8px;min-width:50px;">'
+                    f'<div style="width:{pct:.0f}%;height:100%;background:{color};border-radius:4px;min-width:3px;"></div>'
+                    f'</div>'
+                    f'<span style="font-size:13px;color:{color};min-width:36px;">{pct:.0f}%</span>'
+                    f'</div>'
+                ) if total_max else '<span style="color:#999;">—</span>'
 
-            session_data.append({
-                "考试日期": date[:16] if date else "",
-                "心理学综合": psy_str,
-                "咨询实务": cou_str,
-                "总分": f"{total_score:.0f}/{total_max:.0f}",
-            })
+                rows_html += (
+                    f'<tr>'
+                    f'<td style="white-space:nowrap;padding:12px 16px;color:#555;font-size:14px;">{date[:16] if date else ""}</td>'
+                    f'<td style="padding:12px 16px;font-weight:500;">{type_str}</td>'
+                    f'<td style="padding:12px 16px;">{total_html}</td>'
+                    f'</tr>'
+                )
 
-        if session_data:
-            df = pd.DataFrame(session_data)
-            st.dataframe(df, use_container_width=True, hide_index=True)
+            table_html = f"""
+            <table class="exam-records-table">
+            <thead><tr>
+                <th style="width:150px;">考试日期</th>
+                <th style="width:200px;">类型</th>
+                <th>总分</th>
+            </tr></thead>
+            <tbody>{rows_html}</tbody>
+            </table>
+            """
+            st.markdown(table_html, unsafe_allow_html=True)
+        else:
+            st.info("暂无模拟考试记录")
+
+    # ================================================================
+    #  3. 巩固练习记录
+    # ================================================================
+    st.markdown("---")
+    st.markdown("### 🔁 巩固练习记录")
+
+    consol_records = [r for r in exam_records if r.get("type") == "consolidation"]
+    _render_record_section(consol_records, TYPE_LABELS, default_label="巩固练习")
+
+    # ================================================================
+    #  4. 错题练习记录
+    # ================================================================
+    st.markdown("---")
+    st.markdown("### 📕 错题练习记录")
+
+    wb_records = [r for r in exam_records if r.get("type") == "wrongbook"]
+    _render_record_section(wb_records, TYPE_LABELS, default_label="错题练习")
 
 
-def _show_study_stats(study_records):
-    """学习记录统计"""
-    st.markdown("### 📖 学习记录")
-
-    if not study_records:
-        st.info("暂无学习记录。")
+def _render_record_section(records, type_labels, default_label="训练"):
+    """渲染一段考试记录：汇总指标 + 最近记录表格"""
+    if not records:
+        st.info(f"暂无{default_label}记录。")
         return
 
-    # 筛选出背题模式（mode == "study"）的记录
-    study_only = [r for r in study_records if r.get("mode") == "study"]
-    practice_only = [r for r in study_records if r.get("mode") == "practice"]
+    cols = st.columns(3)
+    cols[0].metric("📋 总训练次数", len(records))
+    avg_accuracy = sum(
+        float(r.get("accuracy", "0%").replace("%", ""))
+        for r in records if r.get("accuracy")
+    ) / len(records) if records else 0
+    cols[1].metric("📊 平均正确率", f"{avg_accuracy:.1f}%")
+    best = max(
+        (float(r.get("accuracy", "0%").replace("%", "")) for r in records if r.get("accuracy")),
+        default=0
+    )
+    cols[2].metric("🏆 最高正确率", f"{best:.1f}%")
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("📖 背题会话数", len(study_only))
-    col2.metric("📝 训练会话数", len(practice_only))
-    col3.metric("📋 总记录数", len(study_records))
+    # 最近 10 条记录
+    recent = sorted(records, key=lambda r: r.get("date", ""), reverse=True)[:10]
 
-    st.markdown("---")
+    rows_html = ""
+    for r in recent:
+        date = r.get("date", "")[:16]
+        rtype = r.get("type", "")
+        # 展开类型标签
+        if rtype == "specialized" and r.get("category"):
+            type_str = f"专项训练 · {r['category']}"
+        elif rtype == "comprehensive" and r.get("category"):
+            type_str = f"综合训练 · {r['category']}"
+        else:
+            type_str = type_labels.get(rtype, default_label)
+        accuracy = r.get("accuracy", "")
+        pct_val = float(accuracy.replace("%", "")) if accuracy else 0
+        correct = r.get("correct", 0)
+        total = r.get("total", 0)
+        color = "#22c55e" if pct_val >= 60 else "#ef4444"
 
-    # 背题记录
-    if study_only:
-        st.markdown("#### 📖 背题记录")
-        recent_study = study_only[-10:]
-        recent_study.reverse()
+        rows_html += (
+            f'<tr>'
+            f'<td style="white-space:nowrap;padding:12px 16px;color:#555;font-size:14px;">{date}</td>'
+            f'<td style="padding:12px 16px;font-weight:500;">{type_str}</td>'
+            f'<td style="padding:12px 16px;">'
+            f'<span style="color:{color};font-weight:600;">{correct}/{total}</span>'
+            f'<span style="color:#999;margin-left:8px;font-size:13px;">{accuracy}</span>'
+            f'</td>'
+            f'</tr>'
+        )
 
-        study_data = []
-        for r in recent_study:
-            status = "✅ 已完成" if r.get("status") == "completed" else "⏳ 进行中" if r.get("status") == "in_progress" else "❌ 已放弃"
-            study_data.append({
-                "时间": r.get("created_at", "")[:16],
-                "状态": status,
-                "总题数": r.get("total", 0),
-                "正确": r.get("correct", "-"),
-                "模式": "背题" if r.get("mode") == "study" else "训练",
-            })
-
-        df = pd.DataFrame(study_data)
-        st.dataframe(df, use_container_width=True, hide_index=True)
-
-    st.markdown("---")
-
-    # 按天统计学习量
-    st.markdown("#### 📅 每日学习量")
-
-    daily_stats = {}
-    for r in study_records:
-        date_str = r.get("created_at", "")[:10]
-        if not date_str:
-            continue
-        if date_str not in daily_stats:
-            daily_stats[date_str] = {"sessions": 0, "total_questions": 0}
-        daily_stats[date_str]["sessions"] += 1
-        daily_stats[date_str]["total_questions"] += r.get("total", 0)
-
-    if daily_stats:
-        daily_data = []
-        for date_str in sorted(daily_stats.keys(), reverse=True)[:30]:
-            stats = daily_stats[date_str]
-            daily_data.append({
-                "日期": date_str,
-                "学习次数": stats["sessions"],
-                "学习题数": stats["total_questions"],
-            })
-
-        if daily_data:
-            df = pd.DataFrame(daily_data)
-            st.dataframe(df, use_container_width=True, hide_index=True)
-
-            # 折线图
-            st.markdown("#### 📈 学习趋势")
-            chart_data = pd.DataFrame(daily_data)
-            chart_data = chart_data.set_index("日期")
-            st.line_chart(chart_data["学习题数"])
+    table_html = f"""
+    <table class="exam-records-table">
+    <thead><tr>
+        <th style="width:150px;">日期</th>
+        <th style="width:220px;">类型</th>
+        <th>正确率</th>
+    </tr></thead>
+    <tbody>{rows_html}</tbody>
+    </table>
+    """
+    st.markdown(table_html, unsafe_allow_html=True)

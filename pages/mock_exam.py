@@ -9,16 +9,15 @@ import time
 import uuid
 from datetime import datetime
 from utils.data_manager import (
-    MOCK_EXAM_CONFIG, extract_questions_by_super, check_answer, get_answer_display,
+    MOCK_EXAM_CONFIG, SUPER_CATEGORY_MAP, extract_questions, check_answer, get_answer_display,
     batch_update_wrong_and_stats, batch_add_answer_records,
-    save_mock_exam_record, infer_category, get_question_stats,
+    save_mock_exam_record, infer_category, load_question_stats,
+    save_draft, load_drafts, delete_draft,
 )
 
 
 def show_mock_exam():
     """模拟考试入口"""
-    st.markdown("# 🎯 模拟考试")
-
     questions = st.session_state.questions
     if not questions:
         st.warning("⚠️ 题库为空，请先在配置管理中导入题库！")
@@ -76,9 +75,33 @@ def _show_mock_start():
             _start_subject("counseling")
 
     st.markdown("---")
-    st.markdown("### 📋 考试规则")
 
-    # 心理学综合
+    # ---- 历史草稿列表（如有） ----
+    mock_drafts = load_drafts("mock")
+    if mock_drafts:
+        st.markdown("### 📂 未完成的考试（点击继续作答）")
+        SUBJECT_LABELS = {"psychology": "心理学综合", "counseling": "咨询实务"}
+        for draft in mock_drafts:
+            d_id = draft.get("draft_id", "")
+            d_sub = SUBJECT_LABELS.get(draft.get("subject_key", ""), draft.get("subject_key", ""))
+            d_answered = len(draft.get("answers", {}))
+            d_total = len(draft.get("question_ids", []))
+            remaining_sec = draft.get("remaining_seconds", 0)
+            remaining_str = f"{int(remaining_sec)//60:02d}:{int(remaining_sec)%60:02d}"
+            d_saved = draft.get("saved_at", "")
+            dcol1, dcol2, dcol3 = st.columns([5, 2, 1])
+            dcol1.markdown(
+                f"**{d_sub}**　已答 {d_answered}/{d_total} 题　"
+                f"剩余时间 {remaining_str}　🕐 {d_saved}"
+            )
+            if dcol2.button("▶ 继续作答", key=f"mock_resume_{d_id}", use_container_width=True, type="primary"):
+                _resume_mock_draft(draft)
+            if dcol3.button("🗑", key=f"mock_del_draft_{d_id}", use_container_width=True, help="删除此草稿"):
+                delete_draft("mock", d_id)
+                st.rerun()
+        st.markdown("---")
+
+    st.markdown("### 📋 考试规则")
     st.markdown("#### 📘 第一科：心理学综合（9:30—11:30）")
     psy_total = psy["single_count"] + psy["multi_count"] + psy["judge_count"]
     psy_max = psy["single_count"] * psy["single_score"] + psy["multi_count"] * psy["multi_score"] + psy["judge_count"] * psy["judge_score"]
@@ -112,11 +135,6 @@ def _show_mock_start():
 
 def _start_subject(subject_key):
     """开始某一科的考试"""
-    # 清除上一科的答案展开状态
-    keys_to_clear = [k for k in st.session_state if k.startswith("mock_show_ans_")]
-    for k in keys_to_clear:
-        del st.session_state[k]
-
     # 如果切换到下一科，先把当前科的成绩保存到 prev
     if subject_key != st.session_state.get("mock_subject"):
         current_result = st.session_state.get("mock_result")
@@ -126,14 +144,15 @@ def _start_subject(subject_key):
     cfg = MOCK_EXAM_CONFIG[subject_key]
     session_id = str(uuid.uuid4())[:8]
 
-    # 根据科目映射到超类进行题目抽取
+    # 根据科目映射到超类过滤题目，再按优先级抽取（与专项训练完全一致）
     super_category_map = {"psychology": "心理学综合", "counseling": "咨询实务"}
     super_cat = super_category_map.get(subject_key, "")
+    sub_categories = SUPER_CATEGORY_MAP.get(super_cat, [])
+    filtered = [q for q in st.session_state.questions if q.get("category", "") in sub_categories]
 
     indefinite_count = cfg.get("indefinite_count", 0)
-    selected = extract_questions_by_super(
-        st.session_state.questions,
-        super_category=super_cat,
+    selected = extract_questions(
+        filtered,
         dan_count=cfg["single_count"],
         duo_count=cfg["multi_count"],
         pan_count=cfg["judge_count"],
@@ -151,8 +170,10 @@ def _start_subject(subject_key):
     st.session_state.mock_current = 0
     st.session_state.mock_answers = {}
     st.session_state.mock_marked = set()
+    st.session_state.mock_uncertain = set()
     st.session_state.mock_start_time = time.time()
     st.session_state.mock_end_time = time.time() + cfg["time_minutes"] * 60
+    st.session_state.mock_last_auto_save = time.time()  # 自动保存计时起点
     st.session_state.mock_confirm_submit = False
     st.session_state.mock_session_id = session_id
     st.session_state.mock_type_boundaries = {
@@ -161,65 +182,127 @@ def _start_subject(subject_key):
         "judge_end": judge_end,
     }
     st.session_state.mock_state = subject_key
+    st.session_state.pop("mock_draft_id", None)  # 新考试清除旧草稿ID
+    st.session_state.pop("mock_paused_at", None)  # 清除暂停状态
+    st.session_state.pop("mock_remaining_at_pause", None)
+    st.rerun()
+
+
+def _resume_mock_draft(draft: dict):
+    """从草稿恢复模拟考试状态"""
+    questions = st.session_state.questions
+    q_map = {q["id"]: q for q in questions}
+    restored_questions = [q_map[qid] for qid in draft.get("question_ids", []) if qid in q_map]
+    if not restored_questions:
+        st.error("❌ 草稿中的题目已不存在于题库中，无法恢复。")
+        return
+
+    subject_key = draft.get("subject_key", "psychology")
+    remaining_seconds = draft.get("remaining_seconds", 0)
+
+    # 保存上一科成绩（如有）
+    current_result = st.session_state.get("mock_result")
+    if current_result is not None:
+        st.session_state.mock_prev_result = current_result
+
+    st.session_state.mock_subject = subject_key
+    st.session_state.mock_questions = restored_questions
+    st.session_state.mock_answers = draft.get("answers", {})
+    st.session_state.mock_marked = set(draft.get("marked", []))
+    st.session_state.mock_uncertain = set(draft.get("uncertain", []))
+    st.session_state.mock_current = draft.get("current_idx", 0)
+    st.session_state.mock_session_id = draft.get("session_id", "")
+    st.session_state.mock_type_boundaries = draft.get("type_boundaries", {"single_end": 0, "multi_end": 0, "judge_end": 0})
+    st.session_state.mock_start_time = time.time()
+    # 恢复剩余时间：end_time = 当前时间 + 剩余秒数
+    st.session_state.mock_end_time = time.time() + max(remaining_seconds, 60)
+    st.session_state.mock_last_auto_save = time.time()  # 自动保存计时起点
+    st.session_state.mock_confirm_submit = False
+    st.session_state.mock_state = subject_key
+    # 标记草稿ID，提交时删除
+    st.session_state.mock_draft_id = draft.get("draft_id", "")
     st.rerun()
 
 
 def _show_exam_subject(subject_key):
     """显示某一科的考试进行中界面"""
+    # ---- 自动保存：每 5 分钟静默保存 ----
+    _now = time.time()
+    if _now - st.session_state.get("mock_last_auto_save", _now) >= 300:
+        _save_mock_draft(subject_key, auto_save=True)
+        st.session_state.mock_last_auto_save = _now
+
     cfg = MOCK_EXAM_CONFIG[subject_key]
     eq = st.session_state.mock_questions
     total_q = len(eq)
     idx = st.session_state.mock_current
+
     q = eq[idx]
     qid = q["id"]
     boundaries = st.session_state.mock_type_boundaries
 
-    # 标题行 + 返回按钮（同行居右）
+    # 缓存答题统计（避免每次渲染读文件，与专项训练一致）
+    if "mock_stats_cache" not in st.session_state:
+        st.session_state.mock_stats_cache = load_question_stats()
+
+    # 标题行 + 返回按钮（同行居右；保存按钮已移至导航行）
     cfg_name = cfg["name"]
     title_col, back_col = st.columns([5, 1])
     with title_col:
-        st.markdown(f"## 🎯 模拟考试 — {cfg_name}")
+        st.markdown(f"#### 🎯 模拟考试 — {cfg_name}")
     with back_col:
-        if st.button("← 返回科目选择", key="mock_back_to_start", use_container_width=True):
+        if st.button("返回", key="mock_back_to_start", use_container_width=True):
             st.session_state.mock_state = "idle"
             keys_to_clear = [
                 "mock_subject", "mock_questions", "mock_current",
-                "mock_answers", "mock_start_time", "mock_end_time",
+                "mock_answers", "mock_marked", "mock_start_time", "mock_end_time",
                 "mock_confirm_submit", "mock_session_id", "mock_type_boundaries",
-                "mock_result", "mock_prev_result",
+                "mock_result", "mock_prev_result", "mock_stats_cache",
             ]
             for key in keys_to_clear:
                 if key in st.session_state:
                     del st.session_state[key]
             st.rerun()
+    # 保存成功提示（提前读取标志，供倒计时暂停/恢复判断）
+    _post_save = st.session_state.pop("mock_draft_saved", False)
+    if _post_save:
+        st.success("✅ 进度已保存，倒计时已暂停。继续作答将自动恢复倒计时。", icon="💾")
 
-    # 倒计时
-    now = time.time()
-    remaining = st.session_state.mock_end_time - now
-
-    if remaining <= 0:
-        _finish_subject(subject_key)
-        return
-
-    mins = int(remaining // 60)
-    secs = int(remaining % 60)
-    time_str = f"{mins:02d}:{secs:02d}"
-
-    if remaining < 300:
-        st.error(f"⏰ **{time_str}** (⚠️ 时间不足5分钟！)")
-    elif remaining < 600:
-        st.warning(f"⏰ **{time_str}**")
+    # 倒计时（时间耗尽后不强制提交，允许继续作答）
+    # 暂停/恢复机制：保存后暂停，用户继续交互时自动恢复
+    if st.session_state.get("mock_paused_at"):
+        if _post_save:
+            # 刚保存完的重渲染：保持暂停，显示冻结时间
+            remaining = st.session_state.get("mock_remaining_at_pause", 0)
+        else:
+            # 用户做了其他操作（答题/翻题等）→ 恢复倒计时
+            paused_elapsed = time.time() - st.session_state.pop("mock_paused_at")
+            st.session_state.mock_end_time += paused_elapsed
+            st.session_state.pop("mock_remaining_at_pause", None)
+            remaining = st.session_state.mock_end_time - time.time()
     else:
-        st.info(f"⏰ 剩余时间: **{time_str}**")
+        remaining = st.session_state.mock_end_time - time.time()
 
-    # 已答/未答统计
-    answered = len(st.session_state.mock_answers)
-    unanswered = total_q - answered
+    if remaining > 0:
+        mins = int(remaining // 60)
+        secs = int(remaining % 60)
+        time_str = f"{mins:02d}:{secs:02d}"
 
-    meta_cols = st.columns([1, 1, 1, 1, 2])
-    meta_cols[0].markdown(f"**已答**: {answered}")
-    meta_cols[1].markdown(f"**未答**: {unanswered}")
-    meta_cols[2].markdown(f"**进度**: {answered}/{total_q}")
+        if st.session_state.get("mock_paused_at"):
+            st.warning(f"⏸️ **{time_str}** (倒计时已暂停)")
+        elif remaining < 300:
+            st.error(f"⏰ **{time_str}** (⚠️ 时间不足5分钟！)")
+        elif remaining < 600:
+            st.warning(f"⏰ **{time_str}**")
+        else:
+            st.info(f"⏰ 剩余时间: **{time_str}**")
+    else:
+        # 时间已耗尽，显示警告但允许继续作答
+        exceeded = int(abs(remaining))
+        if st.session_state.get("mock_paused_at"):
+            st.warning(f"⏸️ **时间已到！** 倒计时已暂停。")
+        else:
+            st.error(f"⏰ **时间已到！** 已超时 {exceeded // 60}分{exceeded % 60}秒，但仍可继续作答。答完后请点击「📤 提交试卷」。")
 
     # 题型段标签
     se = boundaries["single_end"]
@@ -232,24 +315,10 @@ def _show_exam_subject(subject_key):
         type_labels_parts.append(f"🟠 {je-me}题")
     if total_q - je > 0:
         type_labels_parts.append(f"🟣 {total_q-je}题")
-    meta_cols[3].markdown(
+    st.markdown(
         " / ".join(type_labels_parts),
         help="🔵=单选 🟢=多选 🟠=判断 🟣=不定项"
     )
-
-    submit_check = meta_cols[4].button("📤 提交试卷", use_container_width=True, type="primary")
-    if submit_check:
-        st.session_state.mock_confirm_submit = True
-
-    if st.session_state.get("mock_confirm_submit"):
-        st.warning(f"⚠️ 还有 {unanswered} 题未答，确认提交吗？未答题将计为错误。")
-        col_c1, col_c2 = st.columns(2)
-        if col_c1.button("✅ 确认提交", use_container_width=True):
-            _finish_subject(subject_key)
-            return
-        if col_c2.button("❌ 继续答题", use_container_width=True):
-            st.session_state.mock_confirm_submit = False
-            st.rerun()
 
     st.markdown("---")
 
@@ -264,16 +333,61 @@ def _show_exam_subject(subject_key):
 
     # 题目显示
     type_labels = {"single": "🔵 单选题", "multi": "🟢 多选题", "judge": "🟠 判断题", "indefinite": "🟣 不定项选择题"}
-    
-    st.markdown(f"### 第 {idx+1}/{total_q} 题")
-    
     category = q.get('category', infer_category(q.get('source_file', '')))
+
+    # 获取本题答题统计（从缓存读取，与专项训练一致）
+    q_stats = st.session_state.mock_stats_cache.get(qid, {"correct_count": 0, "wrong_count": 0, "last_answer_time": None, "last_correct": None})
+
+    # 题号行：左侧题号，右侧历史统计（与专项训练布局一致）
+    title_cols = st.columns([1, 2])
+    with title_cols[0]:
+        st.markdown(f"##### 第 {idx+1}/{total_q} 题")
+    with title_cols[1]:
+        stats_parts = []
+        if q_stats["correct_count"] > 0 or q_stats["wrong_count"] > 0:
+            stats_parts.append(f"📊 答对 {q_stats['correct_count']} 次 / 答错 {q_stats['wrong_count']} 次")
+        last_correct = q_stats.get("last_correct")
+        if last_correct is True:
+            stats_parts.append("🟢 上次答对")
+        elif last_correct is False:
+            stats_parts.append("🔴 上次答错")
+        # 掌握状态标签
+        if q_stats.get("retention_due"):
+            stats_parts.append("⏰ 遗忘预警")
+        if q_stats.get("unstable"):
+            history = q_stats.get("answer_history", [])
+            if history and not history[-1]:
+                stats_parts.append("⚠️ 消退型")
+            else:
+                stats_parts.append("⚠️ 波动型")
+        if stats_parts:
+            st.markdown(f"<div style='text-align:right;padding-top:0.5em;color:#888;font-size:16px;'>{'&nbsp;&nbsp;|&nbsp;&nbsp;'.join(stats_parts)}</div>", unsafe_allow_html=True)
     
-    title_col1, title_col2 = st.columns([8, 2])
+    # 题型标签 + 不确定按钮 + 标记按钮 同行
+    title_col1, title_col2, title_col3 = st.columns([6, 2, 2])
+    # 答过 3 次以上才显示「不确定」开关
+    total_answers = q_stats["correct_count"] + q_stats["wrong_count"]
     with title_col1:
         st.markdown(f"**{type_labels.get(q['type'], q['type'])}**"
                     f"{' · 📂 ' + category if category else ''}")
     with title_col2:
+        if total_answers >= 3:
+            toggle_key = f"mock_uncertain_toggle_{qid}"
+            if toggle_key not in st.session_state:
+                st.session_state[toggle_key] = qid in st.session_state.mock_uncertain
+
+            def _on_mock_uncertain_toggle():
+                if st.session_state[toggle_key]:
+                    st.session_state.mock_uncertain.add(qid)
+                else:
+                    st.session_state.mock_uncertain.discard(qid)
+
+            st.toggle("不确定",
+                      key=toggle_key,
+                      value=qid in st.session_state.mock_uncertain,
+                      help="标记此题为不确定",
+                      on_change=_on_mock_uncertain_toggle)
+    with title_col3:
         marked = qid in st.session_state.mock_marked
         if st.button("⭐ 标记" if marked else "☆ 标记",
                      key=f"mock_mark_{qid}",
@@ -287,18 +401,19 @@ def _show_exam_subject(subject_key):
     
     st.markdown(f"**{q['question']}**")
 
-    # 获取本题历史答题统计
-    q_stats = get_question_stats(qid)
-    stats_parts = []
-    if q_stats["correct_count"] > 0 or q_stats["wrong_count"] > 0:
-        stats_parts.append(f"答对 {q_stats['correct_count']} 次 / 答错 {q_stats['wrong_count']} 次")
-    last_correct = q_stats.get("last_correct")
-    if last_correct is True:
-        stats_parts.append("🟢 上次答对")
-    elif last_correct is False:
-        stats_parts.append("🔴 上次答错")
-    if stats_parts:
-        st.caption("📊 " + " · ".join(stats_parts))
+    # 选项行距：1.5倍
+    st.markdown("""
+    <style>
+    div[data-testid="stRadio"] label,
+    div[data-testid="stCheckbox"] label {
+        line-height: 1.5;
+    }
+    /* 正文区按钮字号与不确定开关一致（答题卡区有 10px 覆盖） */
+    div.stButton > button {
+        font-size: 13px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
     options = q["options"]
     opt_keys = sorted(options.keys())
@@ -346,34 +461,32 @@ def _show_exam_subject(subject_key):
 
     st.markdown("---")
 
-    # 查看答案功能（切换式：展开/收起）
-    show_answer_key = f"mock_show_ans_{qid}"
-    showing = st.session_state.get(show_answer_key, False)
-    btn_label = "🙈 收起答案" if showing else "📖 查看答案"
-    if st.button(btn_label, key=f"mock_toggle_ans_{qid}", use_container_width=False):
-        st.session_state[show_answer_key] = not showing
-        st.rerun()
-    if showing:
-        correct_display = get_answer_display(q["type"], q["answer"], options)
-        st.markdown(
-            f'<div style="background:#e8f5e9;border-left:4px solid #1b5e20;padding:8px 12px;'
-            f'border-radius:4px;margin:4px 0;">'
-            f'<span style="color:#1b5e20;font-weight:bold;">✅ 正确答案：{q["answer"]} - {correct_display}</span></div>',
-            unsafe_allow_html=True,
-        )
-        if q.get("explanation"):
-            with st.expander("📖 查看解析", expanded=True):
-                st.markdown(q["explanation"])
-
-    # 导航按钮
-    nav_cols = st.columns([1, 2, 1])
+    # 导航按钮（上一题、下一题、保存、提交按钮同行）
+    nav_cols = st.columns([1, 1, 1, 1])
     if nav_cols[0].button("◀ 上一题", use_container_width=True, disabled=(idx == 0)):
         st.session_state.mock_current = idx - 1
         st.rerun()
 
-    if nav_cols[2].button("下一题 ▶", use_container_width=True, disabled=(idx >= total_q - 1)):
+    if nav_cols[1].button("下一题 ▶", use_container_width=True, disabled=(idx >= total_q - 1)):
         st.session_state.mock_current = idx + 1
         st.rerun()
+
+    if nav_cols[2].button("💾 保存", use_container_width=True):
+        _save_mock_draft(subject_key)
+
+    if nav_cols[3].button("📤 提交试卷", use_container_width=True, type="primary"):
+        st.session_state.mock_confirm_submit = True
+
+    if st.session_state.get("mock_confirm_submit"):
+        unanswered = total_q - len(st.session_state.mock_answers)
+        st.warning(f"⚠️ 还有 {unanswered} 题未答，确认提交吗？（未答题不计为错题，但本题不得分）")
+        col_c1, col_c2 = st.columns(2)
+        if col_c1.button("✅ 确认提交", use_container_width=True):
+            _finish_subject(subject_key)
+            return
+        if col_c2.button("❌ 继续答题", use_container_width=True):
+            st.session_state.mock_confirm_submit = False
+            st.rerun()
 
     # 答题卡
     st.markdown("---")
@@ -384,7 +497,7 @@ def _show_exam_subject(subject_key):
     if filter_key not in st.session_state:
         st.session_state[filter_key] = "all"
 
-    fc1, fc2, fc3, fc4 = st.columns(4)
+    fc1, fc2, fc3, fc4, fc5 = st.columns(5)
     if fc1.button("📋 全部", key="mock_filter_all", use_container_width=True,
                   type="primary" if st.session_state[filter_key] == "all" else "secondary"):
         st.session_state[filter_key] = "all"
@@ -401,67 +514,105 @@ def _show_exam_subject(subject_key):
                   type="primary" if st.session_state[filter_key] == "marked" else "secondary"):
         st.session_state[filter_key] = "marked"
         st.rerun()
+    if fc5.button("不确定", key="mock_filter_uncertain", use_container_width=True,
+                  type="primary" if st.session_state[filter_key] == "uncertain" else "secondary"):
+        st.session_state[filter_key] = "uncertain"
+        st.rerun()
 
     filter_mode = st.session_state[filter_key]
+    answered = len(st.session_state.mock_answers)
     marked_count = len(st.session_state.mock_marked)
-    st.progress(answered / total_q, text=f"已答 {answered}/{total_q}" + (f" · 已标记 {marked_count}" if marked_count else ""))
+    uncertain_count = len(st.session_state.mock_uncertain)
+    st.progress(answered / total_q, text=f"已答 {answered}/{total_q}"
+        + (f" · 已标记 {marked_count}" if marked_count else "")
+        + (f" · 不确定 {uncertain_count}" if uncertain_count else ""))
 
-    cols_per_row = 10
-    rows = (total_q + cols_per_row - 1) // cols_per_row
-
-    for row in range(rows):
-        cols = st.columns(cols_per_row)
-        for col_idx in range(cols_per_row):
-            q_idx = row * cols_per_row + col_idx
-            with cols[col_idx]:
-                if q_idx >= total_q:
-                    st.empty()
+    # 答题卡导航格子（Streamlit 原生按钮，不会打开新标签页）
+    st.markdown("""
+    <style>
+    /* 答题卡按钮小字号不换行 */
+    div.stButton > button {
+        font-size: 10px !important; white-space: nowrap !important;
+        padding-left: 0px !important; padding-right: 0px !important;
+        min-height: 22px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    _cols = 10
+    for _row in range((total_q + _cols - 1) // _cols):
+        _rcols = st.columns(_cols)
+        for _ci in range(_cols):
+            _qi = _row * _cols + _ci
+            with _rcols[_ci]:
+                if _qi >= total_q:
+                    st.markdown("&nbsp;", unsafe_allow_html=True)
                     continue
-                q_item = eq[q_idx]
-                q_id = q_item["id"]
+                _qit = eq[_qi]
+                _qid = _qit["id"]
 
                 # 筛选逻辑
-                show = True
-                if filter_mode == "answered" and q_id not in st.session_state.mock_answers:
-                    show = False
-                if filter_mode == "unanswered" and q_id in st.session_state.mock_answers:
-                    show = False
-                if filter_mode == "marked" and q_id not in st.session_state.mock_marked:
-                    show = False
-
-                if not show:
-                    st.empty()
+                _vis = True
+                if filter_mode == "answered" and _qid not in st.session_state.mock_answers:
+                    _vis = False
+                if filter_mode == "unanswered" and _qid in st.session_state.mock_answers:
+                    _vis = False
+                if filter_mode == "marked" and _qid not in st.session_state.mock_marked:
+                    _vis = False
+                if filter_mode == "uncertain" and _qid not in st.session_state.mock_uncertain:
+                    _vis = False
+                if not _vis:
+                    st.markdown("&nbsp;", unsafe_allow_html=True)
                     continue
 
-                is_answered = q_id in st.session_state.mock_answers
-                is_marked = q_id in st.session_state.mock_marked
-                is_current = q_idx == idx
+                _answered = _qid in st.session_state.mock_answers
+                _marked = _qid in st.session_state.mock_marked
+                _uncertain = _qid in st.session_state.mock_uncertain
+                _current = _qi == idx
 
-                label = str(q_idx + 1)
+                _label = str(_qi + 1)
+                if _uncertain:
+                    _label = f"?{_label}"
+                elif _marked:
+                    _label = f"\u2605{_label}"  # ★
+                if _current:
+                    _label = f"\u25b6{_label}"  # ▶
 
-                btn_type = "primary" if is_answered else "secondary"
-
-                # 当前题高亮
-                if is_current:
-                    st.markdown(
-                        '<div style="border:2px solid #1565c0;border-radius:6px;background:#e3f2fd;padding:1px 2px;">',
-                        unsafe_allow_html=True
-                    )
-
-                badge_color = "#ff9800" if is_marked else "transparent"
-                badge_char = "★" if is_marked else "&nbsp;"
-                st.markdown(
-                    f'<div style="text-align:right;font-size:10px;color:{badge_color};'
-                    f'height:14px;line-height:14px;margin-bottom:-4px;">{badge_char}</div>',
-                    unsafe_allow_html=True
-                )
-
-                if st.button(label, key=f"mock_nav_{q_idx}", use_container_width=True, type=btn_type):
-                    st.session_state.mock_current = q_idx
+                _btype = "primary" if _answered else "secondary"
+                if st.button(_label, key=f"mock_card_{_qi}",
+                             use_container_width=True, type=_btype):
+                    st.session_state.mock_current = _qi
                     st.rerun()
 
-                if is_current:
-                    st.markdown('</div>', unsafe_allow_html=True)
+
+
+def _save_mock_draft(subject_key: str, auto_save: bool = False):
+    """将当前模拟考试状态保存为草稿
+    
+    auto_save=True: 后台静默保存，不暂停倒计时，不rerun，不显示提示
+    """
+    session_id = st.session_state.get("mock_session_id", "")
+    now = time.time()
+    remaining_seconds = max(0, st.session_state.get("mock_end_time", now) - now)
+    draft_data = {
+        "subject_key": subject_key,
+        "question_ids": [q["id"] for q in st.session_state.get("mock_questions", [])],
+        "answers": dict(st.session_state.get("mock_answers", {})),
+        "marked": list(st.session_state.get("mock_marked", set())),
+        "uncertain": list(st.session_state.get("mock_uncertain", set())),
+        "current_idx": st.session_state.get("mock_current", 0),
+        "session_id": session_id,
+        "type_boundaries": dict(st.session_state.get("mock_type_boundaries", {})),
+        "remaining_seconds": remaining_seconds,
+    }
+    save_draft("mock", session_id, draft_data)
+    st.session_state.mock_draft_id = session_id
+    if auto_save:
+        return  # 静默保存，不暂停，不rerun
+    st.session_state.mock_draft_saved = True
+    # 暂停倒计时
+    st.session_state.mock_paused_at = now
+    st.session_state.mock_remaining_at_pause = remaining_seconds
+    st.rerun()
 
 
 def _finish_subject(subject_key):
@@ -477,29 +628,40 @@ def _finish_subject(subject_key):
     correct_count = 0
     total_score = 0.0
     details = []
-    wrong_qids = []      # 收集答错的 (qid, user_ans)
-    correct_qids = []    # 收集答对的 qid
-    answer_records = []  # 收集答题记录
+    wrong_qids = []        # 收集答错的 (qid, user_ans) — 只含实际作答的
+    correct_qids = []      # 收集答对的 qid
+    answer_records = []    # 收集答题记录
+    uncertain_map = {}     # 答题者自评不确定性 {qid: bool}
 
     for q in eq:
         qid = q["id"]
         user_ans = answers.get(qid, "")
-        is_correct = check_answer(q["type"], user_ans, q["answer"])
-        score = 0
-        if is_correct:
-            if q["type"] == "single":
-                score = cfg["single_score"]
-            elif q["type"] == "multi":
-                score = cfg["multi_score"]
-            elif q["type"] == "judge":
-                score = cfg["judge_score"]
-            elif q["type"] == "indefinite":
-                score = cfg["indefinite_score"]
-            correct_count += 1
-            total_score += score
-            correct_qids.append(qid)
+        is_answered = user_ans != ""  # 是否实际作答
+        is_uncertain = qid in st.session_state.mock_uncertain
+
+        if not is_answered:
+            # 未作答：不计分，不计入错题/统计
+            is_correct = False
+            score = 0
         else:
-            wrong_qids.append((qid, user_ans))
+            is_correct = check_answer(q["type"], user_ans, q["answer"])
+            score = 0
+            if is_correct:
+                if q["type"] == "single":
+                    score = cfg["single_score"]
+                elif q["type"] == "multi":
+                    score = cfg["multi_score"]
+                elif q["type"] == "judge":
+                    score = cfg["judge_score"]
+                elif q["type"] == "indefinite":
+                    score = cfg["indefinite_score"]
+                correct_count += 1
+                total_score += score
+                correct_qids.append(qid)
+            else:
+                wrong_qids.append((qid, user_ans))
+
+        uncertain_map[qid] = is_uncertain
 
         answer_records.append({
             "question_id": qid,
@@ -507,6 +669,7 @@ def _finish_subject(subject_key):
             "is_correct": is_correct,
             "mode": "mock_exam",
             "session_id": st.session_state.get("mock_session_id", ""),
+            "is_uncertain": is_uncertain,
         })
 
         details.append({
@@ -525,10 +688,16 @@ def _finish_subject(subject_key):
 
     # 批量更新错题库和答题统计（单次读取+单次写入）
     stats_updates = [(qid, True) for qid in correct_qids] + [(qid, False) for qid, _ in wrong_qids]
-    batch_update_wrong_and_stats(wrong_qids, correct_qids, stats_updates)
+    batch_update_wrong_and_stats(wrong_qids, correct_qids, stats_updates, uncertain_map)
 
     # 批量追加答题记录
     batch_add_answer_records(answer_records)
+
+    # 标记数据已变更，触发首页统计缓存刷新
+    st.session_state._data_version = st.session_state.get("_data_version", 0) + 1
+
+    # 刷新统计缓存，确保后续页面读到最新数据
+    st.session_state.mock_stats_cache = load_question_stats()
 
     duration_str = f"{int(duration // 60)}分{int(duration % 60)}秒"
 
@@ -580,12 +749,23 @@ def _finish_subject(subject_key):
     }
     save_mock_exam_record(record)
 
+    # 提交成功后删除对应草稿
+    draft_id = st.session_state.pop("mock_draft_id", None)
+    if draft_id:
+        delete_draft("mock", draft_id)
+
     st.session_state.mock_state = f"{subject_key}_finished"
     st.rerun()
 
 
 def _show_subject_result(subject_key):
     """显示某一科的成绩"""
+    # 守卫初始化：防止页面刷新后 session state 丢失
+    if "mock_marked" not in st.session_state:
+        st.session_state.mock_marked = set()
+    if "mock_uncertain" not in st.session_state:
+        st.session_state.mock_uncertain = set()
+
     cfg = MOCK_EXAM_CONFIG[subject_key]
     result = st.session_state.mock_result
     total = result["total"]
@@ -706,7 +886,7 @@ def _show_subject_result(subject_key):
                 if cat_label:
                     st.markdown(f"**知识板块**：{cat_label}")
 
-                q_stats = get_question_stats(d.get("id", ""))
+                q_stats = st.session_state.mock_stats_cache.get(d.get("id", ""), {"correct_count": 0, "wrong_count": 0})
                 st.caption(f"📊 答题统计：答对 {q_stats['correct_count']} 次 / 答错 {q_stats['wrong_count']} 次")
 
     # 答题卡
@@ -731,17 +911,25 @@ def _show_subject_result(subject_key):
             bg = "#c8e6c9" if is_correct else "#ffcdd2"
             tc = "#1b5e20" if is_correct else "#b71c1c"
             
-            # 标记题角标
+            # 标记题角标 + 不确定角标
             is_marked = q_item["id"] in st.session_state.mock_marked
-            marker = '<sup style="font-size:8px;">⭐</sup>' if is_marked else ''
-            border_style = "2px solid #ff9800" if is_marked else "1px solid #ddd"
+            is_uncertain = q_item["id"] in st.session_state.mock_uncertain
+            if is_uncertain:
+                indicators = '<sup style="font-size:8px;color:#9c27b0;">❓</sup>'
+                border_style = "1px solid #ddd"
+            elif is_marked:
+                indicators = '<sup style="font-size:8px;">⭐</sup>'
+                border_style = "2px solid #ff9800"
+            else:
+                indicators = ''
+                border_style = "1px solid #ddd"
             
             nav_html += f'''
             <div style="flex:1;min-width:0;">
                 <div style="display:block;width:100%;background:{bg};color:{tc};border:{border_style};
                           border-radius:3px;font-size:12px;min-height:30px;line-height:30px;
                           text-align:center;position:relative;">
-                    {q_idx + 1}{marker}
+                    {q_idx + 1}{indicators}
                 </div>
             </div>'''
         nav_html += '</div>'
@@ -818,7 +1006,7 @@ def _show_final_result():
     col1, col2, col3 = st.columns(3)
     if col1.button("🔄 重新考试", key="mock_final_retry", use_container_width=True):
         _reset_mock_exam()
-    if col3.button("🏠 返回首页", key="mock_final_home", use_container_width=True, type="primary"):
+    if col3.button("返回", key="mock_final_home", use_container_width=True, type="primary"):
         _reset_mock_exam()
         st.session_state.pop("nav_to", None)
         st.rerun()
@@ -831,11 +1019,9 @@ def _reset_mock_exam():
         "mock_answers", "mock_start_time", "mock_end_time",
         "mock_confirm_submit", "mock_session_id", "mock_type_boundaries",
         "mock_result", "mock_prev_result", "mock_final_results",
+        "mock_stats_cache",
     ]
     for key in keys_to_clear:
         if key in st.session_state:
             del st.session_state[key]
-    # 清除所有答案展开状态
-    for k in [key for key in st.session_state if key.startswith("mock_show_ans_")]:
-        del st.session_state[k]
     st.rerun()

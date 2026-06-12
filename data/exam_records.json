@@ -166,5 +166,32 @@
         "correct": 3
       }
     }
+  },
+  {
+    "type": "comprehensive",
+    "date": "2026-06-10 13:41",
+    "total": 60,
+    "correct": 58,
+    "accuracy": "96.7%",
+    "category": "综合训练"
+  },
+  {
+    "type": "consolidation",
+    "date": "2026-06-10 17:05",
+    "total": 60,
+    "correct": 52,
+    "accuracy": "86.7%"
+  },
+  {
+    "type": "consolidation",
+    "date": "2026-06-11 09:42",
+    "total": 60,
+    "correct": 53,
+    "accuracy": "88.3%"
+  },
+  {
+    "type": "test",
+    "score": 99,
+    "session": "verify"
   }
 ]

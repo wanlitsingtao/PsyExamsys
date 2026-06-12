@@ -17,6 +17,7 @@ EXAM_RECORDS_FILE = DATA_DIR / "exam_records.json"
 STUDY_RECORDS_FILE = DATA_DIR / "study_records.json"    # 背题历史记录
 ANSWER_RECORDS_FILE = DATA_DIR / "answer_records.json"  # 每题答题过程记录
 BACKUP_DIR = DATA_DIR / "backup"
+DRAFTS_DIR = DATA_DIR / "drafts"
 
 # 题库类型映射（短码 → 显示名）
 EXAM_TYPE_LABELS = {
@@ -50,6 +51,9 @@ DEFAULT_CONFIG = {
     "wrongbook_extract_count": 50,
     "last_import_files": [],
 }
+
+# 遗忘预警阈值：距上次答对 > 此天数即触发"需要复习"标签（即 >=6 天）
+_RETENTION_DAYS_THRESHOLD = 5
 
 # 模拟考试固定配置（实际考试模型，不可配置）
 MOCK_EXAM_CONFIG = {
@@ -274,15 +278,17 @@ def _extract_qids_from_wrong_list(wrong_list):
     return wrong_list
 
 
-def batch_update_wrong_and_stats(wrong_qids, correct_qids, stats_updates):
+def batch_update_wrong_and_stats(wrong_qids, correct_qids, stats_updates, uncertain_map=None):
     """
     批量更新错题库和题目答题统计（单次读+单次写）
     新规则：答错次数 >= 答对次数 → 记入错题本
     - wrong_qids: list of (question_id, user_answer) 本次答错的
     - correct_qids: list of question_id 本次答对的
     - stats_updates: list of (question_id, is_correct) 需要更新统计的
+    - uncertain_map: dict {qid: bool} 答题者自评不确定性标记
     """
     now = datetime.now().isoformat()
+    uncertain_map = uncertain_map or {}
 
     # 1. 先加载并更新题目答题统计，计算每组题的新答对/答错次数
     stats = load_question_stats()
@@ -331,6 +337,23 @@ def batch_update_wrong_and_stats(wrong_qids, correct_qids, stats_updates):
         if last_is_correct is not None:
             stats[qid]["last_correct"] = last_is_correct
 
+        # 更新答题历史（append 本次是否答对）
+        history = list(stats[qid].get("answer_history", []))
+        history.append(last_is_correct if last_is_correct is not None else False)
+        stats[qid]["answer_history"] = history
+
+        # 更新自评不确定性（按指数移动平均混入新标记）
+        old_uncertainty = stats[qid].get("self_uncertainty", 0.0)
+        new_uncertain = 1.0 if uncertain_map.get(qid) else 0.0
+        if old_uncertainty > 0 or new_uncertain > 0:
+            alpha = 0.3  # EMA 平滑系数
+            stats[qid]["self_uncertainty"] = round(alpha * new_uncertain + (1 - alpha) * old_uncertainty, 3)
+        else:
+            stats[qid]["self_uncertainty"] = 0.0
+
+        # 重新计算掌握度等级、置信度、不稳定标记
+        _recalc_mastery_fields(stats[qid])
+
     save_question_stats(stats)
 
     # 2. 根据新规则重建错题库：答错次数 >= 答对次数（且至少答过一次）→ 记入错题
@@ -349,6 +372,58 @@ def batch_update_wrong_and_stats(wrong_qids, correct_qids, stats_updates):
             new_wrong_qids.add(qid)
 
     save_wrong_questions(list(new_wrong_qids))
+
+
+def _recalc_mastery_fields(stats_entry):
+    """
+    根据答题统计重新计算掌握度等级、置信度、不稳定标记
+    直接修改传入的 stats_entry 字典
+    """
+    cc = stats_entry.get("correct_count", 0)
+    wc = stats_entry.get("wrong_count", 0)
+    total = cc + wc
+    history = stats_entry.get("answer_history", [])
+
+    if total == 0:
+        stats_entry["mastery_level"] = 0
+        stats_entry["confidence"] = 0.0
+        stats_entry["unstable"] = False
+        stats_entry["retention_due"] = False
+        return
+
+    accuracy = cc / total if total > 0 else 0
+
+    # ---- 掌握度等级 ----
+    if accuracy >= 0.9 and total >= 5 and len(history) >= 3 and all(history[-3:]):
+        level = 5
+    elif accuracy >= 0.8 and total >= 3:
+        level = 4
+    elif accuracy >= 0.6:
+        level = 3
+    elif total > 2:
+        level = 2
+    else:
+        level = 1
+
+    stats_entry["mastery_level"] = level
+
+    # ---- 置信度 (0.0–1.0) ----
+    sample_factor = min(total / 10, 1.0)
+    changes = sum(1 for i in range(1, len(history)) if history[i] != history[i - 1])
+    stability = 1.0 - min(changes / max(len(history), 1), 1.0)
+    confidence = round(sample_factor * 0.6 + stability * 0.4, 2)
+    stats_entry["confidence"] = confidence
+
+    # ---- 不稳定检测 ----
+    has_correct = any(h for h in history)
+    last_wrong = len(history) > 0 and not history[-1]
+    changes_count = sum(1 for i in range(1, len(history)) if history[i] != history[i - 1])
+    unstable = False
+    if has_correct and last_wrong and changes_count < 2:
+        unstable = True  # 消退型
+    elif changes_count >= 2:
+        unstable = True  # 波动型
+    stats_entry["unstable"] = unstable
 
 
 def batch_add_answer_records(records):
@@ -546,6 +621,16 @@ SUPER_CATEGORY_MAP = {
         "心理危机识别", "家庭教育与心理健康科普",
         "心理咨询专业伦理与相关法律规范",
     ],
+}
+
+# 掌握度等级标签（0-5）
+MASTERY_LABELS = {
+    0: "未学习",
+    1: "初识",
+    2: "学习中",
+    3: "基本掌握",
+    4: "掌握",
+    5: "熟练",
 }
 
 
@@ -787,19 +872,16 @@ def backup_data():
 
 def _priority_sample(question_list, count, wrong_ids=None, stats=None):
     """
-    按优先级从题目列表中抽取 count 道题
-    优先级规则（tier 主导，与错题本规则一致）：
-      tier0（答错过）> tier1（新题+可能猜对题）> tier2（稳定掌握题）
-      tier1 包含：
-        - 从未答过的题目（wrong=0, correct=0）
-        - 答对但从未答错，且尝试次数≤2 的题目（可能猜对，需要重测）
-      tier2 仅包含：多次答对且正确率>50%（已稳定掌握，仅用于补齐）
+    按优先级从题目列表中抽取 count 道题。
+    四级分组：
+      Group 0（答错≥答对，仍在错题本）> Group 1（从未答过）> Group 2（仅答对1次/猜对防护）> Group 3（其余）
+      Group 3 内部四级子排序：
+        sub=0 遗忘预警（retention_due=True，距上次答对>=阈值天）> 
+        sub=1 不稳定（消退型/波动型）> 
+        sub=2 上次答错 > 
+        sub=3 普通
 
-    tier0/tier1/tier2 内部排序：
-      1. 正确率升序（低正确率优先）
-      2. 同等正确率时：尝试次数升序（答题次数少=可能蒙对，优先复检）
-      3. 同等尝试次数时：wrong 次数降序（曾经错过更多次的优先）
-      4. 其余随机打散
+    同级内部排序：正确率升序（低优先） → 答题次数升序（少优先） → wrong降序 → random
     """
     if not question_list or count <= 0:
         return []
@@ -815,31 +897,41 @@ def _priority_sample(question_list, count, wrong_ids=None, stats=None):
         s = stats.get(qid, {"correct_count": 0, "wrong_count": 0})
         wrong = s.get("wrong_count", 0)
         correct = s.get("correct_count", 0)
-
-        # 层级（与错题本规则一致）：
-        #   0=答错过(wrong>0且wrong>=correct)     ——仍在错题本，最高优先
-        #   1=新题或可能猜对(wrong==0, correct<=2) ——从未答过或仅答对1-2次从未答错
-        #   2=稳定掌握(correct>wrong, wrong>0 或 correct>2) ——已移出错题本，仅用于补齐
-        if wrong > 0 and wrong >= correct:
-            tier = 0  # 最高优先：答错过
-        elif correct == 0:
-            tier = 1  # 新题：从未答过
-        elif wrong == 0 and correct <= 2:
-            tier = 1  # 可能猜对：答对1-2次但从未答错，需重测
-        else:
-            tier = 2  # 稳定掌握：多次正确或有过错后正确率>50%
-
-        # 内部排序指标：正确率（升序=低正确率优先）
-        # tier0/tier1/tier2 的 accuracy 参与 tier 内同层排序
         total_ans = wrong + correct
+
+        # 四级分组
+        if wrong > 0 and wrong >= correct:
+            group = 0  # 仍在错题本
+        elif correct == 0 and wrong == 0:
+            group = 1  # 从未答过
+        elif correct == 1 and wrong == 0:
+            group = 2  # 猜对防护（仅答对1次）
+        else:
+            group = 3  # 其余
+
+        # Group 3 内部子排序
+        sub = 3  # 默认普通
+        if group == 3:
+            retention_due = s.get("retention_due", False)
+            unstable = s.get("unstable", False)
+            last_correct = s.get("last_correct")
+            if retention_due:
+                sub = 0  # 遗忘预警最高
+            elif unstable:
+                sub = 1  # 不稳定次之
+            elif last_correct is False:
+                sub = 2  # 上次答错
+            else:
+                sub = 3
+
         accuracy = correct / total_ans if total_ans > 0 else 0.0
 
-        scored.append((tier, accuracy, total_ans, -wrong, random.random(), q))
+        # 排序: group → sub → accuracy↑ → total_ans↑ → -wrong↓ → random
+        scored.append((group, sub, accuracy, total_ans, -wrong, random.random(), q))
 
-    # 排序：tier升序 → accuracy升序 → total_ans升序 → wrong降序 → random
-    scored.sort(key=lambda x: (x[0], x[1], x[2], x[3], x[4]))
+    scored.sort(key=lambda x: (x[0], x[1], x[2], x[3], x[4], x[5]))
 
-    return [q for _, _, _, _, _, q in scored[:count]]
+    return [q for _, _, _, _, _, _, q in scored[:count]]
 
 
 def _balanced_sample_by_type(questions_by_cat, total_count, wrong_ids=None, stats=None):
@@ -945,12 +1037,27 @@ QUESTION_STATS_FILE = DATA_DIR / "question_stats.json"
 
 
 def load_question_stats():
-    """加载题目答题统计"""
+    """加载题目答题统计（retention_due 动态计算，不依赖写盘快照）"""
     ensure_dirs()
     if QUESTION_STATS_FILE.exists():
         with open(QUESTION_STATS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {}
+            raw = json.load(f)
+    else:
+        return {}
+
+    # 动态计算 retention_due（仅依赖 last_correct + last_answer_time，不依赖快照）
+    now = datetime.now()
+    for s in raw.values():
+        if s.get("last_correct") is True and s.get("last_answer_time"):
+            try:
+                last_time = datetime.fromisoformat(s["last_answer_time"])
+                days_since = (now - last_time).days
+                s["retention_due"] = days_since > _RETENTION_DAYS_THRESHOLD
+            except (ValueError, TypeError):
+                s["retention_due"] = False
+        else:
+            s["retention_due"] = False
+    return raw
 
 
 def save_question_stats(stats):
@@ -1136,3 +1243,178 @@ def get_answer_display(question_type, correct_answer, options):
         return "、".join(parts)
     else:
         return f"{correct_answer}: {options.get(correct_answer, '')}"
+
+
+# ============================
+# 草稿系统（答题中途保存/恢复）
+# ============================
+
+def _ensure_drafts_dir():
+    """确保草稿目录存在"""
+    DRAFTS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def save_draft(prefix, draft_id, data):
+    """
+    保存/覆盖答题草稿
+    - prefix: 草稿类型前缀（"mock"/"spec"/"consol"/"wrongbook"）
+    - draft_id: 草稿唯一标识
+    - data: 草稿数据 dict（将顶层字段与草稿元数据合并存储）
+    """
+    _ensure_drafts_dir()
+    filepath = DRAFTS_DIR / f"{prefix}_{draft_id}.json"
+    record = {
+        **data,
+        "draft_id": draft_id,
+        "saved_at": datetime.now().isoformat(),
+    }
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(record, f, ensure_ascii=False, indent=2)
+
+
+def load_drafts(prefix):
+    """
+    加载指定前缀的所有草稿（按保存时间降序排列）
+    - prefix: 草稿类型前缀
+    返回: list[dict]
+    """
+    _ensure_drafts_dir()
+    drafts = []
+    for f in sorted(DRAFTS_DIR.glob(f"{prefix}_*.json"), reverse=True):
+        try:
+            with open(f, "r", encoding="utf-8") as fh:
+                drafts.append(json.load(fh))
+        except (json.JSONDecodeError, IOError):
+            pass  # 忽略损坏的草稿文件
+    return drafts
+
+
+def delete_draft(prefix, draft_id):
+    """
+    删除指定草稿
+    - prefix: 草稿类型前缀
+    - draft_id: 草稿标识
+    """
+    filepath = DRAFTS_DIR / f"{prefix}_{draft_id}.json"
+    if filepath.exists():
+        filepath.unlink()
+
+
+# ============================
+# 掌握度分布分析
+# ============================
+
+def get_mastery_distribution(questions, exam_type=None):
+    """
+    计算各知识板块的掌握度分布。
+    返回:
+      {
+        "by_category": {cat: {total, mastery_counts, studied_rate, avg_mastery, retention_due, unstable}},
+        "retention_list": [{question_id, question, category, days_since_correct, mastery_level}],
+        "unstable_list": [{question_id, question, category, unstable_type, history, confidence, mastery_level}],
+      }
+    """
+    from datetime import datetime as dt
+
+    if exam_type:
+        questions = [q for q in questions if q.get("exam_type") == exam_type]
+
+    stats = load_question_stats()
+    now = dt.now()
+
+    # 初始化各板块
+    cats = {}
+    qid_to_cat = {}
+    for q in questions:
+        cat = q.get("category", "其他")
+        qid_to_cat[q.get("id", "")] = cat
+        if cat not in cats:
+            cats[cat] = {"total": 0, "mastery_counts": [0] * 6,
+                         "retention_due": 0, "unstable": 0}
+
+    for q in questions:
+        qid = q.get("id", "")
+        cat = qid_to_cat.get(qid, "其他")
+        if cat in cats:
+            cats[cat]["total"] += 1
+
+    retention_list = []
+    unstable_list = []
+
+    # 一次遍历计算所有统计
+    for q in questions:
+        qid = q.get("id", "")
+        cat = qid_to_cat.get(qid, "其他")
+        s = stats.get(qid)
+
+        # 掌握度等级（从 stats 读取，batch_update 已预计算）
+        level = s.get("mastery_level", 0) if s else 0
+        if cat in cats:
+            cats[cat]["mastery_counts"][level] += 1
+
+        # retention_due（动态值）
+        if s and s.get("retention_due"):
+            if cat in cats:
+                cats[cat]["retention_due"] += 1
+            days_since = 0
+            last_time = s.get("last_answer_time")
+            if last_time:
+                try:
+                    days_since = (now - dt.fromisoformat(last_time)).days
+                except (ValueError, TypeError):
+                    pass
+            retention_list.append({
+                "question_id": qid,
+                "question": q.get("question", "")[:50],
+                "category": cat,
+                "days_since_correct": days_since,
+                "mastery_level": level,
+            })
+
+        # unstable
+        if s and s.get("unstable"):
+            if cat in cats:
+                cats[cat]["unstable"] += 1
+            history = s.get("answer_history", [])
+            unstable_type = "消退型" if any(history) and (len(history) > 0 and not history[-1]) else "波动型"
+            changes = sum(1 for i in range(1, len(history)) if history[i] != history[i - 1])
+            if not any(history):
+                unstable_type = "全错"
+            elif not history[-1] and changes < 2:
+                unstable_type = "消退型"
+            unstable_list.append({
+                "question_id": qid,
+                "question": q.get("question", "")[:50],
+                "category": cat,
+                "unstable_type": unstable_type,
+                "history": history,
+                "confidence": s.get("confidence", 0.0),
+                "mastery_level": level,
+            })
+
+    # 后处理：计算 studied_rate, avg_mastery
+    by_category = {}
+    for cat, d in cats.items():
+        total = d["total"]
+        counts = d["mastery_counts"]
+        studied = sum(counts[1:])
+        studied_rate = studied / total * 100 if total > 0 else 0
+        avg_mastery = sum(i * counts[i] for i in range(6)) / max(total, 1)
+        by_category[cat] = {
+            "total": total,
+            "mastery_counts": counts,
+            "studied_rate": studied_rate,
+            "avg_mastery": round(avg_mastery, 1),
+            "retention_due": d["retention_due"],
+            "unstable": d["unstable"],
+        }
+
+    # 排序：retention_list 按天数降序，unstable_list 按置信度升序
+    retention_list.sort(key=lambda x: x["days_since_correct"], reverse=True)
+    unstable_list.sort(key=lambda x: x["confidence"])
+
+    return {
+        "by_category": by_category,
+        "retention_list": retention_list,
+        "unstable_list": unstable_list,
+    }

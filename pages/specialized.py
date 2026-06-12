@@ -8,12 +8,14 @@
 """
 import streamlit as st
 import uuid
+import time
 from datetime import datetime
 from utils.data_manager import (
     extract_questions_by_category, extract_questions, check_answer, get_answer_display,
     batch_update_wrong_and_stats, batch_add_answer_records,
     get_all_categories, infer_category, get_question_stats,
     load_config, get_category_training_stats, load_question_stats,
+    save_draft, load_drafts, delete_draft, save_exam_record,
 )
 
 
@@ -183,6 +185,31 @@ def _show_spec_start(questions):
 
     st.markdown("---")
 
+    # ---- 历史草稿列表（如有） ----
+    drafts = load_drafts("spec")
+    if drafts:
+        st.markdown("### 📂 未完成的训练（点击继续作答）")
+        for draft in drafts:
+            d_id = draft.get("draft_id", "")
+            d_cat = draft.get("category", "未知板块")
+            d_mode = draft.get("mode", "specialized")
+            d_mode_label = "综合训练" if d_mode == "comprehensive" else "专项训练"
+            d_answered = len(draft.get("answers", {}))
+            d_total = len(draft.get("question_ids", []))
+            d_saved = draft.get("saved_at", "")
+            dcol1, dcol2, dcol3 = st.columns([5, 2, 1])
+            dcol1.markdown(
+                f"**{d_mode_label}·{d_cat}**　"
+                f"已答 {d_answered}/{d_total} 题　"
+                f"🕐 {d_saved}"
+            )
+            if dcol2.button("▶ 继续作答", key=f"spec_resume_{d_id}", use_container_width=True, type="primary"):
+                _resume_spec_draft(draft, questions)
+            if dcol3.button("🗑", key=f"spec_del_draft_{d_id}", use_container_width=True, help="删除此草稿"):
+                delete_draft("spec", d_id)
+                st.rerun()
+        st.markdown("---")
+
     # 处理选择
     if selected_mode == "comprehensive":
         _start_comprehensive(questions)
@@ -222,8 +249,10 @@ def _start_comprehensive(questions):
     st.session_state.spec_current = 0
     st.session_state.spec_answers = {}
     st.session_state.spec_marked = set()
+    st.session_state.spec_uncertain = set()
     st.session_state.spec_state = "running"
     st.session_state.spec_session_id = session_id
+    st.session_state.spec_last_auto_save = time.time()  # 自动保存计时起点
     st.session_state.spec_category = "综合训练"
     st.session_state.spec_confirm_submit = False
     st.session_state.spec_type_boundaries = {
@@ -231,10 +260,8 @@ def _start_comprehensive(questions):
         "multi_end": multi_end,
     }
     st.session_state.spec_mode = "comprehensive"
+    st.session_state.pop("spec_draft_id", None)  # 新训练清除旧草稿ID
     st.rerun()
-
-
-def _start_specialized(questions, category):
     """开始专项训练"""
     _clear_spec_show_ans()
     config = load_config()
@@ -265,8 +292,10 @@ def _start_specialized(questions, category):
     st.session_state.spec_current = 0
     st.session_state.spec_answers = {}
     st.session_state.spec_marked = set()
+    st.session_state.spec_uncertain = set()
     st.session_state.spec_state = "running"
     st.session_state.spec_session_id = session_id
+    st.session_state.spec_last_auto_save = time.time()  # 自动保存计时起点
     st.session_state.spec_category = category
     st.session_state.spec_confirm_submit = False
     st.session_state.spec_type_boundaries = {
@@ -274,14 +303,48 @@ def _start_specialized(questions, category):
         "multi_end": multi_end,
     }
     st.session_state.spec_mode = "specialized"
+    st.session_state.pop("spec_draft_id", None)  # 新训练清除旧草稿ID
+    st.rerun()
+    """从草稿恢复专项训练/综合训练状态"""
+    _clear_spec_show_ans()
+    # 按 question_ids 还原题目对象（按顺序）
+    q_map = {q["id"]: q for q in questions}
+    restored_questions = [q_map[qid] for qid in draft.get("question_ids", []) if qid in q_map]
+    if not restored_questions:
+        import streamlit as _st
+        _st.error("❌ 草稿中的题目已不存在于题库中，无法恢复。")
+        return
+
+    st.session_state.spec_questions = restored_questions
+    st.session_state.spec_answers = draft.get("answers", {})
+    # marked 草稿存为 list，恢复时转回 set
+    st.session_state.spec_marked = set(draft.get("marked", []))
+    st.session_state.spec_uncertain = set(draft.get("uncertain", []))
+    st.session_state.spec_current = draft.get("current_idx", 0)
+    st.session_state.spec_session_id = draft.get("session_id", "")
+    st.session_state.spec_category = draft.get("category", "综合训练")
+    st.session_state.spec_mode = draft.get("mode", "specialized")
+    st.session_state.spec_type_boundaries = draft.get("type_boundaries", {"single_end": 0, "multi_end": 0})
+    st.session_state.spec_confirm_submit = False
+    st.session_state.spec_state = "running"
+    st.session_state.spec_last_auto_save = time.time()  # 自动保存计时起点
+    # 标记当前是从草稿恢复的，用于提交时删除草稿
+    st.session_state.spec_draft_id = draft.get("draft_id", "")
     st.rerun()
 
 
 def _show_spec_running():
     """显示专项训练进行中的界面（与背题系统统一）"""
+    # ---- 自动保存：每 5 分钟静默保存 ----
+    _now = time.time()
+    if _now - st.session_state.get("spec_last_auto_save", _now) >= 300:
+        _save_spec_draft(auto_save=True)
+        st.session_state.spec_last_auto_save = _now
+
     sq = st.session_state.spec_questions
     total_q = len(sq)
     idx = st.session_state.spec_current
+
     q = sq[idx]
     qid = q["id"]
     boundaries = st.session_state.spec_type_boundaries
@@ -292,50 +355,30 @@ def _show_spec_running():
     if "spec_stats_cache" not in st.session_state:
         st.session_state.spec_stats_cache = load_question_stats()
 
-    # 标题行 + 返回按钮（同行居右）
+    # 标题行 + 返回按钮（同行居右；保存按钮已移至导航行）
     mode_label = "综合训练" if mode == "comprehensive" else "专项训练"
     title_col, back_col = st.columns([5, 1])
     with title_col:
         st.markdown(f"### 🎯 {mode_label}：**{category}**")
     with back_col:
-        if st.button("← 返回训练选择", key="spec_back_to_start", use_container_width=True):
+        if st.button("返回", key="spec_back_to_start", use_container_width=True):
             st.session_state.spec_state = "idle"
             keys_to_clear = [k for k in st.session_state if k.startswith("spec_")]
             for key in keys_to_clear:
                 del st.session_state[key]
             st.rerun()
+    # 保存成功提示
+    if st.session_state.pop("spec_draft_saved", False):
+        st.success("✅ 进度已保存，下次可在首页继续作答。", icon="💾")
     st.markdown("---")
-
-    # 已答/未答统计
-    answered = len(st.session_state.spec_answers)
-    unanswered = total_q - answered
-
-    meta_cols = st.columns([1, 1, 1, 1, 2])
-    meta_cols[0].markdown(f"**已答**: {answered}")
-    meta_cols[1].markdown(f"**未答**: {unanswered}")
-    meta_cols[2].markdown(f"**进度**: {answered}/{total_q}")
 
     # 题型段标签
     se = boundaries["single_end"]
     me = boundaries["multi_end"]
-    meta_cols[3].markdown(
+    st.markdown(
         f"🔵 {se}题 / 🟢 {me-se}题 / 🟠 {total_q-me}题",
         help="蓝色=单选题 | 绿色=多选题 | 橙色=判断题"
     )
-
-    submit_check = meta_cols[4].button("📤 提交所有答案", use_container_width=True, type="primary")
-    if submit_check:
-        st.session_state.spec_confirm_submit = True
-
-    if st.session_state.get("spec_confirm_submit"):
-        st.warning(f"⚠️ 还有 {unanswered} 题未答，确认提交吗？未答题将计为错误。")
-        col_c1, col_c2 = st.columns(2)
-        if col_c1.button("✅ 确认提交", use_container_width=True):
-            _finish_specialized()
-            return
-        if col_c2.button("❌ 继续答题", use_container_width=True):
-            st.session_state.spec_confirm_submit = False
-            st.rerun()
 
     st.markdown("---")
 
@@ -357,7 +400,7 @@ def _show_spec_running():
     # 题号行：左侧题号，右侧历史统计
     title_cols = st.columns([1, 2])
     with title_cols[0]:
-        st.markdown(f"### 第 {idx+1}/{total_q} 题")
+        st.markdown(f"##### 第 {idx+1}/{total_q} 题")
     with title_cols[1]:
         stats_parts = []
         if q_stats["correct_count"] > 0 or q_stats["wrong_count"] > 0:
@@ -367,15 +410,43 @@ def _show_spec_running():
             stats_parts.append("🟢 上次答对")
         elif last_correct is False:
             stats_parts.append("🔴 上次答错")
+        # 掌握状态标签
+        if q_stats.get("retention_due"):
+            stats_parts.append("⏰ 遗忘预警")
+        if q_stats.get("unstable"):
+            history = q_stats.get("answer_history", [])
+            if history and not history[-1]:
+                stats_parts.append("⚠️ 消退型")
+            else:
+                stats_parts.append("⚠️ 波动型")
         if stats_parts:
             st.markdown(f"<div style='text-align:right;padding-top:0.5em;color:#888;font-size:16px;'>{'&nbsp;&nbsp;|&nbsp;&nbsp;'.join(stats_parts)}</div>", unsafe_allow_html=True)
 
-    # 题型标签 + 标记按钮同行
-    type_col1, type_col2 = st.columns([8, 2])
+    # 题型标签 + 不确定按钮 + 标记按钮 同行
+    type_col1, type_col2, type_col3 = st.columns([6, 2, 2])
+    # 答过 3 次以上才显示「不确定」开关
+    total_answers = q_stats["correct_count"] + q_stats["wrong_count"]
     with type_col1:
         st.markdown(f"**{type_labels[q['type']]}**"
                     f" · 📂 {q.get('category', category)}")
     with type_col2:
+        if total_answers >= 3:
+            toggle_key = f"spec_uncertain_toggle_{qid}"
+            if toggle_key not in st.session_state:
+                st.session_state[toggle_key] = qid in st.session_state.spec_uncertain
+
+            def _on_spec_uncertain_toggle():
+                if st.session_state[toggle_key]:
+                    st.session_state.spec_uncertain.add(qid)
+                else:
+                    st.session_state.spec_uncertain.discard(qid)
+
+            st.toggle("不确定",
+                      key=toggle_key,
+                      value=qid in st.session_state.spec_uncertain,
+                      help="标记此题为不确定",
+                      on_change=_on_spec_uncertain_toggle)
+    with type_col3:
         marked = qid in st.session_state.spec_marked
         if st.button("⭐ 标记" if marked else "☆ 标记",
                      key=f"spec_mark_{qid}",
@@ -388,6 +459,20 @@ def _show_spec_running():
             st.rerun()
     
     st.markdown(f"**{q['question']}**")
+
+    # 选项行距：1.5倍
+    st.markdown("""
+    <style>
+    div[data-testid="stRadio"] label,
+    div[data-testid="stCheckbox"] label {
+        line-height: 1.5;
+    }
+    /* 正文区按钮字号与不确定开关一致（答题卡区有 10px 覆盖） */
+    div.stButton > button {
+        font-size: 13px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
     options = q["options"]
     opt_keys = sorted(options.keys())
@@ -461,8 +546,8 @@ def _show_spec_running():
 
     st.markdown("---")
 
-    # 导航按钮（使用 on_click 回调避免双重 rerun）
-    nav_cols = st.columns([1, 2, 1])
+    # 导航按钮（上一题、下一题、保存、提交按钮同行，使用 on_click 回调避免双重 rerun）
+    nav_cols = st.columns([1, 1, 1, 1])
 
     def _go_prev():
         st.session_state.spec_current = max(0, st.session_state.spec_current - 1)
@@ -470,10 +555,30 @@ def _show_spec_running():
     def _go_next():
         st.session_state.spec_current = min(total_q - 1, st.session_state.spec_current + 1)
 
+    def _save_callback():
+        _save_spec_draft()
+
+    def _confirm_submit():
+        st.session_state.spec_confirm_submit = True
+
     nav_cols[0].button("◀ 上一题", use_container_width=True,
                        disabled=(idx == 0), on_click=_go_prev)
-    nav_cols[2].button("下一题 ▶", use_container_width=True,
+    nav_cols[1].button("下一题 ▶", use_container_width=True,
                        disabled=(idx >= total_q - 1), on_click=_go_next)
+    nav_cols[2].button("💾 保存", use_container_width=True, on_click=_save_callback)
+    nav_cols[3].button("📤 提交所有答案", use_container_width=True,
+                       type="primary", on_click=_confirm_submit)
+
+    if st.session_state.get("spec_confirm_submit"):
+        unanswered = total_q - len(st.session_state.spec_answers)
+        st.warning(f"⚠️ 还有 {unanswered} 题未答，确认提交吗？未答题将计为错误。")
+        col_c1, col_c2 = st.columns(2)
+        if col_c1.button("✅ 确认提交", use_container_width=True):
+            _finish_specialized()
+            return
+        if col_c2.button("❌ 继续答题", use_container_width=True):
+            st.session_state.spec_confirm_submit = False
+            st.rerun()
 
     # ---- 答题卡 ----
     st.markdown("---")
@@ -484,7 +589,7 @@ def _show_spec_running():
     if filter_key not in st.session_state:
         st.session_state[filter_key] = "all"
 
-    fc1, fc2, fc3, fc4 = st.columns(4)
+    fc1, fc2, fc3, fc4, fc5 = st.columns(5)
     if fc1.button("📋 全部", key="spec_filter_all", use_container_width=True,
                   type="primary" if st.session_state[filter_key] == "all" else "secondary"):
         st.session_state[filter_key] = "all"
@@ -501,67 +606,98 @@ def _show_spec_running():
                   type="primary" if st.session_state[filter_key] == "marked" else "secondary"):
         st.session_state[filter_key] = "marked"
         st.rerun()
+    if fc5.button("不确定", key="spec_filter_uncertain", use_container_width=True,
+                  type="primary" if st.session_state[filter_key] == "uncertain" else "secondary"):
+        st.session_state[filter_key] = "uncertain"
+        st.rerun()
 
     filter_mode = st.session_state[filter_key]
+    answered = len(st.session_state.spec_answers)
     marked_count = len(st.session_state.spec_marked)
-    st.progress(answered / total_q, text=f"已答 {answered}/{total_q}" + (f" · 已标记 {marked_count}" if marked_count else ""))
+    uncertain_count = len(st.session_state.spec_uncertain)
+    st.progress(answered / total_q, text=f"已答 {answered}/{total_q}"
+        + (f" · 已标记 {marked_count}" if marked_count else "")
+        + (f" · 不确定 {uncertain_count}" if uncertain_count else ""))
 
-    cols_per_row = 10
-    rows = (total_q + cols_per_row - 1) // cols_per_row
-
-    for row in range(rows):
-        cols = st.columns(cols_per_row)
-        for col_idx in range(cols_per_row):
-            q_idx = row * cols_per_row + col_idx
-            with cols[col_idx]:
-                if q_idx >= total_q:
-                    st.empty()
+    # 答题卡导航格子（Streamlit 原生按钮，不会打开新标签页）
+    st.markdown("""
+    <style>
+    div.stButton > button {
+        font-size: 10px !important; white-space: nowrap !important;
+        padding-left: 0px !important; padding-right: 0px !important;
+        min-height: 22px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    _cols = 10
+    for _row in range((total_q + _cols - 1) // _cols):
+        _rcols = st.columns(_cols)
+        for _ci in range(_cols):
+            _qi = _row * _cols + _ci
+            with _rcols[_ci]:
+                if _qi >= total_q:
+                    st.markdown("&nbsp;", unsafe_allow_html=True)
                     continue
-                q_item = sq[q_idx]
-                q_id = q_item["id"]
+                _qit = sq[_qi]
+                _qid = _qit["id"]
 
-                # 筛选逻辑
-                show = True
-                if filter_mode == "answered" and q_id not in st.session_state.spec_answers:
-                    show = False
-                if filter_mode == "unanswered" and q_id in st.session_state.spec_answers:
-                    show = False
-                if filter_mode == "marked" and q_id not in st.session_state.spec_marked:
-                    show = False
-
-                if not show:
-                    st.empty()
+                _vis = True
+                if filter_mode == "answered" and _qid not in st.session_state.spec_answers:
+                    _vis = False
+                if filter_mode == "unanswered" and _qid in st.session_state.spec_answers:
+                    _vis = False
+                if filter_mode == "marked" and _qid not in st.session_state.spec_marked:
+                    _vis = False
+                if filter_mode == "uncertain" and _qid not in st.session_state.spec_uncertain:
+                    _vis = False
+                if not _vis:
+                    st.markdown("&nbsp;", unsafe_allow_html=True)
                     continue
 
-                is_answered = q_id in st.session_state.spec_answers
-                is_marked = q_id in st.session_state.spec_marked
-                is_current = q_idx == idx
+                _answered = _qid in st.session_state.spec_answers
+                _marked = _qid in st.session_state.spec_marked
+                _uncertain = _qid in st.session_state.spec_uncertain
+                _current = _qi == idx
 
-                label = str(q_idx + 1)
+                _label = str(_qi + 1)
+                if _uncertain:
+                    _label = f"?{_label}"
+                elif _marked:
+                    _label = f"\u2605{_label}"
+                if _current:
+                    _label = f"\u25b6{_label}"
 
-                btn_type = "primary" if is_answered else "secondary"
-
-                # 当前题高亮
-                if is_current:
-                    st.markdown(
-                        '<div style="border:2px solid #1565c0;border-radius:6px;background:#e3f2fd;padding:1px 2px;">',
-                        unsafe_allow_html=True
-                    )
-
-                badge_color = "#ff9800" if is_marked else "transparent"
-                badge_char = "★" if is_marked else "&nbsp;"
-                st.markdown(
-                    f'<div style="text-align:right;font-size:10px;color:{badge_color};'
-                    f'height:14px;line-height:14px;margin-bottom:-4px;">{badge_char}</div>',
-                    unsafe_allow_html=True
-                )
-
-                if st.button(label, key=f"spec_nav_{q_idx}", use_container_width=True, type=btn_type):
-                    st.session_state.spec_current = q_idx
+                _btype = "primary" if _answered else "secondary"
+                if st.button(_label, key=f"spec_card_{_qi}",
+                             use_container_width=True, type=_btype):
+                    st.session_state.spec_current = _qi
                     st.rerun()
 
-                if is_current:
-                    st.markdown('</div>', unsafe_allow_html=True)
+
+
+def _save_spec_draft(auto_save: bool = False):
+    """将当前专项训练/综合训练状态保存为草稿
+    
+    auto_save=True: 后台静默保存，不rerun，不显示提示
+    """
+    session_id = st.session_state.get("spec_session_id", "")
+    draft_data = {
+        "category": st.session_state.get("spec_category", ""),
+        "mode": st.session_state.get("spec_mode", "specialized"),
+        "question_ids": [q["id"] for q in st.session_state.get("spec_questions", [])],
+        "answers": dict(st.session_state.get("spec_answers", {})),
+        "marked": list(st.session_state.get("spec_marked", set())),
+        "uncertain": list(st.session_state.get("spec_uncertain", set())),
+        "current_idx": st.session_state.get("spec_current", 0),
+        "session_id": session_id,
+        "type_boundaries": dict(st.session_state.get("spec_type_boundaries", {})),
+    }
+    save_draft("spec", session_id, draft_data)
+    st.session_state.spec_draft_id = session_id
+    if auto_save:
+        return  # 静默保存
+    st.session_state.spec_draft_saved = True
+    st.rerun()
 
 
 def _finish_specialized():
@@ -577,17 +713,21 @@ def _finish_specialized():
     wrong_qids = []      # 收集答错的
     correct_qids = []    # 收集答对的
     answer_records = []  # 收集答题记录
+    uncertain_map = {}   # 答题者自评不确定性 {qid: bool}
 
     for q in sq:
         qid = q["id"]
         user_ans = answers.get(qid, "")
         is_correct = check_answer(q["type"], user_ans, q["answer"])
+        is_uncertain = qid in st.session_state.spec_uncertain
 
         if is_correct:
             correct_count += 1
             correct_qids.append(qid)
         else:
             wrong_qids.append((qid, user_ans))
+
+        uncertain_map[qid] = is_uncertain
 
         # 收集答题记录
         answer_records.append({
@@ -596,6 +736,7 @@ def _finish_specialized():
             "is_correct": is_correct,
             "mode": "specialized" if mode == "specialized" else "comprehensive",
             "session_id": st.session_state.get("spec_session_id", ""),
+            "is_uncertain": is_uncertain,
         })
 
         details.append({
@@ -613,13 +754,16 @@ def _finish_specialized():
 
     # 批量更新错题库和答题统计（单次读取+单次写入）
     stats_updates = [(qid, True) for qid in correct_qids] + [(qid, False) for qid, _ in wrong_qids]
-    batch_update_wrong_and_stats(wrong_qids, correct_qids, stats_updates)
+    batch_update_wrong_and_stats(wrong_qids, correct_qids, stats_updates, uncertain_map)
 
     # 刷新统计缓存，确保结果页读到最新数据
     st.session_state.spec_stats_cache = load_question_stats()
 
     # 批量追加答题记录
     batch_add_answer_records(answer_records)
+
+    # 标记数据已变更，触发首页统计缓存刷新
+    st.session_state._data_version = st.session_state.get("_data_version", 0) + 1
 
     # 分题型统计
     type_stats = {}
@@ -653,6 +797,21 @@ def _finish_specialized():
         "mode": mode,
     }
     st.session_state.spec_state = "finished"
+
+    # 保存考试记录到 exam_records.json
+    save_exam_record({
+        "type": mode,  # "specialized" 或 "comprehensive"
+        "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "total": total_q,
+        "correct": correct_count,
+        "accuracy": f"{correct_count/total_q*100:.1f}%",
+        "category": category,
+    })
+
+    # 提交成功后删除对应草稿（如果本次是从草稿恢复的，或曾保存过进度）
+    draft_id = st.session_state.pop("spec_draft_id", None)
+    if draft_id:
+        delete_draft("spec", draft_id)
     st.rerun()
 
 
@@ -697,70 +856,68 @@ def _show_spec_result():
             st.markdown(f"**{cat}**: {stats['correct']}/{stats['total']} 正确 ({pct:.1f}%)")
             st.progress(stats["correct"] / max(stats["total"], 1))
 
-    # 每题详情
+    # 错题回顾
     st.markdown("---")
-    st.markdown("### 📋 题目详情")
+    wrong_details = [d for d in details if not d["is_correct"]]
+    if wrong_details:
+        st.markdown(f"### ❌ 错题回顾 ({len(wrong_details)}题)")
 
-    for i, d in enumerate(details):
-        tp_label = {"single": "单选", "multi": "多选", "judge": "判断"}[d["type"]]
-        status_icon = "✅" if d["is_correct"] else "❌"
-        user_label = d.get("user_answer", "未答") or "未答"
-        correct_display = get_answer_display(
-            d["type"], d["correct_answer"], d.get("options", {})
-        )
-        with st.expander(f"{i+1}. {status_icon} [{tp_label}] {d['question'][:60]}...", expanded=not d["is_correct"]):
-            st.markdown(f"**题目**: {d['question']}")
-            # 显示所有选项，用颜色标记
-            options = d.get("options", {})
-            user_ans = d.get("user_answer", "") or ""
-            correct_ans = d.get("correct_answer", "")
-            for k, v in sorted(options.items()):
-                is_user_selected = k in user_ans
-                is_correct_key = k in correct_ans
+        for i, d in enumerate(wrong_details):
+            tp_label = {"single": "单选", "multi": "多选", "judge": "判断"}[d["type"]]
+            user_label = d.get("user_answer", "未答") or "未答"
+            correct_display = get_answer_display(
+                d["type"], d["correct_answer"], d.get("options", {})
+            )
+            with st.expander(f"{i+1}. [{tp_label}] {d['question'][:60]}...", expanded=True):
+                st.markdown(f"**题目**: {d['question']}")
+                # 显示所有选项，用颜色标记
+                options = d.get("options", {})
+                user_ans = d.get("user_answer", "") or ""
+                correct_ans = d.get("correct_answer", "")
+                for k, v in sorted(options.items()):
+                    is_user_selected = k in user_ans
+                    is_correct_key = k in correct_ans
 
-                if d["type"] in ("multi", "indefinite"):
-                    if is_user_selected and is_correct_key:
-                        st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {v}</p>',
-                                    unsafe_allow_html=True)
-                    elif is_user_selected and not is_correct_key:
-                            st.markdown(f'<p style="color:#b71c1c;font-weight:bold;">❌️ {k}: {v} (错选)</p>',
+                    if d["type"] in ("multi", "indefinite"):
+                        if is_user_selected and is_correct_key:
+                            st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {v}</p>',
                                         unsafe_allow_html=True)
-                    elif not is_user_selected and is_correct_key:
-                        st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {v} (漏选)</p>',
-                                    unsafe_allow_html=True)
-                    else:
-                        st.markdown(f'{k}: {v}')
-                else:
-                    if is_user_selected and is_correct_key:
-                        st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {v}</p>',
-                                    unsafe_allow_html=True)
-                    elif is_user_selected and not is_correct_key:
-                            st.markdown(f'<p style="color:#b71c1c;font-weight:bold;">❌️ {k}: {v} (错选)</p>',
+                        elif is_user_selected and not is_correct_key:
+                                st.markdown(f'<p style="color:#b71c1c;font-weight:bold;">❌️ {k}: {v} (错选)</p>',
+                                            unsafe_allow_html=True)
+                        elif not is_user_selected and is_correct_key:
+                            st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {v} (漏选)</p>',
                                         unsafe_allow_html=True)
-                    elif not is_user_selected and is_correct_key:
-                        st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {v}</p>',
-                                    unsafe_allow_html=True)
+                        else:
+                            st.markdown(f'{k}: {v}')
                     else:
-                        st.markdown(f'{k}: {v}')
-            if d["is_correct"]:
-                st.markdown(f"**你的答案**: {user_label}")
-            else:
+                        if is_user_selected and is_correct_key:
+                            st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {v}</p>',
+                                        unsafe_allow_html=True)
+                        elif is_user_selected and not is_correct_key:
+                                st.markdown(f'<p style="color:#b71c1c;font-weight:bold;">❌️ {k}: {v} (错选)</p>',
+                                            unsafe_allow_html=True)
+                        elif not is_user_selected and is_correct_key:
+                            st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {v}</p>',
+                                        unsafe_allow_html=True)
+                        else:
+                            st.markdown(f'{k}: {v}')
                 st.markdown(f'<p style="color:red;font-weight:bold;">你的答案: {user_label}</p>', unsafe_allow_html=True)
-            st.markdown(
-                f'<div style="background:#e8f5e9;border-left:4px solid #1b5e20;padding:8px 12px;'
-                f'border-radius:4px;margin:4px 0;">'
-                f'<span style="color:#1b5e20;font-weight:bold;">✅ 正确答案：{d["correct_answer"]} - {correct_display}</span></div>',
-                unsafe_allow_html=True,
-            )
-            # 解析（直接跟在正确答案后面）
-            explanation = d.get("explanation", "")
-            if explanation:
-                st.markdown(explanation)
-            st.markdown(f"**知识板块**: {d.get('category', category)}")
-            q_stats = st.session_state.spec_stats_cache.get(
-                d.get("id", ""), {"correct_count": 0, "wrong_count": 0}
-            )
-            st.caption(f"📊 答题统计：答对 {q_stats['correct_count']} 次 / 答错 {q_stats['wrong_count']} 次")
+                st.markdown(
+                    f'<div style="background:#e8f5e9;border-left:4px solid #1b5e20;padding:8px 12px;'
+                    f'border-radius:4px;margin:4px 0;">'
+                    f'<span style="color:#1b5e20;font-weight:bold;">✅ 正确答案：{d["correct_answer"]} - {correct_display}</span></div>',
+                    unsafe_allow_html=True,
+                )
+                # 解析（直接跟在正确答案后面）
+                explanation = d.get("explanation", "")
+                if explanation:
+                    st.markdown(explanation)
+                st.markdown(f"**知识板块**: {d.get('category', category)}")
+                q_stats = st.session_state.spec_stats_cache.get(
+                    d.get("id", ""), {"correct_count": 0, "wrong_count": 0}
+                )
+                st.caption(f"📊 答题统计：答对 {q_stats['correct_count']} 次 / 答错 {q_stats['wrong_count']} 次")
 
     # 答题卡
     st.markdown("---")
@@ -785,15 +942,23 @@ def _show_spec_result():
             tc = "#1b5e20" if is_correct else "#b71c1c"
             
             is_marked = q_item["id"] in st.session_state.get("spec_marked", set())
-            marker = '<sup style="font-size:8px;">⭐</sup>' if is_marked else ''
-            border_style = "2px solid #ff9800" if is_marked else "1px solid #ddd"
+            is_uncertain = q_item["id"] in st.session_state.get("spec_uncertain", set())
+            if is_uncertain:
+                indicators = '<sup style="font-size:8px;color:#9c27b0;">❓</sup>'
+                border_style = "1px solid #ddd"
+            elif is_marked:
+                indicators = '<sup style="font-size:8px;">⭐</sup>'
+                border_style = "2px solid #ff9800"
+            else:
+                indicators = ''
+                border_style = "1px solid #ddd"
             
             nav_html += f'''
             <div style="flex:1;min-width:0;">
                 <div style="display:block;width:100%;background:{bg};color:{tc};border:{border_style};
                           border-radius:3px;font-size:12px;min-height:30px;line-height:30px;
                           text-align:center;position:relative;">
-                    {q_idx + 1}{marker}
+                    {q_idx + 1}{indicators}
                 </div>
             </div>'''
         nav_html += '</div>'
@@ -810,7 +975,7 @@ def _show_spec_result():
         for key in keys_to_clear:
             del st.session_state[key]
         st.rerun()
-    if col2.button("🏠 返回首页", key="spec_result_home", use_container_width=True, type="primary"):
+    if col2.button("返回", key="spec_result_home", use_container_width=True, type="primary"):
         st.session_state.spec_state = "idle"
         # 清除全部 spec_ 状态，彻底返回首页
         keys_to_clear = [k for k in st.session_state if k.startswith("spec_")]
