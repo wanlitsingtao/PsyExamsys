@@ -13,13 +13,27 @@ from utils.data_access import get_data_access
 
 # 延迟初始化的 DAO 对象
 _dao = None
+_dao_source = None  # 记录当前 DAO 对应的 data_source，用于检测配置变化
 
 
 def _get_dao():
-    """获取 data_access 对象（延迟初始化）"""
-    global _dao
-    if _dao is None:
+    """获取 data_access 对象（延迟初始化，自动检测配置变化）"""
+    global _dao, _dao_source
+    # 每次调用都检查 config.json 中的 data_source 是否变化
+    # 如果变化则重新创建 DAO
+    try:
+        if CONFIG_FILE.exists():
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+            current_source = cfg.get("data_source", "json")
+        else:
+            current_source = "json"
+    except Exception:
+        current_source = "json"
+
+    if _dao is None or _dao_source != current_source:
         _dao = get_data_access()
+        _dao_source = current_source
     return _dao
 
 
@@ -534,9 +548,12 @@ def save_config(config):
     注意：data_source 是启动配置，必须在任何模式下都同步到 config.json，
     以确保重启后 get_data_access() 能读到正确的数据源类型。
     """
+    global _dao
     # data_source 需要始终同步到 config.json（启动配置，不能依赖 DAO 读取）
     if "data_source" in config:
         _sync_data_source_to_json(config["data_source"])
+        # data_source 可能已变化，重置 DAO 使下次调用时重新创建正确实例
+        _dao = None
     _get_dao().save_config(config)
 
 

@@ -8,6 +8,5 @@ echo.
 echo 正在启动...
 echo 启动后请访问: http://localhost:8510
 echo.
-start http://localhost:8510
 "C:\Users\wanli\AppData\Local\Python\pythoncore-3.14-64\python.exe" -m streamlit run app.py --server.port 8510
 pause

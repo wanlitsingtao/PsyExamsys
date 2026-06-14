@@ -17,5 +17,5 @@
   "exam_judge_count": 20,
   "wrongbook_extract_count": 50,
   "last_import_files": [],
-  "data_source": "sqlite"
+  "data_source": "json"
 }
