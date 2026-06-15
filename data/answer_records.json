@@ -67621,5 +67621,4055 @@
     "session_id": "6ed07c61",
     "category": "家庭教育与心理健康科普",
     "timestamp": "2026-06-12T21:42:28.904899"
+  },
+  {
+    "question_id": "bf45c9ad7feb",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "3e8b36d14349",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "94a6e4e0fba5",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "755c8ded0ae4",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "876d32dd7ca5",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "b0ca12b60f6f",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "b510ddc32041",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "98f38af7ed2a",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "1c6d439706b6",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "2a68f300e513",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "8462fbdfd168",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "88e5e000d550",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "18fc925c59cc",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "02631b85c794",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "4f8bec1254e5",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "人格心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "403239d0e669",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "人格心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "bf42f50a5839",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "966f4b8d4468",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "11ee9fbd91ef",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "9bce3873e7b3",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "1521be1cf457",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "dacdbe836395",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "bc937c4c0a58",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "63ac33321e3e",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "3394159548b9",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "163366fbdf15",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "dc96197ebaf2",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "874dc9aeab53",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "da728e5022b9",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "人格心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "57d6d8612a8f",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "0eeb50cbe81c",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "396c51e1b194",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "7396f2503d33",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "602cf64804d8",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "be9720aa624e",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "a3c9c9b74e0b",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "743ce0c17840",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "18cc095538d9",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "add7962c8452",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "a3e9e3a1d326",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "2ddd4d1ad1d4",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "人格心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "3cd29ce0c797",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "11629b604e23",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "7caa671e1ecb",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "9e6ac0f44fc0",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "ac60cc348803",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "ab6422fd3503",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "人格心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "22fe6bbe67ff",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "fd96225cd666",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "人格心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "c899ab23a73d",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "人格心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "16d2a67ebc9d",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "人格心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "231200ae7e4c",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "0b0cc2739d25",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "b88e30436feb",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "af603f85d798",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "319434704682",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "0ff6aff840bc",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "813854087214",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "8406b724818c",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "26d4e2fbd0ce",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "5755ee0f5cca",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "f1c9b36d678c",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "197674c44e2c",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "64f8b4431cd7",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "人格心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "519776f0bb71",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "3e6ea3130242",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "b202b52cd07c",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "97ec1ee14bdf",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "8fbb701b7c0d",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "657c4d3c0644",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "4f5e2a3bf301",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "79faee98efd3",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "486b99562bd9",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "3c57a9ac71eb",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "0f48713b5bcf",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "19c39fc0847b",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "c682beb12fea",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "2d3f6c6ca445",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "人格心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "f84d14154545",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "人格心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "a3ab52e9dd9b",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "e588d0127d2c",
+    "user_answer": "A",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "05a49da48f27",
+    "user_answer": "B",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "ea6b2c80e5b7",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "88149a89e53d",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "8c9e0da93aee",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "6859897a9fbe",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "503bcb3008c7",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "1a7a5d5bd2fc",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "人格心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "8521bec7a287",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "2d5fb959853b",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "41c66dea14ac",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "人格心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "67e2a517691b",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "8ad5321ebaf4",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "6fca6ff9433f",
+    "user_answer": "B",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "a6582f1dd764",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "f6fa3a1580c9",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "54322c18478b",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "f12cd79029e1",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "39ff4b8e0aa2",
+    "user_answer": "A",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "d51f0fa0d000",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "人格心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "be6f4e5221b5",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "afabc954f48d",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "f200484ba1e8",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "c6d53544fa40",
+    "user_answer": "C",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "f94430935074",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "d7e5758cfb6c",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "60cf2578b2ac",
+    "user_answer": "A",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "f4d1d5e04dd7",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "人格心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "e8ca44a0fdd5",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "75821594fc83",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "8c259bb0d0d7",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "ed222216d848",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "986a180d6374",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "人格心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "8393e50cee84",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "b132a2ed9b70",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "b8fe9efbd9fb",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "28829ef5fed9",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "67ee242bb93d",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "3da4324e7bd4",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "8b6eb02e7209",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "bc1aa510e8e2",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "f1c8ea01beae",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "4b5014bf60a2",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "人格心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "cf6d303579aa",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "e2a32964499a",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "a2ce978c7120",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "aadf54017928",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "41488fad764c",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "6e1594c50093",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "a366c5b26410",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "f4605786a215",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "8c40a3e53ee6",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "483bb88d1672",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "人格心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "1402be09da9a",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "86b2b3957cd5",
+    "user_answer": "D",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "人格心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "59f3bce43dbd",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "6728d84f8732",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "84428bd788ce",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "b7e0e22929cd",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "5f56f6772e02",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "82560305a3da",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "cf4cbb95bf3a",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "f913446ba6f7",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "437af5e15bb4",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "d9f8bc6ec7f9",
+    "user_answer": "D",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "cde5f8bad3dc",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "28e90d43058a",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "1ba43670f06b",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "e00cefb081ed",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "68802d2b9472",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "72d1971d89f0",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "7db254f110cd",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "5e130ffc3aec",
+    "user_answer": "AC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "6c522a510949",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "ad5747d9e8d8",
+    "user_answer": "ABC",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "c5afb5796b19",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "d5670fdee63b",
+    "user_answer": "BCD",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "edb6d7049dc6",
+    "user_answer": "CD",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "c8e4384306c5",
+    "user_answer": "AC",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "f4c08507a9f5",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "164cb0780317",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "29b25af2ee12",
+    "user_answer": "AC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "人格心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "a69bcd118377",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "2d6419515781",
+    "user_answer": "AC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "cffd0a0abc18",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "5171f5942f24",
+    "user_answer": "ABCDEF",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "8ed7038303b0",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "0f6703c5fda1",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "68220f5c93cc",
+    "user_answer": "ABCDE",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "8ada33717296",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "58a820b4c93e",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "f67626219007",
+    "user_answer": "ABD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "d7839c27f5ce",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "55f068377a32",
+    "user_answer": "ABCDE",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "人格心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "f50871770890",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "人格心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "a41ffcc1c52c",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "0cd0beb58db0",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "7d63ca65477a",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "3dc2a30a0335",
+    "user_answer": "CD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "416c560cffce",
+    "user_answer": "ABCE",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "1320472a4c28",
+    "user_answer": "ABCD",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "5c88a6b44ccf",
+    "user_answer": "ABC",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "7693be273ae3",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "9af3cc330629",
+    "user_answer": "ABCD",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "9467fedb4d73",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "e92865ab3040",
+    "user_answer": "BCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "5e15de783158",
+    "user_answer": "BC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "1e1f10fa0137",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "1c1235494e31",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "e5faff08d487",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "e0599d78d5ed",
+    "user_answer": "BD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "45da9ebcf1bd",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "人格心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "d1e86b6dbe53",
+    "user_answer": "AC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "176714839302",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "616b3ddc239a",
+    "user_answer": "ABC",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "a760a87dd741",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "038db2c2244b",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "4123394ca59f",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "615df644e432",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "c23eeeef09b9",
+    "user_answer": "AC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "baeba123d1a3",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "38cc4248818f",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "fdb02292b49a",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "da61d4efccc7",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "67f35b0b7b46",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "adff2154021a",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "c9883f2d37a6",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "bddca2f372b0",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "9a07e71f0f50",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "a83a9ff5f39e",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "d6187a1a5833",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "405a294a3279",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "362df1de6023",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "b17cdde4ed4b",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "59fa68187a36",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "02b71d98ff3b",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "2c1ae1856e6c",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "76df28080fdd",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "1225348630c4",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "人格心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "843d1781c710",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "259b9d5ec239",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "13458ccd8876",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "87250b4c307f",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "8d994385c30c",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "82bbfe7fe32c",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "4f278cb69833",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "2e57aa38bbd2",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "549d08b6805a",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "c0277ab8e2af",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "289d9c456cd4",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "7fd0460a8297",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "66083ecce852",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "9bebf8d2cc74",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "da009f8babc1",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "fbf7b488824c",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "333b7823fc2b",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "a7eaf8b95888",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "145f1a1cd5d8",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "心理学导论",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "6dec3e238397",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "d6fbbea1453f",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "人格心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "2e42c87e9605",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "0218f4e172d7",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "异常心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "9b76228f2a66",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "01b5eea8e1f0",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "社会心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "17735a210520",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "9c4c88e090e8",
+    "user_answer": "B",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "9feae779bf24",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "61590aeb86fc",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "咨询心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "5cf740ba9a81",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "1001724914ad",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "2cc453a5",
+    "category": "发展心理学",
+    "timestamp": "2026-06-15T11:39:48.518398"
+  },
+  {
+    "question_id": "69aa0ece170d",
+    "user_answer": "C",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "8bee637154b9",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "ab951bbad2df",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "c0e68a11bf2c",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "d8530f1d2e50",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "dd0e3186fab6",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "e1f3fca9a9df",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "7361db5cf5a8",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "0820528fba03",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "2ec1c2248830",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "3cbd0f0f1afc",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "e9f2ca05b66b",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "90e58669c719",
+    "user_answer": "A",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "ff47abdf7f92",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "5da8c39b1ce8",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "e2b56672351b",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "164569dce7b5",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "31af2e7ffb91",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "6628364f3b4d",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "721d1d641887",
+    "user_answer": "A",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "928104e38c5a",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "c61a3bd4c58c",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "fe23637b65a8",
+    "user_answer": "B",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "cfbbafc58cf8",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "3cecd9e654b0",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "adfc4577c9e5",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "f6c142c49c8a",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "5efd51771b96",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "dbfe06467d60",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "8fb41359c3df",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "a80616e0d50f",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "9c9f39051ad9",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "f21d5a765bdb",
+    "user_answer": "D",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "7f6fc814d6e2",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "823790e8706e",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "e7c77bbd042b",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "e6131fb14004",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "0dcaba9ee41e",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "d6d7d8ce9f83",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "3ac03d513e86",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "aa30dd7464c2",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "0f956aba9dce",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "74d89a8b1b5b",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "7477f6dd39f2",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "ccabd974576d",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "40229b122fe1",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "ec9f77d7dbea",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "cebac9df7d3c",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "0041a4391afc",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "3d668d939ad8",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "76a35888f0d1",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "bc66fa6a2762",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "8b188182ee45",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "afdf7d7a5b34",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "b40905d6687f",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "3bfc8ab80942",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "69353836e65d",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "442c9ed5eb76",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "34c4f3134022",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "9c18d91f6730",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "6e00ac9ddd11",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "655b4ed9717c",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "b5d960afb0dd",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "b554ae33b5fb",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "4c45d9a22853",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "80afe8a191ba",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "887aba17921c",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "ea15c5db8e91",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "1963c2d2113d",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "9a14a3adf258",
+    "user_answer": "A",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "50ebcca81195",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "1dda54997415",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "a1bc36862bee",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "4f8461e7e211",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "79545c3d0c19",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "5aa34d4830e7",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "33192fa31eb3",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "3498b189d1db",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "b4708fa88fa1",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "3c65eac5592d",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "1d4c470d86f2",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "94061d0f33a6",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "64ba6fa67d1d",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "110c486d1352",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "654a88110bae",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "beb2496d8369",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "5f5e8568ab42",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "e6f7f72eb873",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "8bd7bcf7618e",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "f8f6a0d5bb94",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "e4b4ddff48be",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "fc205d5093fc",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "4d21781e4bfc",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "49c0fc850b2a",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "d601320a0528",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "eee2bd3916d6",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "f6af30718771",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "57470f14fca7",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "61c9f9f53921",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "eb35c6e37bca",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "0cf73329913f",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "7de777e511da",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "4fab8c0e7d1b",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "88af1209eea5",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "3a5a7f5cbfa6",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "e9ff709f1d57",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "c1e8cda01774",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "5a5ff35640fc",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "58ec3499431b",
+    "user_answer": "D",
+    "is_correct": false,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "c96e496be37e",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "f215e4063e98",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "8ea0851b9f28",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "d57fa2b1762a",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "b320940eec09",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "7746e628940e",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "b56e1c7dcb7a",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "9364e9f39e53",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "3c50fbbc9f53",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "02aa8bb4f8d8",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "378bf9d7bd73",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "baec8f89e44f",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "02a1031b9f5e",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "0d84608c64f0",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "fd91747a0923",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "6eaf2fc93710",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "ec698714afeb",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "9da8dd1cd603",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "fe9ab4d0e729",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "3d9a0fde91d2",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "2f453ca2b636",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "c180943dcf53",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "58351b748bdc",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "09d3ff3fcd8a",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "9c44ec2a7fca",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "654090fde6fc",
+    "user_answer": "A",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "560b8274a110",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "3335fa3148ac",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "7b3890bdae22",
+    "user_answer": "C",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "38bc2aa85721",
+    "user_answer": "B",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "2214ed258ed9",
+    "user_answer": "D",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "0c8e87ccc45a",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "ea466ea3dbae",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "2f4aa78d9775",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "99d168b5c1d1",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "e486510abb4f",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "8773513ca981",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "6c369ff67aa1",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "874aa48f9456",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "21de84ea56b1",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "6cc2744206ea",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "067813d71f73",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "fb9b4bbae7c3",
+    "user_answer": "ABCDEF",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "5802267a5968",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "f96c891d06ee",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "224891ecc934",
+    "user_answer": "ABD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "5cb484ae0c3f",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "9fdf63f0e813",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "21d5126faeb3",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "93418bd38eba",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "f6c85c9e6553",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "b7b585696afb",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "8713c5295f62",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "3df36660c717",
+    "user_answer": "ABCDE",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "c211d01dca6c",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "38404a359b97",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "50232c0f8f5c",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "26fda56be5bd",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "00c0a49587fa",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "410ad5ba6f2a",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "4b872a788669",
+    "user_answer": "ABCDE",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "ecbf666cfd48",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "cb9af23b009a",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "6f258cbb6137",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "3100fe23115a",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "aa5c6cf787d2",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "5a2703db24cb",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "589eea496860",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "872a2b017d20",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "5b5a7bbb07b5",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "16574e846c80",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "53b74215faa9",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "5fa296235f59",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "0916cc9a9ea7",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "07c6bde7b7ee",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "edbdb35716db",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "2a7e6e58d333",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "a357182a7d93",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "cd898b44a8cc",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询专业伦理与相关法律规范",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "6fbe9b8a061b",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "270447f8b8b5",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "8d432014459a",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "b960197b06f9",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "f922b44813a0",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "726095fb98d9",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "8db57e88d8ee",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "b85d75aaf440",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "d964661976a1",
+    "user_answer": "ABCDE",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理咨询会谈技术",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "48fed061dab5",
+    "user_answer": "AB",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "心理危机识别",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "732b855701c7",
+    "user_answer": "ABC",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "情绪调节与压力管理",
+    "timestamp": "2026-06-15T21:37:11.595271"
+  },
+  {
+    "question_id": "25657325d878",
+    "user_answer": "ABCD",
+    "is_correct": true,
+    "mode": "mock_exam",
+    "session_id": "a064dd83",
+    "category": "家庭教育与心理健康科普",
+    "timestamp": "2026-06-15T21:37:11.595271"
   }
 ]
