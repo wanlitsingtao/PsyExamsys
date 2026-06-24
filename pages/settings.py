@@ -7,6 +7,7 @@ from pathlib import Path
 from utils.data_manager import (
     load_config, save_config, load_questions, save_questions,
     dedup_import, get_question_count, backup_data,
+    load_case_studies, save_case_studies,
     EXAM_TYPE_LABELS, DEFAULT_EXAM_TYPE,
 )
 from utils.parser import batch_parse
@@ -62,16 +63,17 @@ def _show_tab_questions():
     st.markdown("#### 📥 导入题库文件")
     st.markdown("从 `exmbase` 目录导入 docx 文件，或上传新的 docx 文件")
 
-    # 方法1：批量导入exmbase目录
+    # 方法1：批量导入exmbase目录（递归扫描子目录）
     base_dir = Path(__file__).resolve().parent.parent / "exmbase"
-    docx_files = sorted(base_dir.glob("*.docx"))
+    docx_files = sorted(f for f in base_dir.rglob("*.docx") if not f.name.startswith("~$"))
 
     if docx_files:
         st.markdown(f"**`exmbase` 目录中检测到 {len(docx_files)} 个题库文件：**")
         for f in docx_files:
             size = f.stat().st_size
             size_str = f"{size / 1024:.1f} KB"
-            st.markdown(f"- {f.name} ({size_str})")
+            rel_path = str(f.relative_to(base_dir))
+            st.markdown(f"- {rel_path} ({size_str})")
 
         col_i1, col_i2 = st.columns([1, 3])
         if col_i1.button("🚀 批量导入所有文件", use_container_width=True, type="primary"):
@@ -93,11 +95,36 @@ def _show_tab_questions():
                             + f"\n- ✅ {filename}: {stats['total']}题 (单{stats['single']} 多{stats['multi']} 判{stats['judge']})"
                         )
 
-                new_questions, file_stats = batch_parse(base_dir, progress_cb)
+                new_questions, file_stats, case_backgrounds = batch_parse(base_dir, progress_cb)
 
                 # 标记目标题库
                 for q in new_questions:
                     q["exam_type"] = target_exam_type
+
+                # --- 处理案例题：关联 case_study_id ---
+                case_studies_to_save = []
+                for cbg in case_backgrounds:
+                    # 查找该案例范围的子题，设置 case_study_id
+                    sub_count = 0
+                    for q in new_questions:
+                        if (q["source_file"] == cbg["source_file"]
+                                and cbg["start_num"] < q["index"] <= cbg["end_num"]):
+                            q["case_study_id"] = cbg["case_id"]
+                            sub_count += 1
+                    case_studies_to_save.append({
+                        "case_id": cbg["case_id"],
+                        "title": cbg["title"],
+                        "background_id": "",
+                        "question_count": sub_count,
+                        "exam_type": target_exam_type,
+                    })
+
+                # 合并已有案例（避免覆盖）
+                if case_studies_to_save:
+                    existing_cs = {cs["id"] for cs in load_case_studies()}
+                    new_cs = [cs for cs in case_studies_to_save if cs["case_id"] not in existing_cs]
+                    if new_cs:
+                        save_case_studies(new_cs)
 
                 # 去重合并
                 merged, added, skipped, logs = dedup_import(
@@ -268,19 +295,6 @@ def _show_tab_config():
     )
 
     st.markdown("---")
-    st.markdown("**数据源设置**")
-
-    data_source = st.selectbox(
-        "数据源类型",
-        options=["json", "sqlite"],
-        index=0 if config.get("data_source", "json") == "json" else 1,
-        help="json: 使用 JSON 文件存储（默认，兼容性好）\n\n"
-             "sqlite: 使用 SQLite 数据库存储（查询更快，支持大数据量）\n\n"
-             "切换后需重启程序生效",
-        key="cfg_data_source",
-    )
-
-    st.markdown("---")
     st.markdown("**错题本设置**")
 
     wrong_count = st.number_input(
@@ -291,10 +305,19 @@ def _show_tab_config():
     )
 
     st.markdown("---")
+    st.markdown("**遗忘预警设置**")
+
+    retention_threshold = st.number_input(
+        "遗忘预警阈值（天）",
+        min_value=1, max_value=30, value=config.get("retention_days_threshold", 5),
+        help="距上次答对超过此天数后，触发遗忘预警标签，提示需要复习",
+        key="cfg_retention_threshold",
+    )
+
+    st.markdown("---")
 
     if st.button("💾 保存设置", use_container_width=True, type="primary"):
         config.update({
-            "data_source": data_source,
             "spec_per_round": spec_per_round,
             "spec_single_count": spec_single,
             "spec_multi_count": spec_multi,
@@ -304,10 +327,11 @@ def _show_tab_config():
             "exam_multi_count": exam_multi,
             "exam_judge_count": exam_judge,
             "wrongbook_extract_count": wrong_count,
+            "retention_days_threshold": retention_threshold,
         })
         save_config(config)
         st.session_state.config = config
-        st.success("✅ 设置已保存！切换数据源后需重启程序生效。")
+        st.success("✅ 设置已保存！")
 
     # 数据备份
     st.markdown("---")

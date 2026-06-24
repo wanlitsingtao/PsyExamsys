@@ -11,7 +11,7 @@ from utils.data_manager import (
     check_answer, get_answer_display,
     batch_update_wrong_and_stats, batch_add_answer_records,
     load_questions, load_question_stats, infer_category,
-    get_mastery_distribution, save_draft, load_drafts, delete_draft, save_exam_record,
+    get_mastery_distribution, save_draft, load_drafts, delete_draft,
 )
 
 
@@ -205,7 +205,7 @@ def _show_consolidation_running():
     st.markdown("---")
 
     # ---- 题目区（个性化内容：含掌握状态标签） ----
-    type_labels = {"single": "🔵 单选题", "multi": "🟢 多选题", "judge": "🟠 判断题"}
+    type_labels = {"single": "🔵 单选题", "multi": "🟢 多选题", "judge": "🟠 判断题", "案例题": "🟣 案例题", "indefinite": "🟡 不定项选择题"}
     type_str = type_labels.get(q["type"], q["type"])
     cat_str = q.get("category", infer_category(q.get("source_file", "")))
 
@@ -267,15 +267,20 @@ def _show_consolidation_running():
                 st.session_state.consol_marked.add(qid)
             st.rerun()
 
+    # 案例题子题：在题目上方展示案例背景
+    case_bg = q.get("case_background", "")
+    if case_bg:
+        with st.expander("📋 **案例背景**", expanded=True):
+            st.markdown(case_bg)
+
     st.markdown(f"**{q['question']}**")
 
-    # 选项行距：1.5倍
+    # 选项样式（与模拟考试/专项训练一致）
     st.markdown("""
     <style>
-    div[data-testid="stRadio"] label,
-    div[data-testid="stCheckbox"] label {
-        line-height: 1.5;
-    }
+    div[data-testid="stRadio"] > div { gap: 0.75em; }
+    div[data-testid="stRadio"] > div > label { padding: 0.3em 0; }
+    div[data-testid="stCheckbox"] > label { padding: 0.3em 0; }
     /* 正文区按钮字号与不确定开关一致（答题卡区有 10px 覆盖） */
     div.stButton > button {
         font-size: 13px !important;
@@ -307,7 +312,7 @@ def _show_consolidation_running():
             if st.session_state.consol_answers.get(qid) != selected_key:
                 st.session_state.consol_answers[qid] = selected_key
 
-    elif q["type"] == "multi":
+    elif q["type"] in ("multi", "案例题", "indefinite"):
         cols = st.columns(2)
         selected_keys = []
         for i, k in enumerate(opt_keys):
@@ -461,14 +466,20 @@ def _show_consolidation_running():
                 _current = _qi == idx
 
                 _label = str(_qi + 1)
-                if _uncertain:
-                    _label = f"?{_label}"
-                elif _marked:
-                    _label = f"\u2605{_label}"
                 if _current:
-                    _label = f"\u25b6{_label}"
+                    _label = f"▶{_label}"
 
                 _btype = "primary" if _answered else "secondary"
+                # 标记/不确定：固定高度角标行（所有按钮对齐）
+                _badges = []
+                if _marked:
+                    _badges.append('<span style="font-size:8px;color:#ff9800;">⭐</span>')
+                if _uncertain:
+                    _badges.append('<span style="font-size:8px;color:#ff9800;">?</span>')
+                st.markdown(
+                    f'<div style="text-align:right;height:11px;line-height:11px;overflow:hidden;">{"".join(_badges)}</div>',
+                    unsafe_allow_html=True,
+                )
                 if st.button(_label, key=f"consol_card_{_qi}",
                              use_container_width=True, type=_btype):
                     st.session_state.consol_current = _qi
@@ -513,7 +524,16 @@ def _submit_consolidation():
     for q in cq:
         qid = q["id"]
         user_ans = answers.get(qid, "")
-        is_correct = check_answer(q["type"], user_ans, q["answer"])
+
+        # 防御性校验：单选/判断题的 answer 应为单个字母
+        effective_answer = q["answer"]
+        if q["type"] in ("single", "judge") and len(effective_answer) != 1:
+            from utils.data_access import get_data_access
+            fresh = get_data_access().load_question_by_id(qid)
+            if fresh and len(fresh.get("answer", "")) == 1:
+                effective_answer = fresh["answer"]
+
+        is_correct = check_answer(q["type"], user_ans, effective_answer)
         is_uncertain = qid in uncertain_set
 
         results[qid] = {"correct": is_correct}
@@ -536,10 +556,21 @@ def _submit_consolidation():
             "timestamp": now,
         })
 
-    # 2. 批量 I/O：统计 + 错题本（1 次读 + 1 次写）
-    batch_update_wrong_and_stats(wrong_qids, correct_qids, stats_updates, uncertain_map)
+    # 2. 批量 I/O：统计 + 错题本 + 考试记录（单个事务）
+    correct_count = sum(1 for v in results.values() if v.get("correct"))
+    exam_record = {
+        "type": "consolidation",
+        "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "total": len(cq),
+        "correct": correct_count,
+        "accuracy": f"{correct_count/len(cq)*100:.1f}%" if len(cq) > 0 else "0%",
+    }
+    batch_update_wrong_and_stats(
+        wrong_qids, correct_qids, stats_updates,
+        uncertain_map, exam_record=exam_record,
+    )
 
-    # 3. 批量 I/O：答题过程记录（1 次读 + 1 次写）
+    # 3. 批量 I/O：答题过程记录（单个连接）
     batch_add_answer_records(answer_records)
 
     # 标记数据已变更，触发首页统计缓存刷新
@@ -554,16 +585,6 @@ def _submit_consolidation():
     draft_id = st.session_state.pop("consol_draft_id", None)
     if draft_id:
         delete_draft("consol", draft_id)
-
-    # 保存考试记录到 exam_records.json
-    correct_count = sum(1 for v in results.values() if v.get("correct"))
-    save_exam_record({
-        "type": "consolidation",
-        "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-        "total": len(cq),
-        "correct": correct_count,
-        "accuracy": f"{correct_count/len(cq)*100:.1f}%" if len(cq) > 0 else "0%",
-    })
 
 
 # ============================
@@ -647,99 +668,70 @@ def _show_consolidation_result():
     nav_html += "</div>"
     st.markdown(nav_html, unsafe_allow_html=True)
 
-    # ---- 正确题目回顾 ----
-    correct_items = [(i, q) for i, q in enumerate(cq) if results.get(q["id"], {}).get("correct")]
-    if correct_items:
-        st.markdown("---")
-        st.markdown(f"### ✅ 正确题目 ({len(correct_items)}题)")
-        type_labels = {"single": "🔵 单选题", "multi": "🟢 多选题", "judge": "🟠 判断题"}
-
-        for qi, q in correct_items:
-            qid = q["id"]
-            tag = q.get("_tag", "")
-            options = q["options"]
-            cat_str = q.get("category", infer_category(q.get("source_file", "")))
-            title_parts = [f"**第 {qi+1} 题** | {type_labels.get(q['type'], q['type'])}"]
-            if cat_str:
-                title_parts.append(f"📂 {cat_str}")
-            if tag:
-                tag_emoji = "⚠️" if tag in ("消退型", "波动型") else "⏰"
-                title_parts.append(f"{tag_emoji} {tag}")
-
-            with st.expander(" · ".join(title_parts)):
-                st.markdown(f"**题目**: {q['question']}")
-                for k in sorted(options.keys()):
-                    if k in q["answer"]:
-                        st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]}</p>',
-                                    unsafe_allow_html=True)
-                    else:
-                        st.markdown(f'{k}: {options[k]}')
-
-                correct_display = get_answer_display(q["type"], q["answer"], options)
-                st.markdown(
-                    f'<div style="background:#e8f5e9;border-left:4px solid #1b5e20;padding:8px 12px;'
-                    f'border-radius:4px;margin:4px 0;">'
-                    f'<span style="color:#1b5e20;font-weight:bold;">✅ 正确答案：{correct_display}</span></div>',
-                    unsafe_allow_html=True,
-                )
-
-                if q.get("explanation"):
-                    st.markdown(q["explanation"])
-
-    # ---- 错题复盘 ----
+    # ---- 错题回顾（与模拟考试/专项训练格式一致） ----
     wrong_items = [(i, q) for i, q in enumerate(cq) if not results.get(q["id"], {}).get("correct")]
     if wrong_items:
         st.markdown("---")
-        st.markdown(f"### ❌ 错题复盘 ({len(wrong_items)}题)")
-        type_labels = {"single": "🔵 单选题", "multi": "🟢 多选题", "judge": "🟠 判断题"}
+        st.markdown(f"### ❌ 错题回顾 ({len(wrong_items)}题)")
 
-        for qi, q in wrong_items:
+        for i, (qi, q) in enumerate(wrong_items):
             qid = q["id"]
             tag = q.get("_tag", "")
             options = q["options"]
             cat_str = q.get("category", infer_category(q.get("source_file", "")))
-            user_ans_str = st.session_state.consol_answers.get(qid, "未作答")
+            user_ans_str = st.session_state.consol_answers.get(qid, "")
+            tp_label = {"single": "单选", "multi": "多选", "judge": "判断"}.get(q["type"], q["type"])
 
-            title_parts = [f"**第 {qi+1} 题** | {type_labels.get(q['type'], q['type'])}"]
-            if cat_str:
-                title_parts.append(f"📂 {cat_str}")
+            expander_title = f"{i+1}. [{tp_label}] {q['question'][:60]}..."
             if tag:
                 tag_emoji = "⚠️" if tag in ("消退型", "波动型") else "⏰"
-                title_parts.append(f"{tag_emoji} {tag}")
+                expander_title += f" {tag_emoji}{tag}"
 
-            with st.expander(" · ".join(title_parts)):
+            with st.expander(expander_title, expanded=True):
+                # 案例背景
+                case_bg = q.get("case_background", "")
+                if case_bg:
+                    st.markdown(f"**📋 案例背景**：{case_bg[:200]}{'...' if len(case_bg) > 200 else ''}")
+
                 st.markdown(f"**题目**: {q['question']}")
 
                 for k in sorted(options.keys()):
-                    is_correct_opt = k in q["answer"]
-                    is_user_pick = k in user_ans_str
-                    if is_correct_opt and is_user_pick:
-                        # 正确选项 + 用户选了 → 绿色
-                        st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]}</p>',
-                                    unsafe_allow_html=True)
-                    elif is_correct_opt:
-                        # 正确选项 + 用户没选（漏选）→ 绿色标注漏选
-                        st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">⬜ {k}: {options[k]} （漏选）</p>',
-                                    unsafe_allow_html=True)
-                    elif is_user_pick:
-                        # 错误选项 + 用户选了 → 红色
-                        st.markdown(f'<p style="color:#b71c1c;font-weight:bold;">❌ {k}: {options[k]}</p>',
-                                    unsafe_allow_html=True)
+                    is_user_selected = k in user_ans_str
+                    is_correct_key = k in q["answer"]
+
+                    if q["type"] in ("multi", "案例题", "indefinite"):
+                        if is_user_selected and is_correct_key:
+                            st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]}</p>',
+                                        unsafe_allow_html=True)
+                        elif is_user_selected and not is_correct_key:
+                            st.markdown(f'<p style="color:#b71c1c;font-weight:bold;">❌ {k}: {options[k]} (错选)</p>',
+                                        unsafe_allow_html=True)
+                        elif not is_user_selected and is_correct_key:
+                            st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]} (漏选)</p>',
+                                        unsafe_allow_html=True)
+                        else:
+                            st.markdown(f'{k}: {options[k]}')
                     else:
-                        st.markdown(f'{k}: {options[k]}')
+                        if is_user_selected and is_correct_key:
+                            st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]}</p>',
+                                        unsafe_allow_html=True)
+                        elif is_user_selected and not is_correct_key:
+                            st.markdown(f'<p style="color:#b71c1c;font-weight:bold;">❌ {k}: {options[k]} (错选)</p>',
+                                        unsafe_allow_html=True)
+                        elif not is_user_selected and is_correct_key:
+                            st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]}</p>',
+                                        unsafe_allow_html=True)
+                        else:
+                            st.markdown(f'{k}: {options[k]}')
 
-                # 用户答案展示
-                if user_ans_str == "":
-                    user_display = "（未作答）"
+                # 用户答案（使用 st.error 统一样式）
+                if user_ans_str:
+                    user_display = get_answer_display(q["type"], user_ans_str, options)
+                    st.error(f"**你的答案**：{user_display}")
                 else:
-                    user_display = user_ans_str if q["type"] == "judge" else ", ".join(user_ans_str)
-                st.markdown(
-                    f'<div style="background:#ffebee;border-left:4px solid #b71c1c;padding:8px 12px;'
-                    f'border-radius:4px;margin:4px 0;">'
-                    f'<span style="color:#b71c1c;font-weight:bold;">❌ 你的答案：{user_display}</span></div>',
-                    unsafe_allow_html=True,
-                )
+                    st.error("**你的答案**：未作答")
 
+                # 正确答案
                 correct_display = get_answer_display(q["type"], q["answer"], options)
                 st.markdown(
                     f'<div style="background:#e8f5e9;border-left:4px solid #1b5e20;padding:8px 12px;'
@@ -748,8 +740,15 @@ def _show_consolidation_result():
                     unsafe_allow_html=True,
                 )
 
+                # 解析
                 if q.get("explanation"):
                     st.markdown(q["explanation"])
+
+                # 知识板块 + 答题统计
+                if cat_str:
+                    st.markdown(f"**知识板块**：{cat_str}")
+                q_stats = _get_cached_qstats(qid)
+                st.caption(f"📊 答题统计：答对 {q_stats['correct_count']} 次 / 答错 {q_stats['wrong_count']} 次")
 
     # ---- 操作按钮 ----
     st.markdown("---")

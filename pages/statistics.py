@@ -9,7 +9,7 @@ from utils.data_manager import (
     load_exam_records, load_mock_exam_records,
     load_answer_records, load_question_stats,
     _extract_qids_from_wrong_list,
-    get_mastery_distribution, MASTERY_LABELS,
+    get_mastery_distribution, MASTERY_LABELS, get_retention_threshold,
 )
 
 
@@ -287,7 +287,7 @@ def _show_mastery_analysis(questions, exam_type=None):
     - 掌握度等级：0=未学习 1=初识 2=学习中 3=基本掌握 4=掌握 5=熟练
     - 置信度：0.0-1.0，低样本量或走势波动 → 低置信度
     - 不牢靠：答对过又答错（消退型）或交替答对答错（波动型）
-    - 遗忘预警：上次答对后 >5天（即 >=6天），提示需要复习
+    - 遗忘预警：上次答对后超过阈值天数，提示需要复习（当前阈值可在系统设置中配置）
     """
     st.markdown("### 🧠 知识掌握情况分析")
 

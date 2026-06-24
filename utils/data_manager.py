@@ -11,30 +11,30 @@ from datetime import datetime
 
 from utils.data_access import get_data_access
 
-# 延迟初始化的 DAO 对象
+# 延迟初始化的 DAO 对象（固定使用 SQLite）
 _dao = None
-_dao_source = None  # 记录当前 DAO 对应的 data_source，用于检测配置变化
 
 
 def _get_dao():
-    """获取 data_access 对象（延迟初始化，自动检测配置变化）"""
-    global _dao, _dao_source
-    # 每次调用都检查 config.json 中的 data_source 是否变化
-    # 如果变化则重新创建 DAO
-    try:
-        if CONFIG_FILE.exists():
-            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                cfg = json.load(f)
-            current_source = cfg.get("data_source", "json")
-        else:
-            current_source = "json"
-    except Exception:
-        current_source = "json"
-
-    if _dao is None or _dao_source != current_source:
+    """获取 SQLiteDataAccess 单例"""
+    global _dao
+    if _dao is None:
         _dao = get_data_access()
-        _dao_source = current_source
     return _dao
+
+
+# ---- per-rerun 缓存（同一 rerun 内复用全量数据，避免重复 I/O）----
+_rerun_cache_questions = None
+_rerun_cache_stats = None
+_rerun_cache_version = 0
+
+
+def invalidate_rerun_cache():
+    """每次 Streamlit rerun 开始时调用，清除数据缓存"""
+    global _rerun_cache_questions, _rerun_cache_stats, _rerun_cache_version
+    _rerun_cache_questions = None
+    _rerun_cache_stats = None
+    _rerun_cache_version += 1
 
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -49,10 +49,7 @@ DRAFTS_DIR = DATA_DIR / "drafts"
 
 # 题库类型映射（短码 → 显示名）
 EXAM_TYPE_LABELS = {
-    "心理学会咨询师四级": "中国心理学会咨询师四级",
-    "心理学会咨询师三级": "中国心理学会咨询师三级",
-    "心理协会四级": "中国心理协会四级",
-    "心理协会三级": "中国心理协会三级",
+    "心理学会咨询师四级": "心理学会咨询师四级",
 }
 
 # 默认题库
@@ -77,11 +74,16 @@ DEFAULT_CONFIG = {
     "exam_multi_count": 20,
     "exam_judge_count": 20,
     "wrongbook_extract_count": 50,
+    "retention_days_threshold": 5,
     "last_import_files": [],
 }
 
-# 遗忘预警阈值：距上次答对 > 此天数即触发"需要复习"标签（即 >=6 天）
-_RETENTION_DAYS_THRESHOLD = 5
+
+def get_retention_threshold():
+    """获取遗忘预警阈值（距上次答对 > 此天数触发预警）"""
+    config = load_config()
+    return config.get("retention_days_threshold", 5)
+
 
 # 模拟考试固定配置（实际考试模型，不可配置）
 MOCK_EXAM_CONFIG = {
@@ -123,8 +125,12 @@ def ensure_dirs():
 # ============================
 
 def load_questions():
-    """加载题库（通过 DataAccess 抽象层）"""
-    return _get_dao().load_questions()
+    """加载题库（通过 DataAccess 抽象层，per-rerun 缓存）"""
+    global _rerun_cache_questions
+    if _rerun_cache_questions is not None:
+        return _rerun_cache_questions
+    _rerun_cache_questions = _get_dao().load_questions()
+    return _rerun_cache_questions
 
 
 def save_questions(questions):
@@ -142,7 +148,7 @@ def get_question_count(exam_type=None):
         "single": sum(1 for q in qs if q["type"] == "single"),
         "multi": sum(1 for q in qs if q["type"] == "multi"),
         "judge": sum(1 for q in qs if q["type"] == "judge"),
-        "indefinite": sum(1 for q in qs if q["type"] == "indefinite"),
+        "案例题": sum(1 for q in qs if q["type"] == "案例题"),
     }
 
 
@@ -169,6 +175,25 @@ def get_questions_by_exam_type(exam_type):
     """获取指定 exam_type 的全部题目"""
     qs = load_questions()
     return [q for q in qs if q.get("exam_type") == exam_type]
+
+
+# ============================
+# 案例题管理
+# ============================
+
+def load_case_studies():
+    """加载所有案例"""
+    return _get_dao().load_case_studies()
+
+
+def save_case_studies(case_studies):
+    """批量保存案例背景"""
+    return _get_dao().save_case_studies(case_studies)
+
+
+def get_case_sub_questions(case_id):
+    """获取某个案例的全部子题"""
+    return _get_dao().get_case_sub_questions(case_id)
 
 
 # ============================
@@ -267,100 +292,22 @@ def _extract_qids_from_wrong_list(wrong_list):
     return wrong_list
 
 
-def batch_update_wrong_and_stats(wrong_qids, correct_qids, stats_updates, uncertain_map=None):
+def batch_update_wrong_and_stats(wrong_qids, correct_qids, stats_updates,
+                                      uncertain_map=None, exam_record=None):
     """
-    批量更新错题库和题目答题统计（单次读+单次写）
+    批量更新错题库和题目答题统计（委托 DAO 单事务完成）。
     新规则：答错次数 >= 答对次数 → 记入错题本
     - wrong_qids: list of (question_id, user_answer) 本次答错的
     - correct_qids: list of question_id 本次答对的
     - stats_updates: list of (question_id, is_correct) 需要更新统计的
     - uncertain_map: dict {qid: bool} 答题者自评不确定性标记
+    - exam_record: 可选，考试记录 dict，在同一事务内写入
     """
-    now = datetime.now().isoformat()
-    uncertain_map = uncertain_map or {}
-
-    # 1. 先加载并更新题目答题统计，计算每组题的新答对/答错次数
-    stats = load_question_stats()
-    qid_user_ans = dict(wrong_qids)  # qid -> user_answer
-
-    # 预计算所有受影响的 qid 的新统计
-    affected_qids = set()
-    for qid, is_correct in stats_updates:
-        affected_qids.add(qid)
-    affected_qids.update(qid_user_ans.keys())
-    affected_qids.update(correct_qids)
-
-    new_counts = {}
-    for qid in affected_qids:
-        s = stats.get(qid, {"correct_count": 0, "wrong_count": 0})
-        cc = s.get("correct_count", 0)
-        wc = s.get("wrong_count", 0)
-
-        # 应用本次更新
-        for _qid, is_correct in stats_updates:
-            if _qid == qid:
-                if is_correct:
-                    cc += 1
-                else:
-                    wc += 1
-
-        new_counts[qid] = (cc, wc)
-
-        # 同步更新 stats 字典
-        if qid not in stats:
-            stats[qid] = {
-                "correct_count": 0,
-                "wrong_count": 0,
-                "last_answer_time": None,
-                "last_correct": None,
-            }
-        stats[qid]["correct_count"] = cc
-        stats[qid]["wrong_count"] = wc
-        stats[qid]["last_answer_time"] = now
-        # last_correct: True if last updated answer was correct
-        last_is_correct = None
-        for _qid, _is_correct in reversed(stats_updates):
-            if _qid == qid:
-                last_is_correct = _is_correct
-                break
-        if last_is_correct is not None:
-            stats[qid]["last_correct"] = last_is_correct
-
-        # 更新答题历史（append 本次是否答对）
-        history = list(stats[qid].get("answer_history", []))
-        history.append(last_is_correct if last_is_correct is not None else False)
-        stats[qid]["answer_history"] = history
-
-        # 更新自评不确定性（按指数移动平均混入新标记）
-        old_uncertainty = stats[qid].get("self_uncertainty", 0.0)
-        new_uncertain = 1.0 if uncertain_map.get(qid) else 0.0
-        if old_uncertainty > 0 or new_uncertain > 0:
-            alpha = 0.3  # EMA 平滑系数
-            stats[qid]["self_uncertainty"] = round(alpha * new_uncertain + (1 - alpha) * old_uncertainty, 3)
-        else:
-            stats[qid]["self_uncertainty"] = 0.0
-
-        # 重新计算掌握度等级、置信度、不稳定标记
-        _recalc_mastery_fields(stats[qid])
-
-    save_question_stats(stats)
-
-    # 2. 根据新规则重建错题库：答错次数 >= 答对次数（且至少答过一次）→ 记入错题
-    # 错题库仅存储 question_id 列表，统计数字统一从 question_stats.json 读取
-    old_qids = _extract_qids_from_wrong_list(load_wrong_questions())
-
-    # 收集所有满足 wc >= cc 且至少答过一次的 qid
-    new_wrong_qids = set()
-    for qid, (cc, wc) in new_counts.items():
-        if wc >= cc and (wc > 0 or cc > 0):
-            new_wrong_qids.add(qid)
-
-    # 保留未被本次答题影响的原错题（这些题不影响判断，直接保留）
-    for qid in old_qids:
-        if qid not in affected_qids:
-            new_wrong_qids.add(qid)
-
-    save_wrong_questions(list(new_wrong_qids))
+    _get_dao().batch_update_wrong_and_stats(
+        wrong_qids, correct_qids, stats_updates,
+        uncertain_map=uncertain_map,
+        exam_record=exam_record,
+    )
 
 
 def _recalc_mastery_fields(stats_entry):
@@ -425,29 +372,26 @@ def batch_add_answer_records(records):
 def get_top_wrong_questions(count=50, exam_type=None):
     """
     获取答错次数最多的N道题（含完整题目信息）
-    可按 exam_type 过滤
-    统计数字从 question_stats.json 统一读取
+    改为直接调用 DAO 的 SQL 层排序+Limit，避免三重全量加载
     返回: list[tuple(question_dict, wrong_count)]
     """
-    wrong_qids = _extract_qids_from_wrong_list(load_wrong_questions())
-    questions = load_questions()
-    stats = load_question_stats()
-
-    q_map = {q["id"]: q for q in questions}
+    items = _get_dao().get_all_wrong_with_stats(exam_type, limit=count)
     result = []
-
-    for qid in wrong_qids:
-        if qid not in q_map:
-            continue
-        q = q_map[qid]
-        if exam_type and q.get("exam_type") != exam_type:
-            continue
-        wc = stats.get(qid, {}).get("wrong_count", 0)
-        result.append((q, wc))
-
-    # 按答错次数降序排列
-    result.sort(key=lambda x: x[1], reverse=True)
-    return result[:count]
+    for item in items:
+        q = {
+            "id": item["question_id"],
+            "question": item["question"],
+            "type": item["type"],
+            "options": item["options"],
+            "answer": item["answer"],
+            "explanation": item.get("explanation", ""),
+            "category": item.get("category", ""),
+            "exam_type": exam_type or "心理学会咨询师四级",
+            "case_study_id": item.get("case_study_id"),
+            "case_background": item.get("case_background", ""),
+        }
+        result.append((q, item["wrong_count"]))
+    return result
 
 
 def remove_wrong_question(question_id):
@@ -465,26 +409,8 @@ def clear_all_wrong():
 
 def get_wrong_stats(exam_type=None):
     """获取错题统计，可按 exam_type 过滤
-    统计数字统一从 question_stats.json 读取"""
-    wrong_qids = _extract_qids_from_wrong_list(load_wrong_questions())
-    questions = load_questions()
-    stats = load_question_stats()
-    q_map = {q["id"]: q for q in questions}
-
-    if exam_type:
-        wrong_qids = [
-            qid for qid in wrong_qids
-            if qid in q_map and q_map[qid].get("exam_type") == exam_type
-        ]
-
-    if not wrong_qids:
-        return {"total": 0, "most_wrong": 0}
-
-    max_wc = max(stats.get(qid, {}).get("wrong_count", 0) for qid in wrong_qids)
-    return {
-        "total": len(wrong_qids),
-        "most_wrong": max_wc,
-    }
+    委托 DAO 层单连接 SQL JOIN 版本，避免三重全量加载"""
+    return _get_dao().get_wrong_stats(exam_type)
 
 
 def get_all_wrong_with_stats(exam_type=None):
@@ -500,7 +426,7 @@ def get_all_wrong_with_stats(exam_type=None):
     q_map = {q["id"]: q for q in questions}
     stats = load_question_stats()
 
-    type_labels = {"single": "单选", "multi": "多选", "judge": "判断", "indefinite": "不定项"}
+    type_labels = {"single": "单选", "multi": "多选", "judge": "判断", "案例题": "案例题", "indefinite": "不定项"}
 
     result = []
     for qid in wrong_qids:
@@ -523,6 +449,8 @@ def get_all_wrong_with_stats(exam_type=None):
             "answer": q["answer"],
             "explanation": q.get("explanation", ""),
             "category": q.get("category", infer_category(q.get("source_file", ""))),
+            "case_study_id": q.get("case_study_id"),
+            "case_background": q.get("case_background") or "",
             "wrong_count": wc,
             "correct_count": cc,
             "diff": diff,
@@ -543,34 +471,8 @@ def load_config():
 
 
 def save_config(config):
-    """保存配置（通过 DataAccess 抽象层）
-
-    注意：data_source 是启动配置，必须在任何模式下都同步到 config.json，
-    以确保重启后 get_data_access() 能读到正确的数据源类型。
-    """
-    global _dao
-    # data_source 需要始终同步到 config.json（启动配置，不能依赖 DAO 读取）
-    if "data_source" in config:
-        _sync_data_source_to_json(config["data_source"])
-        # data_source 可能已变化，重置 DAO 使下次调用时重新创建正确实例
-        _dao = None
+    """保存配置（通过 DataAccess 抽象层）"""
     _get_dao().save_config(config)
-
-
-def _sync_data_source_to_json(data_source: str) -> None:
-    """将 data_source 同步写入 config.json，确保重启后能读到正确值"""
-    try:
-        if CONFIG_FILE.exists():
-            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                existing = json.load(f)
-        else:
-            existing = {}
-    except (json.JSONDecodeError, IOError):
-        existing = {}
-    if existing.get("data_source") != data_source:
-        existing["data_source"] = data_source
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(existing, f, ensure_ascii=False, indent=2)
 
 
 # ============================
@@ -908,22 +810,24 @@ def _balanced_sample_by_type(questions_by_cat, total_count, wrong_ids=None, stat
 
 
 def extract_questions(questions, dan_count=40, duo_count=30, pan_count=30,
-                      indefinite_count=0, shuffle_types=False):
+                      indefinite_count=0, shuffle_types=False, stats=None):
     """
     从题库中按题型比例抽取题目（含优先级排序：错题 > 未做题 > 答对题）
     - 按指定数量抽取每种题型
     - 不足时全部抽取
-    - 默认按 单选→多选→判断→不定项 顺序排列（不混排）
+    - 默认按 单选→多选→判断→案例题 顺序排列（不混排）
     - shuffle_types=True 时打乱题型顺序（保持同类题内部连续）
-    - 支持不定项选择题 (indefinite)
+    - 支持案例题 (案例题)
+    - stats: 可选，预加载的答题统计，避免重复加载
     """
-    # 预加载辅助数据（各题型抽取复用同一份，减少 I/O）
-    stats = load_question_stats()
+    # 复用已加载的统计（避免重复 I/O）
+    if stats is None:
+        stats = load_question_stats()
 
     singles = [q for q in questions if q["type"] == "single"]
     multis = [q for q in questions if q["type"] == "multi"]
     judges = [q for q in questions if q["type"] == "judge"]
-    indefinites = [q for q in questions if q["type"] == "indefinite"]
+    indefinites = [q for q in questions if q["type"] == "案例题"]
 
     selected_s = _priority_sample(singles, min(dan_count, len(singles)), None, stats)
     selected_m = _priority_sample(multis, min(duo_count, len(multis)), None, stats)
@@ -939,7 +843,7 @@ def extract_questions(questions, dan_count=40, duo_count=30, pan_count=30,
         if selected_j:
             blocks.append(("judge", selected_j))
         if selected_i:
-            blocks.append(("indefinite", selected_i))
+            blocks.append(("案例题", selected_i))
         random.shuffle(blocks)
         selected = []
         for _, block in blocks:
@@ -958,8 +862,12 @@ QUESTION_STATS_FILE = DATA_DIR / "question_stats.json"
 
 
 def load_question_stats():
-    """加载题目答题统计（通过 DataAccess 抽象层）"""
-    return _get_dao().load_question_stats()
+    """加载题目答题统计（通过 DataAccess 抽象层，per-rerun 缓存）"""
+    global _rerun_cache_stats
+    if _rerun_cache_stats is not None:
+        return _rerun_cache_stats
+    _rerun_cache_stats = _get_dao().load_question_stats()
+    return _rerun_cache_stats
 
 
 def save_question_stats(stats):
@@ -985,6 +893,16 @@ def clear_question_stats(question_id=None):
         save_question_stats(stats)
     else:
         save_question_stats({})
+
+
+def load_uncertain_questions():
+    """加载所有标记为不确定的题目，按 self_uncertainty 降序"""
+    return _get_dao().load_uncertain_questions()
+
+
+def clear_uncertain_mark(question_id):
+    """清除某道题的不确定标记（设置 self_uncertainty = 0）"""
+    _get_dao().clear_uncertain_mark(question_id)
 
 
 # ============================
@@ -1080,7 +998,7 @@ def extract_questions_by_super(questions, super_category, dan_count=30, duo_coun
             multis_by_cat.setdefault(cat, []).append(q)
         elif q["type"] == "judge":
             judges_by_cat.setdefault(cat, []).append(q)
-        elif q["type"] == "indefinite":
+        elif q["type"] == "案例题":
             indefinites_by_cat.setdefault(cat, []).append(q)
 
     # 确保所有子类别都有 key（即使该类别没有该题型）
@@ -1104,7 +1022,7 @@ def extract_questions_by_super(questions, super_category, dan_count=30, duo_coun
         if selected_j:
             blocks.append(("judge", selected_j))
         if selected_i:
-            blocks.append(("indefinite", selected_i))
+            blocks.append(("案例题", selected_i))
         random.shuffle(blocks)
         selected = []
         for _, block in blocks:
@@ -1115,14 +1033,34 @@ def extract_questions_by_super(questions, super_category, dan_count=30, duo_coun
     return selected
 
 
+
+def _sanitize_answer(text):
+    """清洗答案中的不可见/干扰字符（零宽空格、BOM等），防止 Word 文档导入时的格式污染"""
+    if not text:
+        return ""
+    # 移除零宽空格和其他常见不可见干扰字符
+    text = text.replace("\u200b", "")  # zero-width space
+    text = text.replace("\u200c", "")  # zero-width non-joiner
+    text = text.replace("\u200d", "")  # zero-width joiner
+    text = text.replace("\u200e", "")  # left-to-right mark
+    text = text.replace("\u200f", "")  # right-to-left mark
+    text = text.replace("\ufeff", "")  # BOM / zero-width no-break space
+    text = text.replace("\ufe0f", "")  # variation selector
+    # 不换行空格 → 普通空格
+    text = text.replace("\u00a0", " ")
+    return text
+
+
 def check_answer(question_type, user_answer, correct_answer):
     """
     判断答案是否正确
     返回: (是否正确, 详细信息)
     """
+    user_answer = _sanitize_answer(user_answer)
+    correct_answer = _sanitize_answer(correct_answer)
     if question_type in ("single", "judge"):
         return user_answer.strip().upper() == correct_answer.strip().upper()
-    elif question_type in ("multi", "indefinite"):
+    elif question_type in ("multi", "案例题"):
         user_set = set(user_answer.strip().upper().replace(" ", ""))
         correct_set = set(correct_answer.strip().upper().replace(" ", ""))
         return user_set == correct_set
@@ -1135,7 +1073,7 @@ def get_answer_display(question_type, correct_answer, options):
     """
     if question_type == "judge":
         return "正确" if correct_answer == "A" else "错误"
-    elif question_type in ("multi", "indefinite"):
+    elif question_type in ("multi", "案例题"):
         parts = []
         for k in correct_answer:
             if k in options:

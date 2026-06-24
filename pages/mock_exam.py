@@ -2,7 +2,7 @@
 模拟考试系统 - 实际考试模型（固定规则，不可配置）
 两科独立计时、独立提交：
   1. 心理学综合（上午）：150单选×0.4 + 50多选×0.6 + 50判断×0.2 = 120分钟
-  2. 咨询实务（下午）：140单选×0.4 + 60多选×0.6 + 10不定项×0.8 = 120分钟
+  2. 咨询实务（下午）：140单选×0.4 + 60多选×0.6 + 10案例题（不定项）×0.8 = 120分钟
 """
 import streamlit as st
 import time
@@ -13,6 +13,7 @@ from utils.data_manager import (
     batch_update_wrong_and_stats, batch_add_answer_records,
     save_mock_exam_record, infer_category, load_question_stats,
     save_draft, load_drafts, delete_draft,
+    load_case_studies, get_case_sub_questions,
 )
 
 
@@ -65,10 +66,8 @@ def _show_mock_start():
         st.markdown("#### 📗 第二科：咨询实务")
         st.markdown(f"- 单选 {cou['single_count']} 题（每题 {cou['single_score']} 分）")
         st.markdown(f"- 多选 {cou['multi_count']} 题（每题 {cou['multi_score']} 分）")
-        if cou["judge_count"] > 0:
-            st.markdown(f"- 判断 {cou['judge_count']} 题（每题 {cou['judge_score']} 分）")
         if cou.get("indefinite_count", 0) > 0:
-            st.markdown(f"- 不定项 {cou['indefinite_count']} 题（每题 {cou['indefinite_score']} 分）")
+            st.markdown(f"- 案例题 {cou['indefinite_count']} 题（每题 {cou['indefinite_score']} 分）")
         st.markdown(f"- 时间：{cou['time_minutes']} 分钟")
         st.markdown("---")
         if st.button("📗 开始咨询实务", use_container_width=True, type="primary", key="start_cou"):
@@ -120,14 +119,15 @@ def _show_mock_start():
     st.markdown(f"  - 单选题 {cou['single_count']} 题（每题 {cou['single_score']} 分）")
     st.markdown(f"  - 多选题 {cou['multi_count']} 题（每题 {cou['multi_score']} 分）")
     if cou["indefinite_count"] > 0:
-        st.markdown(f"  - 不定项选择题 {cou['indefinite_count']} 题（每题 {cou['indefinite_score']} 分）")
-    st.markdown(f"  - 出题顺序：**单选题 → 多选题 → 不定项选择题**")
+        st.markdown(f"  - 案例题 {cou['indefinite_count']} 题（每题 {cou['indefinite_score']} 分，围绕一个案例背景出题）")
+    st.markdown(f"  - 出题顺序：**单选题 → 多选题 → 案例题**")
     st.markdown("")
 
     st.markdown("**规则说明：**")
     st.markdown("- 两科独立计时、独立提交")
     st.markdown("- 先考心理学综合，提交后方可进入咨询实务")
-    st.markdown("- 多选题/不定项选择题需**完全选对**才得分（漏选/多选均不得分）")
+    st.markdown("- 多选题/案例题需**完全选对**才得分（漏选/多选均不得分）")
+    st.markdown("- 案例题为咨询实务特有的不定项选择题，基于真实案例情境，部分题目只有一个正确答案，部分题目有多个正确答案")
     st.markdown("- 未答题目视为错误")
     st.markdown("- 答错自动计入错题本（以最后一次答题结果为准）")
     st.markdown("- 中途退出**不会**保存进度")
@@ -151,14 +151,50 @@ def _start_subject(subject_key):
     filtered = [q for q in st.session_state.questions if q.get("category", "") in sub_categories]
 
     indefinite_count = cfg.get("indefinite_count", 0)
+    # 案例题按案例单位抽取：
+    # 每个案例包含背景文本 + 多道子题，子题按 index_num 排序
+    case_backgrounds = {}  # {case_id: background_text} 用于 UI 展示
+    case_subs_selected = []  # 被选中的案例子题列表
+    if indefinite_count > 0 and subject_key == "counseling":
+        cases = load_case_studies()
+        if cases:
+            # 按案例为单位随机选取，直到子题总数 >= indefinite_count
+            import random
+            random.shuffle(cases)
+            selected_cases = []
+            total_subs = 0
+            for cs in cases:
+                selected_cases.append(cs)
+                total_subs += cs.get("question_count", 0)
+                if total_subs >= indefinite_count:
+                    break
+            # 收集被选案例的全部子题（按 index_num 排序）
+            for cs in selected_cases:
+                subs = get_case_sub_questions(cs["id"])
+                for sub in subs:
+                    sub["case_study_id"] = cs["id"]
+                    case_subs_selected.append(sub)
+                # 缓存案例背景（用于 UI 子题页面上方展示）
+                # 案例背景文本存储在 case_studies.title 中，优先使用
+                bg_text = cs.get("title", "")
+                if bg_text:
+                    case_backgrounds[cs["id"]] = bg_text
+
+    # 预加载统计，避免 extract_questions 内重复全量加载
+    _stats = load_question_stats()
     selected = extract_questions(
         filtered,
         dan_count=cfg["single_count"],
         duo_count=cfg["multi_count"],
         pan_count=cfg["judge_count"],
-        indefinite_count=indefinite_count,
+        indefinite_count=0,  # 案例题过滤掉，下面单独追加
         shuffle_types=False,
+        stats=_stats,
     )
+
+    # 案例题子题追加到试卷末尾
+    if case_subs_selected:
+        selected.extend(case_subs_selected)
 
     # 计算各题型边界
     single_end = sum(1 for q in selected if q["type"] == "single")
@@ -181,6 +217,7 @@ def _start_subject(subject_key):
         "multi_end": multi_end,
         "judge_end": judge_end,
     }
+    st.session_state.mock_case_backgrounds = case_backgrounds  # 案例背景缓存
     st.session_state.mock_state = subject_key
     st.session_state.pop("mock_draft_id", None)  # 新考试清除旧草稿ID
     st.session_state.pop("mock_paused_at", None)  # 清除暂停状态
@@ -199,6 +236,18 @@ def _resume_mock_draft(draft: dict):
 
     subject_key = draft.get("subject_key", "psychology")
     remaining_seconds = draft.get("remaining_seconds", 0)
+
+    # 重建案例背景缓存
+    case_backgrounds = {}
+    from utils.data_manager import load_case_studies, get_case_sub_questions
+    all_cases = load_case_studies()
+    case_ids_in_exam = set(q.get("case_study_id", "") for q in restored_questions if q.get("case_study_id"))
+    for cs in all_cases:
+        if cs["id"] in case_ids_in_exam:
+            bg_text = cs.get("title", "")
+            if bg_text:
+                case_backgrounds[cs["id"]] = bg_text
+    st.session_state.mock_case_backgrounds = case_backgrounds
 
     # 保存上一科成绩（如有）
     current_result = st.session_state.get("mock_result")
@@ -258,6 +307,7 @@ def _show_exam_subject(subject_key):
                 "mock_answers", "mock_marked", "mock_start_time", "mock_end_time",
                 "mock_confirm_submit", "mock_session_id", "mock_type_boundaries",
                 "mock_result", "mock_prev_result", "mock_stats_cache",
+                "mock_case_backgrounds",
             ]
             for key in keys_to_clear:
                 if key in st.session_state:
@@ -308,17 +358,18 @@ def _show_exam_subject(subject_key):
     se = boundaries["single_end"]
     me = boundaries["multi_end"]
     je = boundaries["judge_end"]
-    type_labels_parts = [f"🔵 {se}题"]
+    type_labels_parts = [f"🔵 单选 {se}题"]
     if me - se > 0:
-        type_labels_parts.append(f"🟢 {me-se}题")
+        type_labels_parts.append(f"🟢 多选 {me-se}题")
     if je - me > 0:
-        type_labels_parts.append(f"🟠 {je-me}题")
-    if total_q - je > 0:
-        type_labels_parts.append(f"🟣 {total_q-je}题")
-    st.markdown(
-        " / ".join(type_labels_parts),
-        help="🔵=单选 🟢=多选 🟠=判断 🟣=不定项"
-    )
+        type_labels_parts.append(f"🟠 判断 {je-me}题")
+    case_count = total_q - je
+    if case_count > 0:
+        case_qids = [eq[i]["id"] for i in range(je, total_q)]
+        case_study_ids = set(eq[i].get("case_study_id", "") for i in range(je, total_q))
+        case_count_label = f"🟣 案例 {case_count}题 ({len(case_study_ids)}个案例)"
+        type_labels_parts.append(case_count_label)
+    st.markdown(" / ".join(type_labels_parts))
 
     st.markdown("---")
 
@@ -332,8 +383,20 @@ def _show_exam_subject(subject_key):
     """, unsafe_allow_html=True)
 
     # 题目显示
-    type_labels = {"single": "🔵 单选题", "multi": "🟢 多选题", "judge": "🟠 判断题", "indefinite": "🟣 不定项选择题"}
+    type_labels = {"single": "🔵 单选题", "multi": "🟢 多选题", "judge": "🟠 判断题", "案例题": "🟣 案例题", "indefinite": "🟡 不定项选择题"}
     category = q.get('category', infer_category(q.get('source_file', '')))
+
+    # 案例题子题：在题目上方展示案例背景
+    case_study_id = q.get("case_study_id", "")
+    if case_study_id:
+        bg_text = st.session_state.get("mock_case_backgrounds", {}).get(case_study_id, "")
+        if bg_text:
+            with st.expander("📋 **案例背景**", expanded=True):
+                st.markdown(
+                    f"""<div style="background:#f3e5f5;padding:14px 16px;border-radius:8px;
+                    border-left:5px solid #9c27b0;font-size:16px;line-height:1.8;">{bg_text}</div>""",
+                    unsafe_allow_html=True,
+                )
 
     # 获取本题答题统计（从缓存读取，与专项训练一致）
     q_stats = st.session_state.mock_stats_cache.get(qid, {"correct_count": 0, "wrong_count": 0, "last_answer_time": None, "last_correct": None})
@@ -438,7 +501,7 @@ def _show_exam_subject(subject_key):
             selected_key = selected_opt.split(":")[0]
             if st.session_state.mock_answers.get(qid) != selected_key:
                 st.session_state.mock_answers[qid] = selected_key
-    elif q["type"] in ("multi", "indefinite"):
+    elif q["type"] in ("multi", "案例题", "indefinite"):
         cols = st.columns(2)
         selected_keys = []
         for i, k in enumerate(opt_keys):
@@ -570,14 +633,20 @@ def _show_exam_subject(subject_key):
                 _current = _qi == idx
 
                 _label = str(_qi + 1)
-                if _uncertain:
-                    _label = f"?{_label}"
-                elif _marked:
-                    _label = f"\u2605{_label}"  # ★
                 if _current:
-                    _label = f"\u25b6{_label}"  # ▶
+                    _label = f"▶{_label}"
 
                 _btype = "primary" if _answered else "secondary"
+                # 标记/不确定：固定高度角标行（所有按钮对齐）
+                _badges = []
+                if _marked:
+                    _badges.append('<span style="font-size:8px;color:#ff9800;">⭐</span>')
+                if _uncertain:
+                    _badges.append('<span style="font-size:8px;color:#ff9800;">?</span>')
+                st.markdown(
+                    f'<div style="text-align:right;height:11px;line-height:11px;overflow:hidden;">{"".join(_badges)}</div>',
+                    unsafe_allow_html=True,
+                )
                 if st.button(_label, key=f"mock_card_{_qi}",
                              use_container_width=True, type=_btype):
                     st.session_state.mock_current = _qi
@@ -633,7 +702,7 @@ def _finish_subject(subject_key):
     answer_records = []    # 收集答题记录
     uncertain_map = {}     # 答题者自评不确定性 {qid: bool}
 
-    for q in eq:
+    for qi, q in enumerate(eq):
         qid = q["id"]
         user_ans = answers.get(qid, "")
         is_answered = user_ans != ""  # 是否实际作答
@@ -644,7 +713,16 @@ def _finish_subject(subject_key):
             is_correct = False
             score = 0
         else:
-            is_correct = check_answer(q["type"], user_ans, q["answer"])
+            # 防御性校验：单选/判断题的 answer 应为单个字母
+            # 如果内存数据异常（如被多选题答案污染），从数据库重新读取
+            effective_answer = q["answer"]
+            if q["type"] in ("single", "judge") and len(effective_answer) != 1:
+                from utils.data_access import get_data_access
+                fresh = get_data_access().load_question_by_id(qid)
+                if fresh and len(fresh.get("answer", "")) == 1:
+                    effective_answer = fresh["answer"]
+
+            is_correct = check_answer(q["type"], user_ans, effective_answer)
             score = 0
             if is_correct:
                 if q["type"] == "single":
@@ -653,7 +731,7 @@ def _finish_subject(subject_key):
                     score = cfg["multi_score"]
                 elif q["type"] == "judge":
                     score = cfg["judge_score"]
-                elif q["type"] == "indefinite":
+                elif q["type"] in ("案例题", "indefinite"):
                     score = cfg["indefinite_score"]
                 correct_count += 1
                 total_score += score
@@ -674,7 +752,7 @@ def _finish_subject(subject_key):
 
         details.append({
             "id": q["id"],
-            "index": q["index"],
+            "index": qi + 1,
             "type": q["type"],
             "question": q["question"],
             "options": q.get("options", {}),
@@ -781,7 +859,7 @@ def _show_subject_result(subject_key):
     st.markdown(f"# 📊 {cfg['name']} - 成绩报告")
     st.markdown("---")
 
-    cols = st.columns(4)
+    cols = st.columns([1.2, 1.8, 1, 1])
     cols[0].metric("✅ 正确", f"{correct}/{total}", f"{accuracy:.1f}%")
     cols[1].metric("📊 得分", f"{score:.1f} / {max_score:.1f}")
     cols[2].metric("⏱️ 用时", duration)
@@ -801,7 +879,7 @@ def _show_subject_result(subject_key):
             type_stats[tp]["correct"] += 1
             type_stats[tp]["score"] += d["score"]
 
-    type_names = {"single": "单选题", "multi": "多选题", "judge": "判断题", "indefinite": "不定项选择题"}
+    type_names = {"single": "单选题", "multi": "多选题", "judge": "判断题", "案例题": "案例题"}
 
     for tp, stats in type_stats.items():
         pct = stats["correct"] / stats["total"] * 100 if stats["total"] > 0 else 0
@@ -823,7 +901,7 @@ def _show_subject_result(subject_key):
     if wrong_details:
         st.markdown(f"### ❌ 错题回顾 ({len(wrong_details)}题)")
         for i, d in enumerate(wrong_details):
-            tp_label = {"single": "单选", "multi": "多选", "judge": "判断", "indefinite": "不定项"}.get(d["type"], d["type"])
+            tp_label = {"single": "单选", "multi": "多选", "judge": "判断", "案例题": "案例题"}.get(d["type"], d["type"])
             cat_label = d.get("category", "")
             user_ans = d.get("user_answer", "").strip().upper()
             correct_ans = d["correct_answer"].strip().upper()
@@ -834,11 +912,14 @@ def _show_subject_result(subject_key):
                 st.markdown(f"**题目**: {d['question']}")
 
                 # 显示所有选项，用颜色标记
+                # 注意：单选/判断题 correct_ans 是单个字母（如 "A"），必须用 ==不能用 in
+                # 多选/案例题 correct_ans 是多个字母（如 "ABC"），用 in 判断
+                is_multi = d["type"] in ("multi", "案例题", "indefinite")
                 for k in opt_keys:
                     is_user_selected = k in user_ans
-                    is_correct_key = k in correct_ans
+                    is_correct_key = (k in correct_ans) if is_multi else (k == correct_ans)
 
-                    if d["type"] in ("multi", "indefinite"):
+                    if is_multi:
                         if is_user_selected and is_correct_key:
                             st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]}</p>',
                                         unsafe_allow_html=True)
@@ -906,10 +987,15 @@ def _show_subject_result(subject_key):
                 nav_html += '<div style="flex:1;min-width:0;"></div>'
                 continue
             q_item = eq[q_idx]
-            d = details_by_idx.get(q_item["index"], {})
+            d = details_by_idx.get(q_idx + 1, {})
             is_correct = d.get("is_correct", False)
             bg = "#c8e6c9" if is_correct else "#ffcdd2"
             tc = "#1b5e20" if is_correct else "#b71c1c"
+            
+            # 案例题子题：左侧紫色竖条标记
+            case_border = ""
+            if q_item.get("case_study_id"):
+                case_border = "border-left:4px solid #9c27b0 !important;"
             
             # 标记题角标 + 不确定角标
             is_marked = q_item["id"] in st.session_state.mock_marked
@@ -928,7 +1014,7 @@ def _show_subject_result(subject_key):
             <div style="flex:1;min-width:0;">
                 <div style="display:block;width:100%;background:{bg};color:{tc};border:{border_style};
                           border-radius:3px;font-size:12px;min-height:30px;line-height:30px;
-                          text-align:center;position:relative;">
+                          text-align:center;position:relative;{case_border}">
                     {q_idx + 1}{indicators}
                 </div>
             </div>'''
@@ -1013,15 +1099,20 @@ def _show_final_result():
 
 
 def _reset_mock_exam():
-    """重置模拟考试状态"""
+    """重置模拟考试状态，返回模拟考试首页"""
     keys_to_clear = [
         "mock_state", "mock_subject", "mock_questions", "mock_current",
         "mock_answers", "mock_start_time", "mock_end_time",
         "mock_confirm_submit", "mock_session_id", "mock_type_boundaries",
         "mock_result", "mock_prev_result", "mock_final_results",
-        "mock_stats_cache",
+        "mock_stats_cache", "mock_case_backgrounds",
+        "mock_marked", "mock_uncertain", "mock_draft_id",
+        "mock_paused_at", "mock_remaining_at_pause", "mock_last_auto_save",
+        "mock_draft_saved",
     ]
     for key in keys_to_clear:
         if key in st.session_state:
             del st.session_state[key]
+    # 显式设置状态为 idle，确保下次渲染进入首页
+    st.session_state.mock_state = "idle"
     st.rerun()

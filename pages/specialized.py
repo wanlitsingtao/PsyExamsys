@@ -18,6 +18,21 @@ from utils.data_manager import (
     save_draft, load_drafts, delete_draft, save_exam_record,
 )
 
+# 知识板块标题图标映射（指示标题含义，不用对号/警告图标）
+CATEGORY_ICONS = {
+    "心理学导论": "🧠",
+    "社会心理学": "👥",
+    "人格心理学": "🎭",
+    "发展心理学": "🌱",
+    "异常心理学": "🔎",
+    "咨询心理学": "💬",
+    "心理咨询会谈技术": "🎙️",
+    "情绪调节与压力管理": "🧘",
+    "心理危机识别": "🆘",
+    "家庭教育与心理健康科普": "🏠",
+    "心理咨询专业伦理与相关法律规范": "⚖️",
+}
+
 
 def show_specialized():
     questions = st.session_state.questions
@@ -98,11 +113,14 @@ def _show_spec_start(questions):
         "心理咨询专业伦理与相关法律规范",
     ]
 
+    # 需要从界面隐藏的板块（题型或其他非知识板块）
+    hidden_categories = {"案例题", ""}
+
     # 过滤出实际存在的板块
-    available_cats = [c for c in cat_order if c in cats]
-    # 加上可能存在但不在顺序中的板块
+    available_cats = [c for c in cat_order if c in cats and c not in hidden_categories]
+    # 加上可能存在但不在顺序中的板块（排除需要隐藏的）
     for c in sorted(cats.keys()):
-        if c not in available_cats:
+        if c not in available_cats and c not in hidden_categories:
             available_cats.append(c)
 
     # ---------- 注入 CSS：所有按钮红底白字（Streamlit 原生红色）----------
@@ -138,7 +156,7 @@ def _show_spec_start(questions):
     # ---- 综合训练卡片（放在最前面） ----
     with col1:
         with st.container(border=True):
-            st.markdown("**✅ 📊 综合训练**")
+            st.markdown("**📚 综合训练**")
             st.caption(f"总 {comp_total_all} 题 | 已答 {comp_answered} 题 | 对 {comp_correct} 题 | 错 {comp_wrong} 题")
             if st.button("🚀 开始综合训练",
                         use_container_width=True,
@@ -162,17 +180,13 @@ def _show_spec_start(questions):
         # 只要该板块有题目就可以开始训练（不再强制三类题型都满足最低数量）
         can_start = actual_total > 0
 
-        # 判断是否有题型不足，给出提示
-        all_full = (info["single"] >= spec_single and
-                    info["multi"] >= spec_multi and
-                    info["judge"] >= spec_judge)
-        status_icon = "✅" if all_full else "⚠️"
-
         # 获取该板块的答题统计
         cs = cat_stats.get(cat, {"total": info["total"], "answered": 0, "correct": 0, "wrong": 0})
 
+        cat_icon = CATEGORY_ICONS.get(cat, "📖")
+
         with col.container(border=True):
-            st.markdown(f"**{status_icon} {cat}**")
+            st.markdown(f"**{cat_icon} {cat}**")
             st.caption(f"总 {info['total']} 题 | "
                        f"已答 {cs['answered']} 题 | "
                        f"对 {cs['correct']} 题 | "
@@ -376,8 +390,7 @@ def _show_spec_running():
     se = boundaries["single_end"]
     me = boundaries["multi_end"]
     st.markdown(
-        f"🔵 {se}题 / 🟢 {me-se}题 / 🟠 {total_q-me}题",
-        help="蓝色=单选题 | 绿色=多选题 | 橙色=判断题"
+        f"🔵 单选 {se}题 / 🟢 多选 {me-se}题 / 🟠 判断 {total_q-me}题"
     )
 
     st.markdown("---")
@@ -392,7 +405,7 @@ def _show_spec_running():
     """, unsafe_allow_html=True)
 
     # ---- 题目显示 ----
-    type_labels = {"single": "🔵 单选题", "multi": "🟢 多选题", "judge": "🟠 判断题"}
+    type_labels = {"single": "🔵 单选题", "multi": "🟢 多选题", "judge": "🟠 判断题", "案例题": "🟣 案例题", "indefinite": "🟡 不定项选择题"}
 
     # 获取本题答题统计（从缓存读取，避免每次渲染读文件）
     q_stats = st.session_state.spec_stats_cache.get(qid, {"correct_count": 0, "wrong_count": 0, "last_answer_time": None, "last_correct": None})
@@ -458,6 +471,12 @@ def _show_spec_running():
                 st.session_state.spec_marked.add(qid)
             st.rerun()
     
+    # 案例题子题：在题目上方展示案例背景
+    case_bg = q.get("case_background", "")
+    if case_bg:
+        with st.expander("📋 **案例背景**", expanded=True):
+            st.markdown(case_bg)
+
     st.markdown(f"**{q['question']}**")
 
     # 选项行距：1.5倍
@@ -499,7 +518,7 @@ def _show_spec_running():
             if st.session_state.spec_answers.get(qid) != selected_key:
                 st.session_state.spec_answers[qid] = selected_key
 
-    elif q["type"] == "multi":
+    elif q["type"] in ("multi", "案例题", "indefinite"):
         cols = st.columns(2)
         selected_keys = []
         for i, k in enumerate(opt_keys):
@@ -660,14 +679,20 @@ def _show_spec_running():
                 _current = _qi == idx
 
                 _label = str(_qi + 1)
-                if _uncertain:
-                    _label = f"?{_label}"
-                elif _marked:
-                    _label = f"\u2605{_label}"
                 if _current:
-                    _label = f"\u25b6{_label}"
+                    _label = f"▶{_label}"
 
                 _btype = "primary" if _answered else "secondary"
+                # 标记/不确定：固定高度角标行（所有按钮对齐）
+                _badges = []
+                if _marked:
+                    _badges.append('<span style="font-size:8px;color:#ff9800;">⭐</span>')
+                if _uncertain:
+                    _badges.append('<span style="font-size:8px;color:#ff9800;">?</span>')
+                st.markdown(
+                    f'<div style="text-align:right;height:11px;line-height:11px;overflow:hidden;">{"".join(_badges)}</div>',
+                    unsafe_allow_html=True,
+                )
                 if st.button(_label, key=f"spec_card_{_qi}",
                              use_container_width=True, type=_btype):
                     st.session_state.spec_current = _qi
@@ -697,8 +722,6 @@ def _save_spec_draft(auto_save: bool = False):
     if auto_save:
         return  # 静默保存
     st.session_state.spec_draft_saved = True
-    st.rerun()
-
 
 def _finish_specialized():
     """结束专项训练，计算成绩并更新错题本"""
@@ -750,6 +773,7 @@ def _finish_specialized():
             "correct_answer": q["answer"],
             "is_correct": is_correct,
             "category": q.get("category", category),
+            "case_background": q.get("case_background", ""),
         })
 
     # 批量更新错题库和答题统计（单次读取+单次写入）
@@ -869,6 +893,11 @@ def _show_spec_result():
                 d["type"], d["correct_answer"], d.get("options", {})
             )
             with st.expander(f"{i+1}. [{tp_label}] {d['question'][:60]}...", expanded=True):
+                # 案例背景
+                case_bg = d.get("case_background", "")
+                if case_bg:
+                    st.markdown(f"**📋 案例背景**：{case_bg[:200]}{'...' if len(case_bg) > 200 else ''}")
+
                 st.markdown(f"**题目**: {d['question']}")
                 # 显示所有选项，用颜色标记
                 options = d.get("options", {})
@@ -878,7 +907,7 @@ def _show_spec_result():
                     is_user_selected = k in user_ans
                     is_correct_key = k in correct_ans
 
-                    if d["type"] in ("multi", "indefinite"):
+                    if d["type"] in ("multi", "案例题", "indefinite"):
                         if is_user_selected and is_correct_key:
                             st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {v}</p>',
                                         unsafe_allow_html=True)

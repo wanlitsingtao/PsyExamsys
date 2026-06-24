@@ -1,6 +1,6 @@
 """
 相关性分析 - 题目属性多维度关联分析
-分析维度：答题次数、答错次数、掌握类型、遗忘预警、时间维度、板块热力、交叉分析
+分析维度：答题次数、答错次数、掌握类型、遗忘预警、时间维度、板块热力、交叉分析、自评不确定性与不稳定类型
 """
 import streamlit as st
 import json
@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from collections import defaultdict
 
-from utils.data_manager import load_question_stats, load_questions, MASTERY_LABELS
+from utils.data_manager import load_question_stats, load_questions, MASTERY_LABELS, get_retention_threshold
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
@@ -111,11 +111,11 @@ def _dim1(records):
     st.subheader("一、总答题次数 × 置信度 & 掌握等级")
 
     buckets = [
-        ("1-2次",   lambda r: r["total_attempts"] <= 2),
-        ("3-5次",   lambda r: r["total_attempts"] <= 5),
-        ("6-10次",  lambda r: r["total_attempts"] <= 10),
-        ("11-20次", lambda r: r["total_attempts"] <= 20),
-        ("21次+",   lambda r: True),
+        ("1.1-2次",   lambda r: r["total_attempts"] <= 2),
+        ("2.3-5次",   lambda r: r["total_attempts"] <= 5),
+        ("3.6-10次",  lambda r: r["total_attempts"] <= 10),
+        ("4.11-20次", lambda r: r["total_attempts"] <= 20),
+        ("5.21次+",   lambda r: True),
     ]
     grouped = _bucket(records, buckets)
 
@@ -218,10 +218,10 @@ def _dim3(records):
     st.subheader("三、自评不确定性 × 实际正确率")
 
     buckets = [
-        ("无标记(0)",      lambda r: r["self_uncertainty"] == 0),
-        ("轻微(0.01-0.3)", lambda r: r["self_uncertainty"] <= 0.3),
-        ("中等(0.31-0.7)", lambda r: r["self_uncertainty"] <= 0.7),
-        ("高度(0.71+)",    lambda r: True),
+        ("1-无标记(0)",      lambda r: r["self_uncertainty"] == 0),
+        ("2-轻微(0.01-0.3)", lambda r: r["self_uncertainty"] <= 0.3),
+        ("3-中等(0.31-0.7)", lambda r: r["self_uncertainty"] <= 0.7),
+        ("4-高度(0.71+)",    lambda r: True),
     ]
     grouped = _bucket(records, buckets)
 
@@ -322,11 +322,11 @@ def _dim5(records):
         return
 
     buckets = [
-        ("0-3天",   lambda r: r["days_since_correct"] <= 3),
-        ("4-7天",   lambda r: r["days_since_correct"] <= 7),
-        ("8-14天",  lambda r: r["days_since_correct"] <= 14),
-        ("15-30天", lambda r: r["days_since_correct"] <= 30),
-        ("30天+",   lambda r: True),
+        ("1.0-3天",   lambda r: r["days_since_correct"] <= 3),
+        ("2.4-7天",   lambda r: r["days_since_correct"] <= 7),
+        ("3.8-14天",  lambda r: r["days_since_correct"] <= 14),
+        ("4.15-30天", lambda r: r["days_since_correct"] <= 30),
+        ("5.30天+",   lambda r: True),
     ]
     grouped = _bucket(valid, buckets)
 
@@ -353,10 +353,10 @@ def _dim5(records):
     if tipping_point:
         st.success(
             f"**结论**：距上次答对超过 **{tipping_point}** 后，遗忘预警率突破 50%。\n"
-            f"当前系统设定的复习阈值为 **7 天**，从数据看：\n"
-            f"4-7 天遗忘率为 **{retention_vals[1] if len(retention_vals) > 1 else '?'}%**，"
-            f"8-14 天升至 **{retention_vals[2] if len(retention_vals) > 2 else '?'}%**。\n"
-            f"7 天阈值基本合理，答对后建议在 1 周内安排复习。"
+            f"当前系统设定的复习阈值为 **{get_retention_threshold()} 天**，从数据看：\n"
+            f"{labels[1]} 遗忘率为 **{retention_vals[1] if len(retention_vals) > 1 else '?'}%**，"
+            f"{labels[2]} 升至 **{retention_vals[2] if len(retention_vals) > 2 else '?'}%**。\n"
+            f"{get_retention_threshold()} 天阈值基本合理，答对后建议在规定时间内安排复习。"
         )
     else:
         st.success(
@@ -530,6 +530,86 @@ def _dim7(records):
 
 
 # ============================================================
+#  维度 8：自评不确定性 × 不稳定类型（波动型 / 消退型）
+# ============================================================
+
+def _dim8(records):
+    st.subheader("八、自评不确定性 × 不稳定类型（波动型 / 消退型）")
+
+    buckets = [
+        ("1-无标记(0)",      lambda r: r["self_uncertainty"] == 0),
+        ("2-轻微(0.01-0.3)", lambda r: r["self_uncertainty"] <= 0.3),
+        ("3-中等(0.31-0.7)", lambda r: r["self_uncertainty"] <= 0.7),
+        ("4-高度(0.71+)",    lambda r: True),
+    ]
+    grouped = _bucket(records, buckets)
+
+    # 只保留有实际数据的组
+    valid_groups = [(l, g) for l, g in grouped if len(g) > 0]
+    if len(valid_groups) < 2:
+        st.info("自评不确定性数据不足（绝大多数题目没有标记不确定性），跳过此分析")
+        return
+
+    labels = [k for k, _ in valid_groups]
+    type_order = ["波动型", "消退型"]
+
+    type_data = {}
+    for t in type_order:
+        type_data[t] = []
+    for _, grp in valid_groups:
+        n = len(grp)
+        cnt = defaultdict(int)
+        for r in grp:
+            cnt[r["unstable_type"]] += 1
+        for t in type_order:
+            type_data[t].append(round(cnt.get(t, 0) / n * 100, 1))
+
+    # 过滤掉全为零的类型
+    type_data = {k: v for k, v in type_data.items() if any(x > 0 for x in v)}
+    if not type_data:
+        st.info("当前数据中没有波动型或消退型题目，跳过此分析")
+        return
+
+    df_type = pd.DataFrame(type_data, index=labels)
+    st.bar_chart(df_type, use_container_width=True)
+    st.caption("各柱内不同颜色代表该不确定性级别下波动型 / 消退型题目的占比(%)")
+
+    # ── 结论 ──
+    conclusions = []
+
+    for t_name in ["波动型", "消退型"]:
+        if t_name not in type_data or len(type_data[t_name]) < 2:
+            continue
+        vals = type_data[t_name]
+        if vals[-1] > vals[0]:
+            conclusions.append(
+                f"🔴 {t_name}占比从 **{labels[0]}** 的 **{vals[0]}%** "
+                f"上升到 **{labels[-1]}** 的 **{vals[-1]}%**"
+            )
+        elif vals[-1] == vals[0]:
+            conclusions.append(
+                f"🟡 {t_name}占比在各不确定性级别中基本持平（~{vals[0]}%）"
+            )
+        else:
+            conclusions.append(
+                f"🟢 {t_name}占比从 **{labels[0]}** 的 **{vals[0]}%** "
+                f"下降到 **{labels[-1]}** 的 **{vals[-1]}%**"
+            )
+
+    if conclusions:
+        st.success(
+            f"**结论**：自评不确定性与答题不稳定类型存在关联。\n"
+            + "\n".join(f"- {c}" for c in conclusions)
+            + "\n\n建议对自评不确定性较高的题目加强针对性巩固练习，"
+            "防止答题表现波动或消退。"
+        )
+    else:
+        st.info("当前数据不足以得出结论")
+
+    st.markdown("---")
+
+
+# ============================================================
 #  主入口
 # ============================================================
 
@@ -565,7 +645,7 @@ def show_correlation():
 
     st.markdown("---")
 
-    # ── 七个分析维度 ──
+    # ── 八个分析维度 ──
     _dim1(records)
     _dim2(records)
     _dim3(records)
@@ -573,5 +653,6 @@ def show_correlation():
     _dim5(records)
     _dim6(records)
     _dim7(records)
+    _dim8(records)
 
     st.caption("💡 提示：切换到本页时自动使用最新数据计算。点击「刷新分析」可手动触发重新计算。")

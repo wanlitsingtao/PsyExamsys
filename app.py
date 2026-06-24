@@ -20,7 +20,10 @@ if "_app_initialized" not in st.session_state:
     st.session_state._app_initialized = True
 
 # 初始化 session_state
-from utils.data_manager import load_config, load_questions, get_available_exam_types, DEFAULT_EXAM_TYPE
+from utils.data_manager import load_config, load_questions, get_available_exam_types, DEFAULT_EXAM_TYPE, invalidate_rerun_cache
+
+# 每次 rerun 开始时清除数据缓存，确保使用最新数据
+invalidate_rerun_cache()
 
 if "config" not in st.session_state:
     st.session_state.config = load_config()
