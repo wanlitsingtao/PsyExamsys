@@ -259,11 +259,15 @@ def _start_comprehensive(questions):
     single_end = sum(1 for q in selected if q["type"] == "single")
     multi_end = single_end + sum(1 for q in selected if q["type"] == "multi")
 
+    # 预填不确定开关：历史标记为不确定的题目默认打开
+    _stats_c = load_question_stats(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
+    _pre_uncertain_c = {qid for qid, s in _stats_c.items() if s.get("self_uncertainty", 0) > 0}
+
     st.session_state.spec_questions = selected
     st.session_state.spec_current = 0
     st.session_state.spec_answers = {}
     st.session_state.spec_marked = set()
-    st.session_state.spec_uncertain = set()
+    st.session_state.spec_uncertain = {q["id"] for q in selected if q["id"] in _pre_uncertain_c}
     st.session_state.spec_state = "running"
     st.session_state.spec_session_id = session_id
     st.session_state.spec_last_auto_save = time.time()  # 自动保存计时起点
@@ -276,7 +280,6 @@ def _start_comprehensive(questions):
     st.session_state.spec_mode = "comprehensive"
     st.session_state.pop("spec_draft_id", None)  # 新训练清除旧草稿ID
     st.rerun()
-    """开始专项训练"""
     _clear_spec_show_ans()
     config = load_config()
     # 使用配置中的题数（默认 30单选 + 20多选 + 10判断 = 60题）
@@ -302,11 +305,15 @@ def _start_comprehensive(questions):
     single_end = sum(1 for q in selected if q["type"] == "single")
     multi_end = single_end + sum(1 for q in selected if q["type"] == "multi")
 
+    # 预填不确定开关：历史标记为不确定的题目默认打开
+    _stats_s = load_question_stats(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
+    _pre_uncertain_s = {qid for qid, s in _stats_s.items() if s.get("self_uncertainty", 0) > 0}
+
     st.session_state.spec_questions = selected
     st.session_state.spec_current = 0
     st.session_state.spec_answers = {}
     st.session_state.spec_marked = set()
-    st.session_state.spec_uncertain = set()
+    st.session_state.spec_uncertain = {q["id"] for q in selected if q["id"] in _pre_uncertain_s}
     st.session_state.spec_state = "running"
     st.session_state.spec_session_id = session_id
     st.session_state.spec_last_auto_save = time.time()  # 自动保存计时起点
@@ -319,7 +326,6 @@ def _start_comprehensive(questions):
     st.session_state.spec_mode = "specialized"
     st.session_state.pop("spec_draft_id", None)  # 新训练清除旧草稿ID
     st.rerun()
-    """从草稿恢复专项训练/综合训练状态"""
     _clear_spec_show_ans()
     # 按 question_ids 还原题目对象（按顺序）
     q_map = {q["id"]: q for q in questions}
@@ -367,7 +373,7 @@ def _show_spec_running():
 
     # 缓存答题统计（避免每次渲染读文件）
     if "spec_stats_cache" not in st.session_state:
-        st.session_state.spec_stats_cache = load_question_stats()
+        st.session_state.spec_stats_cache = load_question_stats(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
 
     # 标题行 + 返回按钮（同行居右；保存按钮已移至导航行）
     mode_label = "综合训练" if mode == "comprehensive" else "专项训练"
@@ -781,10 +787,10 @@ def _finish_specialized():
     batch_update_wrong_and_stats(wrong_qids, correct_qids, stats_updates, uncertain_map)
 
     # 刷新统计缓存，确保结果页读到最新数据
-    st.session_state.spec_stats_cache = load_question_stats()
+    st.session_state.spec_stats_cache = load_question_stats(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
 
     # 批量追加答题记录
-    batch_add_answer_records(answer_records)
+    batch_add_answer_records(answer_records, exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
 
     # 标记数据已变更，触发首页统计缓存刷新
     st.session_state._data_version = st.session_state.get("_data_version", 0) + 1
@@ -830,7 +836,7 @@ def _finish_specialized():
         "correct": correct_count,
         "accuracy": f"{correct_count/total_q*100:.1f}%",
         "category": category,
-    })
+    }, exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
 
     # 提交成功后删除对应草稿（如果本次是从草稿恢复的，或曾保存过进度）
     draft_id = st.session_state.pop("spec_draft_id", None)
@@ -841,6 +847,9 @@ def _finish_specialized():
 
 def _show_spec_result():
     """显示专项训练结果"""
+    # 守卫初始化：防止页面刷新后 session state 丢失
+    if "spec_stats_cache" not in st.session_state:
+        st.session_state.spec_stats_cache = load_question_stats(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
     result = st.session_state.spec_result
     total = result["total"]
     correct = result["correct"]

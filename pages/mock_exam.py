@@ -181,7 +181,7 @@ def _start_subject(subject_key):
                     case_backgrounds[cs["id"]] = bg_text
 
     # 预加载统计，避免 extract_questions 内重复全量加载
-    _stats = load_question_stats()
+    _stats = load_question_stats(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
     selected = extract_questions(
         filtered,
         dan_count=cfg["single_count"],
@@ -201,12 +201,15 @@ def _start_subject(subject_key):
     multi_end = single_end + sum(1 for q in selected if q["type"] == "multi")
     judge_end = multi_end + sum(1 for q in selected if q["type"] == "judge")
 
+    # 预填不确定开关：历史标记为不确定的题目默认打开
+    _pre_uncertain = {qid for qid, s in _stats.items() if s.get("self_uncertainty", 0) > 0}
+
     st.session_state.mock_subject = subject_key
     st.session_state.mock_questions = selected
     st.session_state.mock_current = 0
     st.session_state.mock_answers = {}
     st.session_state.mock_marked = set()
-    st.session_state.mock_uncertain = set()
+    st.session_state.mock_uncertain = {q["id"] for q in selected if q["id"] in _pre_uncertain}
     st.session_state.mock_start_time = time.time()
     st.session_state.mock_end_time = time.time() + cfg["time_minutes"] * 60
     st.session_state.mock_last_auto_save = time.time()  # 自动保存计时起点
@@ -292,7 +295,7 @@ def _show_exam_subject(subject_key):
 
     # 缓存答题统计（避免每次渲染读文件，与专项训练一致）
     if "mock_stats_cache" not in st.session_state:
-        st.session_state.mock_stats_cache = load_question_stats()
+        st.session_state.mock_stats_cache = load_question_stats(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
 
     # 标题行 + 返回按钮（同行居右；保存按钮已移至导航行）
     cfg_name = cfg["name"]
@@ -769,13 +772,13 @@ def _finish_subject(subject_key):
     batch_update_wrong_and_stats(wrong_qids, correct_qids, stats_updates, uncertain_map)
 
     # 批量追加答题记录
-    batch_add_answer_records(answer_records)
+    batch_add_answer_records(answer_records, exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
 
     # 标记数据已变更，触发首页统计缓存刷新
     st.session_state._data_version = st.session_state.get("_data_version", 0) + 1
 
     # 刷新统计缓存，确保后续页面读到最新数据
-    st.session_state.mock_stats_cache = load_question_stats()
+    st.session_state.mock_stats_cache = load_question_stats(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
 
     duration_str = f"{int(duration // 60)}分{int(duration % 60)}秒"
 
@@ -825,7 +828,7 @@ def _finish_subject(subject_key):
         "session_id": st.session_state.get("mock_session_id", ""),
         "category_stats": cat_stats,
     }
-    save_mock_exam_record(record)
+    save_mock_exam_record(record, exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
 
     # 提交成功后删除对应草稿
     draft_id = st.session_state.pop("mock_draft_id", None)
@@ -843,6 +846,8 @@ def _show_subject_result(subject_key):
         st.session_state.mock_marked = set()
     if "mock_uncertain" not in st.session_state:
         st.session_state.mock_uncertain = set()
+    if "mock_stats_cache" not in st.session_state:
+        st.session_state.mock_stats_cache = load_question_stats(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
 
     cfg = MOCK_EXAM_CONFIG[subject_key]
     result = st.session_state.mock_result

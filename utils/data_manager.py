@@ -226,14 +226,23 @@ def dedup_import(existing_questions, new_questions):
 # 错题库管理
 # ============================
 
-def load_wrong_questions():
-    """加载错题库（通过 DataAccess 抽象层）"""
-    return _get_dao().load_wrong_questions()
+def load_wrong_questions(exam_type=None):
+    """加载错题库（通过 DataAccess 抽象层）
+    
+    Args:
+        exam_type: 考试类型过滤。None 时返回全部。
+    """
+    return _get_dao().load_wrong_questions(exam_type=exam_type)
 
 
-def save_wrong_questions(wrong_list):
-    """保存错题库（通过 DataAccess 抽象层）"""
-    _get_dao().save_wrong_questions(wrong_list)
+def save_wrong_questions(wrong_list, exam_type=None):
+    """保存错题库（通过 DataAccess 抽象层）
+    
+    Args:
+        wrong_list: 错题 ID 列表（元素可以是 str 或 (qid, exam_type) 元组）
+        exam_type: 考试类型。若 wrong_list 元素是 str，则此参数用于自动填充。
+    """
+    _get_dao().save_wrong_questions(wrong_list, exam_type=exam_type)
 
 
 def add_wrong_record(question_id, user_answer):
@@ -303,11 +312,14 @@ def batch_update_wrong_and_stats(wrong_qids, correct_qids, stats_updates,
     - uncertain_map: dict {qid: bool} 答题者自评不确定性标记
     - exam_record: 可选，考试记录 dict，在同一事务内写入
     """
+    global _rerun_cache_stats
     _get_dao().batch_update_wrong_and_stats(
         wrong_qids, correct_qids, stats_updates,
         uncertain_map=uncertain_map,
         exam_record=exam_record,
     )
+    # 写入后立即清除 rerun 缓存，确保下次 load_question_stats() 读到最新数据
+    _rerun_cache_stats = None
 
 
 def _recalc_mastery_fields(stats_entry):
@@ -362,7 +374,7 @@ def _recalc_mastery_fields(stats_entry):
     stats_entry["unstable"] = unstable
 
 
-def batch_add_answer_records(records):
+def batch_add_answer_records(records, exam_type=None):
     """
     批量追加答题过程记录（通过 DataAccess 抽象层）
     """
@@ -595,7 +607,7 @@ def get_category_training_stats(questions):
 # 答题过程记录（每题的全量记录）
 # ============================
 
-def load_answer_records():
+def load_answer_records(exam_type=None):
     """加载答题过程记录（通过 DataAccess 抽象层）"""
     return _get_dao().load_answer_records()
 
@@ -622,12 +634,16 @@ def add_answer_record(question_id, user_answer, is_correct, mode="study", sessio
 # 考试记录
 # ============================
 
-def load_exam_records():
-    """加载考试记录（通过 DataAccess 抽象层）"""
-    return _get_dao().load_exam_records()
+def load_exam_records(exam_type=None):
+    """加载考试记录（通过 DataAccess 抽象层）
+    
+    Args:
+        exam_type: 考试类型过滤。None 时返回全部。
+    """
+    return _get_dao().load_exam_records(exam_type=exam_type)
 
 
-def save_exam_record(record):
+def save_exam_record(record, exam_type=None):
     """保存一条考试记录（通过 DataAccess 抽象层）"""
     _get_dao().append_exam_record(record)
 
@@ -636,12 +652,12 @@ def save_exam_record(record):
 # 背题历史记录（每次背题会话的持久化）
 # ============================
 
-def load_study_records():
+def load_study_records(exam_type=None):
     """加载背题历史记录（通过 DataAccess 抽象层）"""
     return _get_dao().load_study_records()
 
 
-def save_study_record(record):
+def save_study_record(record, exam_type=None):
     """保存一条背题历史记录（通过 DataAccess 抽象层）"""
     _get_dao().append_study_record(record)
 
@@ -663,12 +679,16 @@ def find_study_record(session_id):
 MOCK_EXAM_RECORDS_FILE = DATA_DIR / "mock_exam_records.json"
 
 
-def load_mock_exam_records():
-    """加载模拟考试记录（通过 DataAccess 抽象层）"""
-    return _get_dao().load_mock_exam_records()
+def load_mock_exam_records(exam_type=None):
+    """加载模拟考试记录（通过 DataAccess 抽象层）
+    
+    Args:
+        exam_type: 考试类型过滤。None 时返回全部。
+    """
+    return _get_dao().load_mock_exam_records(exam_type=exam_type)
 
 
-def save_mock_exam_record(record):
+def save_mock_exam_record(record, exam_type=None):
     """保存一条模拟考试记录（通过 DataAccess 抽象层）"""
     _get_dao().append_mock_exam_record(record)
 
@@ -861,18 +881,21 @@ def extract_questions(questions, dan_count=40, duo_count=30, pan_count=30,
 QUESTION_STATS_FILE = DATA_DIR / "question_stats.json"
 
 
-def load_question_stats():
+def load_question_stats(exam_type=None):
     """加载题目答题统计（通过 DataAccess 抽象层，per-rerun 缓存）"""
     global _rerun_cache_stats
     if _rerun_cache_stats is not None:
         return _rerun_cache_stats
-    _rerun_cache_stats = _get_dao().load_question_stats()
+    _rerun_cache_stats = _get_dao().load_question_stats(exam_type=exam_type)
     return _rerun_cache_stats
 
 
-def save_question_stats(stats):
+def save_question_stats(stats, exam_type=None):
     """保存题目答题统计（通过 DataAccess 抽象层）"""
-    _get_dao().save_question_stats(stats)
+    global _rerun_cache_stats
+    _get_dao().save_question_stats(stats, exam_type=exam_type)
+    # 写入后清除缓存，确保下次读到最新数据
+    _rerun_cache_stats = None
 
 def get_question_stats(question_id):
     """获取某道题的答题统计"""
@@ -895,7 +918,7 @@ def clear_question_stats(question_id=None):
         save_question_stats({})
 
 
-def load_uncertain_questions():
+def load_uncertain_questions(exam_type=None):
     """加载所有标记为不确定的题目，按 self_uncertainty 降序"""
     return _get_dao().load_uncertain_questions()
 

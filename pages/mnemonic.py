@@ -581,11 +581,8 @@ def _compute_mnemonic_data():
 @st.fragment()
 def _render_uncertain_tab():
     """不确定题目列表 — 使用 fragment 隔离，toggle 变化只重跑此片段，不刷新整页。
-    toggle 关闭时立即写库，列表数据下次进入模块或手动刷新时才重新加载。"""
-    uncertain_questions = st.session_state.get("_mnemonic_uncertain_cache")
-    if uncertain_questions is None:
-        uncertain_questions = load_uncertain_questions()
-        st.session_state["_mnemonic_uncertain_cache"] = uncertain_questions
+    每次渲染直接从数据库加载最新数据，不缓存。"""
+    uncertain_questions = load_uncertain_questions(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
 
     if len(uncertain_questions) == 0:
         st.info("暂无标记为不确定的题目。在专项练习或模拟考试中，可通过题目旁的「不确定」开关标记题目。")
@@ -593,93 +590,113 @@ def _render_uncertain_tab():
 
     total = len(uncertain_questions)
 
-    # 顶部概览 + 刷新按钮
-    top_c1, top_c2 = st.columns([3, 1])
+    # 顶部概览 + 展开按钮 + 刷新按钮
+    top_c1, top_c2, top_c3 = st.columns([3, 1, 1])
     with top_c1:
         st.caption(f"共 **{total}** 道不确定题目 · 按标记次数降序排列")
     with top_c2:
-        if st.button("🔄 刷新列表", use_container_width=True, key="mnemonic_refresh_uncertain"):
-            st.session_state.pop("_mnemonic_uncertain_cache", None)
-            st.session_state["_mnemonic_force_refresh"] = True
+        btn_label = "全部展开" if not st.session_state.get("mnemonic_all_expanded", False) else "全部折叠"
+        if st.button(btn_label, use_container_width=True, key="expand_uncertain"):
+            st.session_state.mnemonic_all_expanded = (
+                not st.session_state.get("mnemonic_all_expanded", False)
+            )
+            st.rerun()
+    with top_c3:
+        if st.button("刷新列表", use_container_width=True, key="mnemonic_refresh_uncertain",
+                     help="关闭不确定开关后手动刷新以移除该题"):
             st.rerun()
     st.markdown("---")
 
-    # 逐题可折叠卡片（参照错题解析 Detail 样式）
-    for idx, q in enumerate(uncertain_questions, 1):
-        qid = q["id"]
-        uncertainty = q.get("uncertainty_score", 0)
-        question_text = _clean_question(q.get("question", ""))
-        opts = q.get("options", {})
-        ans_key = q.get("answer", "").strip().upper()
-        q_type = q.get("type", "single")
-        explanation = q.get("explanation", "")
+    # 按知识板块分组展示
+    from collections import Counter, defaultdict
+    cat_map = defaultdict(list)
+    for q in uncertain_questions:
+        cat = q.get("category", "") or "未分类"
+        cat_map[cat].append(q)
 
-        # 题型标签
-        type_labels = {"single": "单选题", "multi": "多选题", "judge": "判断题", "案例题": "案例题", "indefinite": "不定项选择题"}
-        type_label = type_labels.get(q_type, q_type)
+    # 按题数降序排列板块
+    sorted_cats = sorted(cat_map.items(), key=lambda x: -len(x[1]))
+    global_idx = 0
+    for cat, cat_questions in sorted_cats:
+        global_idx += 1
+        st.markdown(f"### 📂 {cat}（{len(cat_questions)} 题）")
 
-        # 标记次数显示（混合值转显示）
-        mark_count_display = f"{round(uncertainty, 2)}"
-        if uncertainty == int(uncertainty):
-            mark_count_display = str(int(uncertainty))
+        for idx, q in enumerate(cat_questions, 1):
+            qid = q["id"]
+            uncertainty = q.get("uncertainty_score", 0)
+            question_text = _clean_question(q.get("question", ""))
+            opts = q.get("options", {})
+            ans_key = q.get("answer", "").strip().upper()
+            q_type = q.get("type", "single")
+            explanation = q.get("explanation", "")
 
-        # 展开标题
-        q_short = question_text[:40] + "..." if len(question_text) > 40 else question_text
-        expander_label = f"#{idx} · **{type_label}** · 标记 {mark_count_display} 次 | {q_short}"
+            # 题型标签
+            type_labels = {"single": "单选题", "multi": "多选题", "judge": "判断题", "案例题": "案例题", "indefinite": "不定项选择题"}
+            type_label = type_labels.get(q_type, q_type)
 
-        toggle_key = f"mnemonic_uncertain_toggle_{qid}"
-        if toggle_key not in st.session_state:
-            st.session_state[toggle_key] = True
+            # 标记次数显示（混合值转显示）
+            mark_count_display = f"{round(uncertainty, 2)}"
+            if uncertainty == int(uncertainty):
+                mark_count_display = str(int(uncertainty))
 
-        with st.expander(expander_label, expanded=False):
-            # ---- 题目正文 ----
-            st.markdown(f"**📝 题目：** {question_text}")
+            # 展开标题
+            q_short = question_text[:40] + "..." if len(question_text) > 40 else question_text
+            expander_label = f"#{global_idx}-{idx} · **{type_label}** · 标记 {mark_count_display} 次 | {q_short}"
 
-            # ---- 全部选项（正确答案绿底加粗）----
-            st.markdown("**选项：**")
-            opt_keys = sorted(opts.keys())
-            for k in opt_keys:
-                is_correct = k in ans_key
-                if is_correct:
-                    st.markdown(
-                        f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {opts[k]}</p>',
-                        unsafe_allow_html=True)
-                else:
-                    st.markdown(f'{k}: {opts[k]}')
+            toggle_key = f"mnemonic_uncertain_toggle_{qid}"
+            if toggle_key not in st.session_state:
+                st.session_state[toggle_key] = True
 
-            # ---- 正确答案框 ----
-            correct_display = get_answer_display(q_type, ans_key, opts)
-            st.markdown(
-                f'<div style="background:#e8f5e9;border-left:4px solid #1b5e20;padding:8px 12px;'
-                f'border-radius:4px;margin:8px 0;">'
-                f'<span style="color:#1b5e20;font-weight:bold;">✅ 正确答案：{correct_display}</span></div>',
-                unsafe_allow_html=True,
-            )
+            all_expanded = st.session_state.get("mnemonic_all_expanded", False)
+            with st.expander(expander_label, expanded=all_expanded):
+                # ---- 题目正文 ----
+                st.markdown(f"**📝 题目：** {question_text}")
 
-            # ---- 解析 ----
-            if explanation and explanation.strip():
-                st.markdown("**📖 题目解析：**")
-                st.markdown(explanation.strip())
+                # ---- 全部选项（正确答案绿底加粗）----
+                st.markdown("**选项：**")
+                opt_keys = sorted(opts.keys())
+                for k in opt_keys:
+                    is_correct = k in ans_key
+                    if is_correct:
+                        st.markdown(
+                            f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {opts[k]}</p>',
+                            unsafe_allow_html=True)
+                    else:
+                        st.markdown(f'{k}: {opts[k]}')
 
-            # ---- 底部操作行 ----
-            st.markdown("---")
-            op_c1, op_c2, op_c3 = st.columns([2, 1, 1])
-            with op_c1:
-                st.caption(f"标记强度：{mark_count_display} 次")
-            with op_c3:
-                def _make_uncertain_callback(_qid):
-                    def _cb():
-                        # toggle 关闭时立即写库，不触发整页刷新
-                        if not st.session_state.get(f"mnemonic_uncertain_toggle_{_qid}", True):
-                            clear_uncertain_mark(_qid)
-                    return _cb
-                st.toggle(
-                    "移除标记",
-                    key=toggle_key,
-                    value=True,
-                    help="关闭后该题不再作为不确定题目，已记录到数据库",
-                    on_change=_make_uncertain_callback(qid),
+                # ---- 正确答案框 ----
+                correct_display = get_answer_display(q_type, ans_key, opts)
+                st.markdown(
+                    f'<div style="background:#e8f5e9;border-left:4px solid #1b5e20;padding:8px 12px;'
+                    f'border-radius:4px;margin:8px 0;">'
+                    f'<span style="color:#1b5e20;font-weight:bold;">✅ 正确答案：{correct_display}</span></div>',
+                    unsafe_allow_html=True,
                 )
+
+                # ---- 解析 ----
+                if explanation and explanation.strip():
+                    st.markdown("**📖 题目解析：**")
+                    st.markdown(explanation.strip())
+
+                # ---- 底部操作行 ----
+                st.markdown("---")
+                op_c1, op_c2, op_c3 = st.columns([2, 1, 1])
+                with op_c1:
+                    st.caption(f"标记强度：{mark_count_display} 次")
+                with op_c3:
+                    def _make_uncertain_callback(_qid):
+                        def _cb():
+                            # toggle 关闭时立即写库，不触发整页刷新
+                            if not st.session_state.get(f"mnemonic_uncertain_toggle_{_qid}", True):
+                                clear_uncertain_mark(_qid)
+                        return _cb
+                    st.toggle(
+                        "移除标记",
+                        key=toggle_key,
+                        value=True,
+                        help="关闭后该题不再作为不确定题目，已记录到数据库",
+                        on_change=_make_uncertain_callback(qid),
+                    )
 
 
 def show_mnemonic():
@@ -699,22 +716,10 @@ def show_mnemonic():
     duration_items = data["duration_items"]
     other_number_items = data["other_number_items"]
 
-    # ---- 显示模式（全局） ----
-    mode_col1, mode_col2, _ = st.columns([1, 1, 2])
-    with mode_col1:
-        show_answer = st.checkbox("显示答案", value=True)
-    with mode_col2:
-        btn_label = "全部展开" if not st.session_state.get("mnemonic_all_expanded", False) else "全部折叠"
-        if st.button(btn_label, use_container_width=True):
-            st.session_state.mnemonic_all_expanded = (
-                not st.session_state.get("mnemonic_all_expanded", False)
-            )
-            st.rerun()
+    show_answer = True
 
-    # ---- 加载不确定题目（用于 Tab 标签计数 + 缓存给 fragment 使用）----
-    if "_mnemonic_uncertain_cache" not in st.session_state:
-        st.session_state["_mnemonic_uncertain_cache"] = load_uncertain_questions()
-    uncertain_questions = st.session_state["_mnemonic_uncertain_cache"]
+    # ---- 加载不确定题目（从数据库实时加载，用于 Tab 标签计数）----
+    uncertain_questions = load_uncertain_questions(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
 
     # ---- 四 Tab ----
     scale_total = len(scale_dimension_items) + len(scale_score_items) + len(entry_count_items)
@@ -730,10 +735,25 @@ def show_mnemonic():
         if len(number_items) == 0:
             st.info("当前题库未检测到数字记忆题，请确认题库已导入。")
         else:
-            search = st.text_input(
-                "🔍 搜索数字题", placeholder="例如：量表、条目、年龄...",
-                label_visibility="collapsed", key="search_number"
-            )
+            search_col, btn_col, reload_col = st.columns([3, 1, 1])
+            with search_col:
+                search = st.text_input(
+                    "🔍 搜索数字题", placeholder="例如：量表、条目、年龄...",
+                    label_visibility="collapsed", key="search_number"
+                )
+            with btn_col:
+                btn_label = "全部展开" if not st.session_state.get("mnemonic_all_expanded", False) else "全部折叠"
+                if st.button(btn_label, use_container_width=True, key="expand_number"):
+                    st.session_state.mnemonic_all_expanded = (
+                        not st.session_state.get("mnemonic_all_expanded", False)
+                    )
+                    st.session_state.pop("mnemonic_expanded", None)
+                    st.rerun()
+            with reload_col:
+                if st.button("重新加载", use_container_width=True, key="reload_number",
+                             help="题库中导入新题目后需重新加载"):
+                    st.session_state.pop("_mnemonic_data", None)
+                    st.rerun()
 
             st.caption(
                 f"当前题库共 {len(number_items)} 道数字记忆题"
@@ -804,10 +824,17 @@ def show_mnemonic():
         if scale_total == 0:
             st.info("当前题库未检测到量表记忆题（维度/分数/条目）。")
         else:
-            search_scale = st.text_input(
-                "🔍 搜索量表题", placeholder="例如：量表维度、分数、条目...",
-                label_visibility="collapsed", key="search_scale"
-            )
+            search_col, reload_col = st.columns([3, 1])
+            with search_col:
+                search_scale = st.text_input(
+                    "🔍 搜索量表题", placeholder="例如：量表维度、分数、条目...",
+                    label_visibility="collapsed", key="search_scale"
+                )
+            with reload_col:
+                if st.button("重新加载", use_container_width=True, key="reload_scale",
+                             help="题库中导入新题目后需重新加载"):
+                    st.session_state.pop("_mnemonic_data", None)
+                    st.rerun()
 
             st.caption(
                 f"量表维度 {len(scale_dimension_items)} 题 · 量表分数 {len(scale_score_items)} 题 · 量表条目 {len(entry_count_items)} 题"
@@ -901,10 +928,25 @@ def show_mnemonic():
         else:
             from collections import Counter
             cat_counts = Counter(item["category"] for item in person_items)
-            search = st.text_input(
-                "🔍 搜索人名题", placeholder="例如：弗洛伊德、量表编制者...",
-                label_visibility="collapsed", key="search_person"
-            )
+            search_col, btn_col, reload_col = st.columns([3, 1, 1])
+            with search_col:
+                search = st.text_input(
+                    "🔍 搜索人名题", placeholder="例如：弗洛伊德、量表编制者...",
+                    label_visibility="collapsed", key="search_person"
+                )
+            with btn_col:
+                btn_label = "全部展开" if not st.session_state.get("mnemonic_all_expanded", False) else "全部折叠"
+                if st.button(btn_label, use_container_width=True, key="expand_person"):
+                    st.session_state.mnemonic_all_expanded = (
+                        not st.session_state.get("mnemonic_all_expanded", False)
+                    )
+                    st.session_state.pop("mnemonic_expanded", None)
+                    st.rerun()
+            with reload_col:
+                if st.button("重新加载", use_container_width=True, key="reload_person",
+                             help="题库中导入新题目后需重新加载"):
+                    st.session_state.pop("_mnemonic_data", None)
+                    st.rerun()
 
             st.caption(
                 f"当前题库共 {len(person_items)} 道人名记忆题，覆盖 {len(cat_counts)} 个知识板块"

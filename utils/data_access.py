@@ -1,24 +1,14 @@
 """
-数据访问层 — 抽象数据源，支持 JSON / SQLite 切换
+数据访问层 — 抽象数据源，支持 SQLite / Supabase 切换
 """
+
 import json
 import sqlite3
-import shutil
 from pathlib import Path
 from datetime import datetime
 
 # 常量（本地定义，避免循环导入）
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
-QUESTIONS_FILE = DATA_DIR / "questions.json"
-QUESTION_STATS_FILE = DATA_DIR / "question_stats.json"
-WRONG_FILE = DATA_DIR / "wrong_questions.json"
-CONFIG_FILE = DATA_DIR / "config.json"
-EXAM_RECORDS_FILE = DATA_DIR / "exam_records.json"
-STUDY_RECORDS_FILE = DATA_DIR / "study_records.json"
-ANSWER_RECORDS_FILE = DATA_DIR / "answer_records.json"
-MOCK_EXAM_RECORDS_FILE = DATA_DIR / "mock_exam_records.json"
-BACKUP_DIR = DATA_DIR / "backup"
-DRAFTS_DIR = DATA_DIR / "drafts"
 
 # SQLite 数据库路径
 SQLITE_DB = DATA_DIR / "exmsys.db"
@@ -78,7 +68,7 @@ class DataAccess:
         raise NotImplementedError
 
     # ---- 案例题 ----
-    def load_case_studies(self) -> list:
+    def load_case_studies(self, exam_type=None) -> list:
         raise NotImplementedError
 
     def save_case_studies(self, case_studies: list) -> None:
@@ -91,7 +81,7 @@ class DataAccess:
         raise NotImplementedError
 
     # ---- 错题 ----
-    def load_wrong_questions(self) -> list:
+    def load_wrong_questions(self, exam_type=None) -> list:
         raise NotImplementedError
 
     def save_wrong_questions(self, wrong_list) -> None:
@@ -124,7 +114,7 @@ class DataAccess:
         raise NotImplementedError
 
     # ---- 答题统计 ----
-    def load_question_stats(self) -> dict:
+    def load_question_stats(self, exam_type=None) -> dict:
         raise NotImplementedError
 
     def save_question_stats(self, stats: dict) -> None:
@@ -133,13 +123,13 @@ class DataAccess:
     def get_question_stats(self, question_id) -> dict:
         raise NotImplementedError
 
-    def get_all_question_stats(self) -> dict:
+    def get_all_question_stats(self, exam_type=None) -> dict:
         raise NotImplementedError
 
     def clear_question_stats(self, question_id=None) -> None:
         raise NotImplementedError
 
-    def load_uncertain_questions(self) -> list:
+    def load_uncertain_questions(self, exam_type=None) -> list:
         """加载所有标记为不确定的题目，按 self_uncertainty 降序"""
         raise NotImplementedError
 
@@ -148,7 +138,7 @@ class DataAccess:
         raise NotImplementedError
 
     # ---- 答题记录 ----
-    def load_answer_records(self) -> list:
+    def load_answer_records(self, exam_type=None) -> list:
         raise NotImplementedError
 
     def save_answer_records(self, records: list) -> None:
@@ -161,14 +151,14 @@ class DataAccess:
         raise NotImplementedError
 
     # ---- 考试记录 ----
-    def load_exam_records(self) -> list:
+    def load_exam_records(self, exam_type=None) -> list:
         raise NotImplementedError
 
     def append_exam_record(self, record: dict) -> None:
         raise NotImplementedError
 
     # ---- 背题记录 ----
-    def load_study_records(self) -> list:
+    def load_study_records(self, exam_type=None) -> list:
         raise NotImplementedError
 
     def append_study_record(self, record: dict) -> None:
@@ -181,7 +171,7 @@ class DataAccess:
         raise NotImplementedError
 
     # ---- 模拟考试记录 ----
-    def load_mock_exam_records(self) -> list:
+    def load_mock_exam_records(self, exam_type=None) -> list:
         raise NotImplementedError
 
     def append_mock_exam_record(self, record: dict) -> None:
@@ -195,10 +185,10 @@ class DataAccess:
         raise NotImplementedError
 
     # ---- 草稿 ----
-    def save_draft(self, prefix: str, draft_id: str, data: dict) -> None:
+    def save_draft(self, prefix: str, draft_id: str, data: dict, exam_type: str = None) -> None:
         raise NotImplementedError
 
-    def load_drafts(self, prefix: str) -> list:
+    def load_drafts(self, prefix: str, exam_type: str = None) -> list:
         raise NotImplementedError
 
     def delete_draft(self, prefix: str, draft_id: str) -> None:
@@ -480,12 +470,15 @@ class SQLiteDataAccess(DataAccess):
 
     # ---- 案例题 ----
 
-    def load_case_studies(self) -> list:
+    def load_case_studies(self, exam_type=None) -> list:
         """加载所有案例（case_studies 表）"""
         conn = self._get_conn()
         try:
             cur = conn.cursor()
-            cur.execute("SELECT * FROM case_studies ORDER BY id")
+            if exam_type:
+                cur.execute("SELECT * FROM case_studies WHERE exam_type = ? ORDER BY id", (exam_type,))
+            else:
+                cur.execute("SELECT * FROM case_studies ORDER BY id")
             rows = cur.fetchall()
             return [dict(row) for row in rows]
         except sqlite3.OperationalError:
@@ -576,22 +569,44 @@ class SQLiteDataAccess(DataAccess):
     def _extract_qids_from_wrong_list(self, wrong_list):
         return wrong_list  # SQLite 版直接返回 qid 列表
 
-    def load_wrong_questions(self) -> list:
+    def load_wrong_questions(self, exam_type=None) -> list:
         conn = self._get_conn()
         try:
             cur = conn.cursor()
-            cur.execute("SELECT question_id FROM wrong_questions")
+            if exam_type:
+                cur.execute("""
+                    SELECT w.question_id FROM wrong_questions w
+                    JOIN questions q ON w.question_id = q.id
+                    WHERE q.exam_type = ?
+                """, (exam_type,))
+            else:
+                cur.execute("SELECT question_id FROM wrong_questions")
             return [row["question_id"] for row in cur.fetchall()]
         finally:
             conn.close()
 
-    def save_wrong_questions(self, wrong_list) -> None:
+    def save_wrong_questions(self, wrong_list, exam_type: str = None) -> None:
+        """保存错题列表，自动带 exam_type。
+        wrong_list 元素可以是 qid 字符串，或 (qid, exam_type) 元组。
+        """
         conn = self._get_conn()
         try:
             cur = conn.cursor()
             cur.execute("DELETE FROM wrong_questions")
-            for qid in wrong_list:
-                cur.execute("INSERT OR IGNORE INTO wrong_questions (question_id) VALUES (?)", (qid,))
+            for item in wrong_list:
+                if isinstance(item, (list, tuple)) and len(item) >= 2:
+                    qid, et = item[0], item[1]
+                else:
+                    qid = item
+                    # 自动查找 exam_type
+                    cur2 = conn.cursor()
+                    cur2.execute("SELECT exam_type FROM questions WHERE id = ?", (qid,))
+                    row = cur2.fetchone()
+                    et = row[0] if row else (exam_type or "心理学会咨询师四级")
+                cur.execute(
+                    "INSERT OR IGNORE INTO wrong_questions (question_id, exam_type) VALUES (?, ?)",
+                    (qid, et)
+                )
             conn.commit()
         except Exception:
             conn.rollback()
@@ -734,22 +749,38 @@ class SQLiteDataAccess(DataAccess):
                 stats[qid]["answer_history"] = history
 
                 old_unc = stats[qid].get("self_uncertainty", 0.0)
-                new_unc = 1.0 if uncertain_map.get(qid) else 0.0
-                if old_unc > 0 or new_unc > 0:
-                    stats[qid]["self_uncertainty"] = round(
-                        0.3 * new_unc + 0.7 * old_unc, 3)
-                else:
+                if qid in uncertain_map and uncertain_map[qid] is False:
+                    # 用户本次主动关闭不确定开关 → 立即清零
                     stats[qid]["self_uncertainty"] = 0.0
+                else:
+                    new_unc = 1.0 if uncertain_map.get(qid) else 0.0
+                    if old_unc > 0 or new_unc > 0:
+                        stats[qid]["self_uncertainty"] = round(
+                            0.3 * new_unc + 0.7 * old_unc, 3)
+                    else:
+                        stats[qid]["self_uncertainty"] = 0.0
 
                 _recalc_mastery_fields(stats[qid])
 
-            # 2) 批量 upsert 受影响的统计行
+            # 2) 批量 upsert 受影响的统计行（带 exam_type）
+            # 先批量查 exam_type
+            if affected_qids:
+                _placeholders = ",".join("?" for _ in affected_qids)
+                _cur2 = conn.cursor()
+                _cur2.execute(
+                    f"SELECT id, exam_type FROM questions WHERE id IN ({_placeholders})",
+                    tuple(affected_qids)
+                )
+                _type_map = {row["id"]: row["exam_type"] for row in _cur2.fetchall()}
+            else:
+                _type_map = {}
+
             cur.executemany("""
                 INSERT OR REPLACE INTO question_stats
                 (question_id, correct_count, wrong_count, last_answer_time, last_correct,
                  answer_history, mastery_level, confidence, unstable,
-                 self_uncertainty, first_answer_time)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 self_uncertainty, first_answer_time, exam_type)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, [
                 (
                     qid,
@@ -763,6 +794,7 @@ class SQLiteDataAccess(DataAccess):
                     stats[qid].get("unstable", 0),
                     stats[qid].get("self_uncertainty", 0.0),
                     stats[qid].get("first_answer_time"),
+                    _type_map.get(qid, "心理学会咨询师四级"),
                 )
                 for qid in affected_qids
             ])
@@ -785,12 +817,19 @@ class SQLiteDataAccess(DataAccess):
                     "DELETE FROM wrong_questions WHERE question_id = ?",
                     [(qid,) for qid in to_remove]
                 )
-            # 只插入新增的错题
+            # 只插入新增的错题（带 exam_type）
             to_add = new_wrong - old_qids
             if to_add:
+                _placeholders = ",".join("?" for _ in to_add)
+                _cur2 = conn.cursor()
+                _cur2.execute(
+                    f"SELECT id, exam_type FROM questions WHERE id IN ({_placeholders})",
+                    tuple(to_add)
+                )
+                _et_map = {row["id"]: row["exam_type"] for row in _cur2.fetchall()}
                 cur.executemany(
-                    "INSERT INTO wrong_questions (question_id) VALUES (?)",
-                    [(qid,) for qid in to_add]
+                    "INSERT INTO wrong_questions (question_id, exam_type) VALUES (?, ?)",
+                    [(qid, _et_map.get(qid, "心理学会咨询师四级")) for qid in to_add]
                 )
 
             # 4) 考试记录（可选，同一事务内完成）
@@ -945,11 +984,14 @@ class SQLiteDataAccess(DataAccess):
 
     # ---- 答题统计 ----
 
-    def load_question_stats(self) -> dict:
+    def load_question_stats(self, exam_type=None) -> dict:
         conn = self._get_conn()
         try:
             cur = conn.cursor()
-            cur.execute("SELECT * FROM question_stats")
+            if exam_type:
+                cur.execute("SELECT * FROM question_stats WHERE exam_type = ?", (exam_type,))
+            else:
+                cur.execute("SELECT * FROM question_stats")
             rows = cur.fetchall()
             stats = {}
             now = datetime.now()
@@ -983,10 +1025,36 @@ class SQLiteDataAccess(DataAccess):
         finally:
             conn.close()
 
-    def save_question_stats(self, stats: dict) -> None:
-        """批量 upsert 题目统计（executemany 一次性写入）"""
+    def save_question_stats(self, stats: dict, exam_type: str = None) -> None:
+        """批量 upsert 题目统计（executemany 一次性写入）
+        
+        Args:
+            stats: {question_id: stats_dict}
+            exam_type: 题库类型。若提供则直接写入；若 None 则自动从 questions 表查找。
+                       为兼容旧调用，两个来源都尝试。
+        """
         if not stats:
             return
+        # 自动补填 exam_type（批量查一次，避免 N 次查询）
+        if exam_type is None:
+            qids = list(stats.keys())
+            if qids:
+                placeholders = ",".join("?" for _ in qids)
+                _conn = self._get_conn()
+                try:
+                    _cur = _conn.cursor()
+                    _cur.execute(
+                        f"SELECT id, exam_type FROM questions WHERE id IN ({placeholders})",
+                        tuple(qids)
+                    )
+                    _type_map = {row["id"]: row["exam_type"] for row in _cur.fetchall()}
+                finally:
+                    _conn.close()
+            else:
+                _type_map = {}
+        else:
+            _type_map = {qid: exam_type for qid in stats}
+
         conn = self._get_conn()
         try:
             cur = conn.cursor()
@@ -994,8 +1062,8 @@ class SQLiteDataAccess(DataAccess):
                 INSERT OR REPLACE INTO question_stats
                 (question_id, correct_count, wrong_count, last_answer_time, last_correct,
                  answer_history, mastery_level, confidence, unstable,
-                 self_uncertainty, first_answer_time)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 self_uncertainty, first_answer_time, exam_type)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, [
                 (
                     qid,
@@ -1009,6 +1077,7 @@ class SQLiteDataAccess(DataAccess):
                     s.get("unstable", 0),
                     s.get("self_uncertainty", 0.0),
                     s.get("first_answer_time"),
+                    _type_map.get(qid, "心理学会咨询师四级"),
                 )
                 for qid, s in stats.items()
             ])
@@ -1061,8 +1130,8 @@ class SQLiteDataAccess(DataAccess):
         finally:
             conn.close()
 
-    def get_all_question_stats(self) -> dict:
-        return self.load_question_stats()
+    def get_all_question_stats(self, exam_type=None) -> dict:
+        return self.load_question_stats(exam_type=exam_type)
 
     def clear_question_stats(self, question_id=None) -> None:
         conn = self._get_conn()
@@ -1079,18 +1148,27 @@ class SQLiteDataAccess(DataAccess):
         finally:
             conn.close()
 
-    def load_uncertain_questions(self) -> list:
+    def load_uncertain_questions(self, exam_type=None) -> list:
         """加载所有标记为不确定的题目，按 self_uncertainty 降序"""
         conn = self._get_conn()
         try:
             cur = conn.cursor()
-            cur.execute("""
-                SELECT q.*, qs.self_uncertainty
-                FROM question_stats qs
-                JOIN questions q ON qs.question_id = q.id
-                WHERE qs.self_uncertainty > 0
-                ORDER BY qs.self_uncertainty DESC
-            """)
+            if exam_type:
+                cur.execute("""
+                    SELECT q.*, qs.self_uncertainty
+                    FROM question_stats qs
+                    JOIN questions q ON qs.question_id = q.id
+                    WHERE qs.self_uncertainty > 0 AND q.exam_type = ?
+                    ORDER BY qs.self_uncertainty DESC
+                """, (exam_type,))
+            else:
+                cur.execute("""
+                    SELECT q.*, qs.self_uncertainty
+                    FROM question_stats qs
+                    JOIN questions q ON qs.question_id = q.id
+                    WHERE qs.self_uncertainty > 0
+                    ORDER BY qs.self_uncertainty DESC
+                """)
             rows = cur.fetchall()
             result = []
             for row in rows:
@@ -1120,11 +1198,14 @@ class SQLiteDataAccess(DataAccess):
 
     # ---- 答题记录 ----
 
-    def load_answer_records(self) -> list:
+    def load_answer_records(self, exam_type=None) -> list:
         conn = self._get_conn()
         try:
             cur = conn.cursor()
-            cur.execute("SELECT * FROM answer_records ORDER BY id")
+            if exam_type:
+                cur.execute("SELECT * FROM answer_records WHERE exam_type = ? ORDER BY id", (exam_type,))
+            else:
+                cur.execute("SELECT * FROM answer_records ORDER BY id")
             return [dict(row) for row in cur.fetchall()]
         finally:
             conn.close()
@@ -1185,14 +1266,19 @@ class SQLiteDataAccess(DataAccess):
         finally:
             conn.close()
 
-    def batch_add_answer_records(self, records: list) -> None:
-        """批量添加答题记录——查询 category + 批量插入在单个连接内完成"""
+    def batch_add_answer_records(self, records: list, exam_type: str = None) -> None:
+        """批量添加答题记录——查询 category + 批量插入在单个连接内完成
+        
+        Args:
+            records: 答题记录列表
+            exam_type: 题库类型。若提供则直接写入；若 None 则自动从 questions 表查找。
+        """
         from utils.data_manager import infer_category
         now = datetime.now().isoformat()
         if not records:
             return
 
-        # 只查出需要的题目 category，不加载全部题目
+        # 只查出需要的题目 category + exam_type，不加载全部题目
         qids = list(set(rec.get("question_id", "") for rec in records if rec.get("question_id")))
         placeholders = ",".join("?" for _ in qids) if qids else ""
 
@@ -1202,11 +1288,15 @@ class SQLiteDataAccess(DataAccess):
             if qids:
                 cur = conn.cursor()
                 cur.execute(
-                    f"SELECT id, category, source_file FROM questions WHERE id IN ({placeholders})",
+                    f"SELECT id, category, source_file, exam_type FROM questions WHERE id IN ({placeholders})",
                     tuple(qids)
                 )
                 for row in cur.fetchall():
-                    q_map[row["id"]] = {"category": row["category"], "source_file": row["source_file"]}
+                    q_map[row["id"]] = {
+                        "category": row["category"],
+                        "source_file": row["source_file"],
+                        "exam_type": row["exam_type"],
+                    }
 
             # 组装 + 批量插入（同一连接）
             rows = []
@@ -1214,8 +1304,10 @@ class SQLiteDataAccess(DataAccess):
                 qid = rec.get("question_id", "")
                 q_info = q_map.get(qid)
                 category = "未知"
+                et = exam_type or "心理学会咨询师四级"
                 if q_info:
                     category = q_info.get("category") or infer_category(q_info.get("source_file", ""))
+                    et = q_info.get("exam_type") or et
                 rows.append((
                     qid,
                     rec.get("user_answer", ""),
@@ -1224,13 +1316,14 @@ class SQLiteDataAccess(DataAccess):
                     rec.get("session_id", ""),
                     category,
                     rec.get("timestamp", now),
+                    et,
                 ))
 
             cur = conn.cursor()
             cur.executemany("""
                 INSERT INTO answer_records
-                (question_id, user_answer, is_correct, mode, session_id, category, timestamp)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                (question_id, user_answer, is_correct, mode, session_id, category, timestamp, exam_type)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, rows)
             conn.commit()
         except Exception:
@@ -1241,23 +1334,26 @@ class SQLiteDataAccess(DataAccess):
 
     # ---- 考试记录 ----
 
-    def load_exam_records(self) -> list:
+    def load_exam_records(self, exam_type=None) -> list:
         conn = self._get_conn()
         try:
             cur = conn.cursor()
-            cur.execute("SELECT data FROM exam_records ORDER BY id")
+            if exam_type:
+                cur.execute("SELECT data FROM exam_records WHERE exam_type = ? ORDER BY id", (exam_type,))
+            else:
+                cur.execute("SELECT data FROM exam_records ORDER BY id")
             rows = cur.fetchall()
             return [json.loads(row["data"]) for row in rows]
         finally:
             conn.close()
 
-    def append_exam_record(self, record: dict) -> None:
+    def append_exam_record(self, record: dict, exam_type: str = None) -> None:
         conn = self._get_conn()
         try:
             cur = conn.cursor()
             cur.execute(
-                "INSERT INTO exam_records (data) VALUES (?)",
-                (json.dumps(record, ensure_ascii=False),)
+                "INSERT INTO exam_records (data, exam_type) VALUES (?, ?)",
+                (json.dumps(record, ensure_ascii=False), exam_type or "心理学会咨询师四级")
             )
             conn.commit()
         except Exception:
@@ -1268,11 +1364,14 @@ class SQLiteDataAccess(DataAccess):
 
     # ---- 背题记录 ----
 
-    def load_study_records(self) -> list:
+    def load_study_records(self, exam_type=None) -> list:
         conn = self._get_conn()
         try:
             cur = conn.cursor()
-            cur.execute("SELECT * FROM study_records ORDER BY session_id")
+            if exam_type:
+                cur.execute("SELECT * FROM study_records WHERE exam_type = ? ORDER BY session_id", (exam_type,))
+            else:
+                cur.execute("SELECT * FROM study_records ORDER BY session_id")
             rows = cur.fetchall()
             records = []
             for row in rows:
@@ -1284,14 +1383,14 @@ class SQLiteDataAccess(DataAccess):
         finally:
             conn.close()
 
-    def append_study_record(self, record: dict) -> None:
+    def append_study_record(self, record: dict, exam_type: str = None) -> None:
         conn = self._get_conn()
         try:
             cur = conn.cursor()
             cur.execute("""
                 INSERT OR REPLACE INTO study_records
-                (session_id, mode, total, answered, correct, wrong, start_time, end_time, details)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (session_id, mode, total, answered, correct, wrong, start_time, end_time, details, exam_type)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 record.get("session_id", ""),
                 record.get("mode", ""),
@@ -1302,6 +1401,7 @@ class SQLiteDataAccess(DataAccess):
                 record.get("start_time", ""),
                 record.get("end_time", ""),
                 json.dumps(record.get("details", []), ensure_ascii=False),
+                exam_type or "心理学会咨询师四级",
             ))
             conn.commit()
         except Exception:
@@ -1346,23 +1446,26 @@ class SQLiteDataAccess(DataAccess):
 
     # ---- 模拟考试记录 ----
 
-    def load_mock_exam_records(self) -> list:
+    def load_mock_exam_records(self, exam_type=None) -> list:
         conn = self._get_conn()
         try:
             cur = conn.cursor()
-            cur.execute("SELECT data FROM mock_exam_records ORDER BY id")
+            if exam_type:
+                cur.execute("SELECT data FROM mock_exam_records WHERE exam_type = ? ORDER BY id", (exam_type,))
+            else:
+                cur.execute("SELECT data FROM mock_exam_records ORDER BY id")
             rows = cur.fetchall()
             return [json.loads(row["data"]) for row in rows]
         finally:
             conn.close()
 
-    def append_mock_exam_record(self, record: dict) -> None:
+    def append_mock_exam_record(self, record: dict, exam_type: str = None) -> None:
         conn = self._get_conn()
         try:
             cur = conn.cursor()
             cur.execute(
-                "INSERT INTO mock_exam_records (data) VALUES (?)",
-                (json.dumps(record, ensure_ascii=False),)
+                "INSERT INTO mock_exam_records (data, exam_type) VALUES (?, ?)",
+                (json.dumps(record, ensure_ascii=False), exam_type or "心理学会咨询师四级")
             )
             conn.commit()
         except Exception:
@@ -1405,7 +1508,7 @@ class SQLiteDataAccess(DataAccess):
 
     # ---- 草稿 ----
 
-    def save_draft(self, prefix: str, draft_id: str, data: dict) -> None:
+    def save_draft(self, prefix: str, draft_id: str, data: dict, exam_type: str = None) -> None:
         conn = self._get_conn()
         try:
             cur = conn.cursor()
@@ -1426,14 +1529,20 @@ class SQLiteDataAccess(DataAccess):
         finally:
             conn.close()
 
-    def load_drafts(self, prefix: str) -> list:
+    def load_drafts(self, prefix: str, exam_type: str = None) -> list:
         conn = self._get_conn()
         try:
             cur = conn.cursor()
-            cur.execute(
-                "SELECT draft_id, data, saved_at FROM drafts WHERE prefix = ? ORDER BY saved_at DESC",
-                (prefix,)
-            )
+            if exam_type:
+                cur.execute(
+                    "SELECT draft_id, data, saved_at FROM drafts WHERE prefix = ? AND exam_type = ? ORDER BY saved_at DESC",
+                    (prefix, exam_type)
+                )
+            else:
+                cur.execute(
+                    "SELECT draft_id, data, saved_at FROM drafts WHERE prefix = ? ORDER BY saved_at DESC",
+                    (prefix,)
+                )
             results = []
             for row in cur.fetchall():
                 record = json.loads(row["data"])

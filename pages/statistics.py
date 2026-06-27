@@ -25,12 +25,12 @@ def _get_cached_stats(exam_type):
         )
 
     # 版本过期，重新加载所有数据（1 次批量 I/O）
-    wrong_list = load_wrong_questions()
+    wrong_list = load_wrong_questions(exam_type=exam_type)
     wrong_stats = get_wrong_stats(exam_type)
-    exam_records = load_exam_records()
-    mock_records = load_mock_exam_records()
-    answer_records = load_answer_records()
-    question_stats = load_question_stats()
+    exam_records = load_exam_records(exam_type=exam_type)
+    mock_records = load_mock_exam_records(exam_type=exam_type)
+    answer_records = load_answer_records(exam_type=exam_type)
+    question_stats = load_question_stats(exam_type=exam_type)
 
     st.session_state._stats_cache = {
         "_version": version,

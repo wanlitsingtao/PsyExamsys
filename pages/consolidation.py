@@ -11,7 +11,8 @@ from utils.data_manager import (
     check_answer, get_answer_display,
     batch_update_wrong_and_stats, batch_add_answer_records,
     load_questions, load_question_stats, infer_category,
-    get_mastery_distribution, save_draft, load_drafts, delete_draft,
+    get_mastery_distribution, load_uncertain_questions,
+    save_draft, load_drafts, delete_draft,
 )
 
 
@@ -54,7 +55,7 @@ def _generate_consol_questions():
     retention_list = mastery.get("retention_list", [])
     unstable_list = mastery.get("unstable_list", [])
 
-    # 去重合并：消退型优先 → 遗忘预警（上次答对）→ 波动型
+    # 去重合并：消退型 → 遗忘预警 → 波动型 → 不确定题目
     seen = set()
     combined = []
     # 1. 消退型（答对过又答错，最需关注）
@@ -71,7 +72,7 @@ def _generate_consol_questions():
         if qid not in seen:
             seen.add(qid)
             combined.append(item)
-    # 3. 波动型（对错交替，掌握不稳定，放到上次答对之后）
+    # 3. 波动型（对错交替，掌握不稳定，放到遗忘预警之后）
     for item in unstable_list:
         if item.get("unstable_type") != "波动型":
             continue
@@ -79,6 +80,18 @@ def _generate_consol_questions():
         if qid not in seen:
             seen.add(qid)
             combined.append(item)
+    # 4. 不确定题目（用户自标记，已按 uncertainty_score 降序，标记次数越多优先级越高）
+    #    若同一题已在前三级中出现，跳过；只补充前三级尚未涵盖的不确定题目
+    uncertain_qs = load_uncertain_questions(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
+    for uq in uncertain_qs:
+        qid = uq["id"]
+        if qid not in seen:
+            seen.add(qid)
+            combined.append({
+                "question_id": qid,
+                "unstable_type": "不确定题目",
+                "uncertainty_score": uq.get("uncertainty_score", 0),
+            })
 
     # 取最多 60 题
     count = min(len(combined), 60)
@@ -98,7 +111,10 @@ def _generate_consol_questions():
     st.session_state.consol_current = 0
     st.session_state.consol_answers = {}
     st.session_state.consol_marked = set()
-    st.session_state.consol_uncertain = set()
+    # 预填不确定开关：历史标记为不确定的题目默认打开
+    _consol_stats = load_question_stats(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
+    _consol_pre_uncertain = {qid for qid, s in _consol_stats.items() if s.get("self_uncertainty", 0) > 0}
+    st.session_state.consol_uncertain = {q["id"] for q in selected if q["id"] in _consol_pre_uncertain}
     st.session_state.consol_submitted = False
     st.session_state.consol_results = {}
     st.session_state.consol_confirm_submit = False
@@ -114,7 +130,7 @@ def _generate_consol_questions():
 def _show_consol_start():
     """巩固练习开始页面 — 开始练习 + 未完成草稿列表"""
     st.markdown("# 🎯 巩固练习")
-    st.markdown("针对掌握不牢靠（消退型/波动型）和遗忘预警的题目进行专项巩固。")
+    st.markdown("针对掌握不牢靠（消退型/波动型）、遗忘预警以及自标记不确定的题目进行专项巩固。")
 
     # ---- 开始练习 ----
     st.markdown("---")
@@ -185,7 +201,7 @@ def _show_consolidation_running():
 
     # 缓存答题统计（避免每题渲染时重复读盘）
     if "consol_stats_cache" not in st.session_state:
-        st.session_state.consol_stats_cache = load_question_stats()
+        st.session_state.consol_stats_cache = load_question_stats(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
 
     answered = len(st.session_state.consol_answers)
     unanswered = total_q - answered
@@ -224,7 +240,12 @@ def _show_consolidation_running():
         elif last_correct is False:
             stats_parts.append("🔴 上次答错")
         if tag:
-            tag_emoji = "⚠️" if tag in ("消退型", "波动型") else "⏰"
+            if tag in ("消退型", "波动型"):
+                tag_emoji = "⚠️"
+            elif tag == "不确定题目":
+                tag_emoji = "🎯"
+            else:
+                tag_emoji = "⏰"
             stats_parts.append(f"{tag_emoji} {tag}")
         if stats_parts:
             st.markdown(f"<div style='text-align:right;padding-top:0.5em;color:#888;font-size:16px;'>{'&nbsp;&nbsp;|&nbsp;&nbsp;'.join(stats_parts)}</div>", unsafe_allow_html=True)
@@ -543,8 +564,7 @@ def _submit_consolidation():
         else:
             wrong_qids.append((qid, user_ans))
         stats_updates.append((qid, is_correct))
-        if is_uncertain:
-            uncertain_map[qid] = True
+        uncertain_map[qid] = is_uncertain  # 明确传入 True/False，False 时触发立即清零
 
         answer_records.append({
             "question_id": qid,
@@ -571,7 +591,7 @@ def _submit_consolidation():
     )
 
     # 3. 批量 I/O：答题过程记录（单个连接）
-    batch_add_answer_records(answer_records)
+    batch_add_answer_records(answer_records, exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
 
     # 标记数据已变更，触发首页统计缓存刷新
     st.session_state._data_version = st.session_state.get("_data_version", 0) + 1
@@ -684,7 +704,12 @@ def _show_consolidation_result():
 
             expander_title = f"{i+1}. [{tp_label}] {q['question'][:60]}..."
             if tag:
-                tag_emoji = "⚠️" if tag in ("消退型", "波动型") else "⏰"
+                if tag in ("消退型", "波动型"):
+                    tag_emoji = "⚠️"
+                elif tag == "不确定题目":
+                    tag_emoji = "🎯"
+                else:
+                    tag_emoji = "⏰"
                 expander_title += f" {tag_emoji}{tag}"
 
             with st.expander(expander_title, expanded=True):

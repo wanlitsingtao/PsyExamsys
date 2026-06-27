@@ -79,6 +79,23 @@ def _show_wrongbook_home():
         st.session_state.wb_regenerate = True
         st.rerun()
 
+    # 清空错题（仅首页可见，避免与结果页混在一起）
+    st.markdown("---")
+    st.markdown("### 🗑️ 清空错题")
+    st.markdown("清空后所有错题记录将被永久删除，不可恢复。")
+    if st.button("🗑️ 清空所有错题", key="wb_home_clear_btn", use_container_width=True):
+        st.session_state.wb_confirm_clear = True
+    if st.session_state.get("wb_confirm_clear"):
+        st.warning("⚠️ 确认清空所有错题吗？此操作不可恢复！")
+        cc1, cc2 = st.columns(2)
+        if cc1.button("✅ 确认清空", key="wb_home_confirm_clear", use_container_width=True):
+            clear_all_wrong()
+            st.session_state.wb_confirm_clear = False
+            st.rerun()
+        if cc2.button("❌ 取消", key="wb_home_cancel_clear", use_container_width=True):
+            st.session_state.wb_confirm_clear = False
+            st.rerun()
+
 
 # ============================
 #  错题解析模式
@@ -264,7 +281,7 @@ def _render_analysis_detail(item, idx, total):
 def _show_wrong_practice():
     # 缓存答题统计（避免每题渲染时重复读盘）
     if "wb_stats_cache" not in st.session_state:
-        st.session_state.wb_stats_cache = load_question_stats()
+        st.session_state.wb_stats_cache = load_question_stats(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
 
     wrong_stats = get_wrong_stats(st.session_state.get("exam_type"))
     config = st.session_state.config
@@ -277,12 +294,15 @@ def _show_wrong_practice():
         return
 
     # 检测文件数据是否已变化（其他模块可能已更新错题库）
-    cached_total = st.session_state.get("wb_cached_total", -1)
-    if cached_total != wrong_stats["total"]:
-        st.session_state.wb_regenerate = True
+    # 注意：已提交状态下不触发重新初始化，避免清空 wb_results 导致结果页丢失
+    if not st.session_state.get("wb_submitted"):
+        cached_total = st.session_state.get("wb_cached_total", -1)
+        if cached_total != wrong_stats["total"]:
+            st.session_state.wb_regenerate = True
 
-    # 初始化错题学习状态
-    if "wb_questions" not in st.session_state or st.session_state.get("wb_regenerate"):
+    # 初始化错题学习状态（已提交状态下不重新初始化，保留结果页）
+    if ("wb_questions" not in st.session_state or st.session_state.get("wb_regenerate")) \
+            and not st.session_state.get("wb_submitted"):
         count = config["wrongbook_extract_count"]
         top_wrong = get_top_wrong_questions(count, st.session_state.get("exam_type"))
 
@@ -295,7 +315,10 @@ def _show_wrong_practice():
         st.session_state.wb_current = 0
         st.session_state.wb_answers = {}
         st.session_state.wb_marked = set()
-        st.session_state.wb_uncertain = set()
+        # 预填不确定开关：历史标记为不确定的题目默认打开
+        _wb_stats = load_question_stats(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
+        _wb_pre_uncertain = {qid for qid, s in _wb_stats.items() if s.get("self_uncertainty", 0) > 0}
+        st.session_state.wb_uncertain = {q["id"] for q in st.session_state.wb_questions if q["id"] in _wb_pre_uncertain}
         st.session_state.wb_submitted = False
         st.session_state.wb_results = {}
         st.session_state.wb_regenerate = False
@@ -303,7 +326,7 @@ def _show_wrong_practice():
         st.session_state.wb_confirm_submit = False
         st.session_state.wb_last_auto_save = time.time()  # 自动保存计时起点
 
-    wq = st.session_state.wb_questions
+    wq = st.session_state.get("wb_questions")
     if not wq:
         st.info("错题已全部掌握！")
         return
@@ -816,25 +839,24 @@ def _show_wrong_practice():
         else:
             st.info(f"📖 **错题复习完成！** 正确率: {pct:.1f}%。继续加油！")
 
-        # 操作按钮
+        # 操作按钮（与其他模块一致：再来一次 + 返回）
         op_col1, op_col2 = st.columns(2)
-        if op_col1.button("🔄 重新组卷", key="wb_regenerate_btn", use_container_width=True, type="primary"):
+        if op_col1.button("🔄 再来一次", key="wb_result_retry", use_container_width=True, type="primary"):
+            # 重新出题
             st.session_state.wb_regenerate = True
+            # 清除提交相关状态
+            for k in ("wb_submitted", "wb_results", "wb_confirm_submit", "wb_confirm_clear"):
+                st.session_state.pop(k, None)
             st.rerun()
-        if op_col2.button("🗑️ 清空错题", key="wb_clear_btn", use_container_width=True):
-            st.session_state.wb_confirm_clear = True
-
-    # 清空确认
-    if st.session_state.get("wb_confirm_clear"):
-        st.warning("⚠️ 确认清空所有错题吗？此操作不可恢复！")
-        c1, c2 = st.columns(2)
-        if c1.button("✅ 确认清空", use_container_width=True):
-            clear_all_wrong()
-            st.session_state.wb_questions = []
-            st.session_state.wb_confirm_clear = False
-            st.rerun()
-        if c2.button("❌ 取消", use_container_width=True):
-            st.session_state.wb_confirm_clear = False
+        if op_col2.button("返回", key="wb_result_back", use_container_width=True):
+            # 返回错题本首页
+            st.session_state.wb_mode = None
+            for k in ("wb_submitted", "wb_results", "wb_questions",
+                       "wb_answers", "wb_wrong_counts", "wb_current",
+                       "wb_marked", "wb_uncertain", "wb_regenerate",
+                       "wb_confirm_submit", "wb_confirm_clear",
+                       "wb_session_id", "wb_cached_total"):
+                st.session_state.pop(k, None)
             st.rerun()
 
 
@@ -886,8 +908,7 @@ def _submit_wrongbook():
         else:
             wrong_qids.append((qid, user_ans))
         stats_updates.append((qid, is_correct))
-        if is_uncertain:
-            uncertain_map[qid] = True
+        uncertain_map[qid] = is_uncertain  # 明确传入 True/False，False 时触发立即清零
 
         answer_records.append({
             "question_id": qid,
@@ -903,7 +924,7 @@ def _submit_wrongbook():
     batch_update_wrong_and_stats(wrong_qids, correct_qids, stats_updates, uncertain_map)
 
     # 3. 批量 I/O：答题过程记录（1 次读 + 1 次写）
-    batch_add_answer_records(answer_records)
+    batch_add_answer_records(answer_records, exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
 
     st.session_state.wb_results = results
     st.session_state.wb_submitted = True
@@ -921,4 +942,4 @@ def _submit_wrongbook():
         "total": len(wq),
         "correct": correct_count,
         "accuracy": f"{correct_count/len(wq)*100:.1f}%" if len(wq) > 0 else "0%",
-    })
+    }, exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
