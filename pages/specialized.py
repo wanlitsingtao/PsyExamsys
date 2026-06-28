@@ -828,7 +828,7 @@ def _finish_specialized():
     }
     st.session_state.spec_state = "finished"
 
-    # 保存考试记录到 exam_records.json
+    # 保存考试记录到数据库
     save_exam_record({
         "type": mode,  # "specialized" 或 "comprehensive"
         "date": datetime.now().strftime("%Y-%m-%d %H:%M"),

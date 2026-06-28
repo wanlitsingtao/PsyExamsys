@@ -2,7 +2,6 @@
 配置管理 - 题库管理、系统设置
 """
 import streamlit as st
-import json
 from pathlib import Path
 from utils.data_manager import (
     load_config, save_config, load_questions, save_questions,
@@ -212,13 +211,6 @@ def _show_tab_questions():
         st.session_state.questions = questions
         st.success(f"✅ 已刷新，当前题库 {len(questions)} 题")
         st.rerun()
-
-    if col_d2.button("📤 导出题库为JSON", use_container_width=True):
-        qs = load_questions()
-        export_path = Path(__file__).resolve().parent.parent / "data" / "questions_export.json"
-        with open(export_path, "w", encoding="utf-8") as f:
-            json.dump(qs, f, ensure_ascii=False, indent=2)
-        st.success(f"✅ 已导出到: {export_path}")
 
     if col_d3.button("⚠️ 清空题库", use_container_width=True, disabled=(len(questions) == 0)):
         st.session_state.confirm_clear_questions = True

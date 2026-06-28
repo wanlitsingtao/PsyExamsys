@@ -79,7 +79,7 @@ def show_statistics():
 
 
 def _show_wrong_stats(questions, wrong_list, wrong_stats, question_stats):
-    """错题统计 — 统计数字统一从 question_stats.json 读取"""
+    """错题统计 — 统计数字统一从 question_stats 表读取"""
     st.markdown("### 📕 错题统计")
     wrong_qids = _extract_qids_from_wrong_list(wrong_list)
 

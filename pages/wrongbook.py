@@ -934,7 +934,7 @@ def _submit_wrongbook():
     # 清除错题本自身的统计缓存
     st.session_state.pop("wb_stats_cache", None)
 
-    # 保存考试记录到 exam_records.json
+    # 保存考试记录到数据库
     correct_count = sum(1 for v in results.values() if v.get("correct"))
     save_exam_record({
         "type": "wrongbook",
