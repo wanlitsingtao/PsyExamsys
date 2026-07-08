@@ -243,8 +243,14 @@ def add_wrong_record(question_id, user_answer):
     记录错题 - 以最后一次答题为准
     新规则：答错次数 >= 答对次数 才记入错题本
     错题库仅存储 question_id 列表，统计数字统一从 question_stats 表读取
+
+    实现上委托给 batch_update_wrong_and_stats，确保错题库和统计在同一事务内更新。
     """
-    _get_dao().add_wrong_record(question_id, user_answer)
+    batch_update_wrong_and_stats(
+        wrong_qids=[(question_id, user_answer)],
+        correct_qids=[],
+        stats_updates=[(question_id, False)],
+    )
 
 
 def add_correct_record(question_id):
@@ -252,31 +258,14 @@ def add_correct_record(question_id):
     记录答对 - 以最后一次答题为准
     新规则：答对后若 答错次数 < 答对次数，从错题本移除
     错题库仅存储 question_id 列表
+
+    实现上委托给 batch_update_wrong_and_stats，确保错题库和统计在同一事务内更新。
     """
-    now = datetime.now().isoformat()
-
-    # 1. 更新题目答题统计（答对+1）
-    stats = load_question_stats()
-    if question_id not in stats:
-        stats[question_id] = {
-            "correct_count": 0,
-            "wrong_count": 0,
-            "last_answer_time": None,
-            "last_correct": None,
-        }
-    stats[question_id]["correct_count"] += 1
-    stats[question_id]["last_correct"] = True
-    stats[question_id]["last_answer_time"] = now
-    save_question_stats(stats)
-
-    s = stats[question_id]
-
-    # 2. 新规则：答错次数 < 答对次数 → 从错题本移除
-    if s["wrong_count"] < s["correct_count"]:
-        wrong_qids = _extract_qids_from_wrong_list(load_wrong_questions())
-        if question_id in wrong_qids:
-            wrong_qids.remove(question_id)
-            save_wrong_questions(wrong_qids)
+    batch_update_wrong_and_stats(
+        wrong_qids=[],
+        correct_qids=[question_id],
+        stats_updates=[(question_id, True)],
+    )
 
 
 # ============================
@@ -312,7 +301,7 @@ def batch_update_wrong_and_stats(wrong_qids, correct_qids, stats_updates,
         exam_record=exam_record,
     )
     # 写入后立即清除 rerun 缓存，确保下次 load_question_stats() 读到最新数据
-    _rerun_cache_stats = None
+    _rerun_cache_stats = {}
 
 
 def _recalc_mastery_fields(stats_entry):
@@ -872,6 +861,9 @@ def extract_questions(questions, dan_count=40, duo_count=30, pan_count=30,
 def load_question_stats(exam_type=None):
     """加载题目答题统计（通过 DataAccess 抽象层，per-rerun 缓存按 exam_type 隔离）"""
     global _rerun_cache_stats
+    # 防御性初始化：如果缓存被意外设为 None，自动恢复为空字典
+    if _rerun_cache_stats is None:
+        _rerun_cache_stats = {}
     cache_key = exam_type or "__all__"
     if cache_key in _rerun_cache_stats:
         return _rerun_cache_stats[cache_key]
@@ -1104,14 +1096,14 @@ def _ensure_drafts_dir():
     DRAFTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def save_draft(prefix, draft_id, data):
+def save_draft(prefix, draft_id, data, exam_type=None):
     """保存/覆盖答题草稿（通过 DataAccess 抽象层）"""
-    _get_dao().save_draft(prefix, draft_id, data)
+    _get_dao().save_draft(prefix, draft_id, data, exam_type=exam_type)
 
 
-def load_drafts(prefix):
+def load_drafts(prefix, exam_type=None):
     """加载指定前缀的所有草稿（通过 DataAccess 抽象层）"""
-    return _get_dao().load_drafts(prefix)
+    return _get_dao().load_drafts(prefix, exam_type=exam_type)
 
 
 def delete_draft(prefix, draft_id):

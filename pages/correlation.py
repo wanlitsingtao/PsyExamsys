@@ -351,13 +351,25 @@ def _dim5(records):
             break
 
     if tipping_point:
-        st.success(
+        # 根据实际分桶数量动态构建结论，避免 IndexError
+        parts = [
             f"**结论**：距上次答对超过 **{tipping_point}** 后，遗忘预警率突破 50%。\n"
             f"当前系统设定的复习阈值为 **{get_retention_threshold()} 天**，从数据看：\n"
-            f"{labels[1]} 遗忘率为 **{retention_vals[1] if len(retention_vals) > 1 else '?'}%**，"
-            f"{labels[2]} 升至 **{retention_vals[2] if len(retention_vals) > 2 else '?'}%**。\n"
+        ]
+        if len(labels) >= 2:
+            parts.append(
+                f"{labels[1]} 遗忘率为 **{retention_vals[1]}%**，"
+            )
+        if len(labels) >= 3:
+            parts.append(
+                f"{labels[2]} 升至 **{retention_vals[2]}%**。\n"
+            )
+        else:
+            parts.append("\n")
+        parts.append(
             f"{get_retention_threshold()} 天阈值基本合理，答对后建议在规定时间内安排复习。"
         )
+        st.success("".join(parts))
     else:
         st.success(
             f"**结论**：距上次答对天数越长，遗忘预警率越高。"

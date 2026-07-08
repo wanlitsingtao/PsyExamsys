@@ -280,6 +280,10 @@ def _start_comprehensive(questions):
     st.session_state.spec_mode = "comprehensive"
     st.session_state.pop("spec_draft_id", None)  # 新训练清除旧草稿ID
     st.rerun()
+
+
+def _start_specialized(questions, category):
+    """开始专项训练（按指定板块抽题）"""
     _clear_spec_show_ans()
     config = load_config()
     # 使用配置中的题数（默认 30单选 + 20多选 + 10判断 = 60题）
@@ -326,13 +330,16 @@ def _start_comprehensive(questions):
     st.session_state.spec_mode = "specialized"
     st.session_state.pop("spec_draft_id", None)  # 新训练清除旧草稿ID
     st.rerun()
+
+
+def _resume_spec_draft(draft, questions):
+    """恢复专项训练草稿"""
     _clear_spec_show_ans()
     # 按 question_ids 还原题目对象（按顺序）
     q_map = {q["id"]: q for q in questions}
     restored_questions = [q_map[qid] for qid in draft.get("question_ids", []) if qid in q_map]
     if not restored_questions:
-        import streamlit as _st
-        _st.error("❌ 草稿中的题目已不存在于题库中，无法恢复。")
+        st.error("❌ 草稿中的题目已不存在于题库中，无法恢复。")
         return
 
     st.session_state.spec_questions = restored_questions
@@ -770,7 +777,7 @@ def _finish_specialized():
 
         details.append({
             "id": q["id"],
-            "index": q["index"],
+            "index": q.get("index", q.get("index_num", 0)),
             "type": q["type"],
             "question": q["question"],
             "options": q.get("options", {}),
@@ -974,7 +981,7 @@ def _show_spec_result():
                 nav_html += '<div style="flex:1;min-width:0;"></div>'
                 continue
             q_item = sq[q_idx]
-            d = details_by_idx.get(q_item["index"], {})
+            d = details_by_idx.get(q_item.get("index", q_item.get("index_num", 0)), {})
             is_correct = d.get("is_correct", False)
             bg = "#c8e6c9" if is_correct else "#ffcdd2"
             tc = "#1b5e20" if is_correct else "#b71c1c"

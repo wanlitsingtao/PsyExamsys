@@ -221,24 +221,47 @@ def _show_consolidation_running():
     st.markdown("---")
 
     # ---- 题目区（个性化内容：含掌握状态标签） ----
-    type_labels = {"single": "🔵 单选题", "multi": "🟢 多选题", "judge": "🟠 判断题", "案例题": "🟣 案例题", "indefinite": "🟡 不定项选择题"}
+    type_labels = {"single": "单选题", "multi": "多选题", "judge": "判断题", "案例题": "案例题", "indefinite": "不定项选择题"}
     type_str = type_labels.get(q["type"], q["type"])
     cat_str = q.get("category", infer_category(q.get("source_file", "")))
+    tag = q.get("_tag", "")
+    q_stats = _get_cached_qstats(qid)
+    status_label = "未答"
+    status_class = "status-unanswered"
+    if qid in st.session_state.consol_answers:
+        status_label = "已答"
+        status_class = "status-correct"
+    if q_stats.get("wrong_count", 0) > 0 and q_stats.get("last_correct") is False:
+        status_label = "之前答错"
+        status_class = "status-wrong"
 
-    # 题号行：左侧题号，右侧历史统计（含巩固类型标签）
-    title_cols = st.columns([1, 2])
-    with title_cols[0]:
-        st.markdown(f"##### 第 {idx+1}/{total_q} 题")
-    with title_cols[1]:
-        q_stats = _get_cached_qstats(qid)
+    question_card_html = f'''
+    <div class="question-card">
+      <div style="display:flex;align-items:flex-start;gap:0.9rem;flex-wrap:wrap;">
+        <div class="question-index">{idx + 1}</div>
+        <div style="flex:1;min-width:0;">
+          <div class="question-title">{q["question"]}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.55rem;align-items:center;">
+            <span class="question-meta-tag">{type_str}</span>
+            <span class="question-meta-tag" style="background:#f8fafc;color:#334155;border:1px solid #cbd5e1;">{cat_str}</span>
+            <span class="question-status-chip {status_class}">{status_label}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    '''
+    st.markdown(question_card_html, unsafe_allow_html=True)
+
+    with st.expander("📊 历史统计", expanded=False):
         stats_parts = []
         if q_stats["correct_count"] > 0 or q_stats["wrong_count"] > 0:
-            stats_parts.append(f"📊 答对 {q_stats['correct_count']} 次 / 答错 {q_stats['wrong_count']} 次")
+            stats_parts.append(f"答对 {q_stats['correct_count']} 次")
+            stats_parts.append(f"答错 {q_stats['wrong_count']} 次")
         last_correct = q_stats.get("last_correct")
         if last_correct is True:
-            stats_parts.append("🟢 上次答对")
+            stats_parts.append("上次答对")
         elif last_correct is False:
-            stats_parts.append("🔴 上次答错")
+            stats_parts.append("上次答错")
         if tag:
             if tag in ("消退型", "波动型"):
                 tag_emoji = "⚠️"
@@ -247,16 +270,12 @@ def _show_consolidation_running():
             else:
                 tag_emoji = "⏰"
             stats_parts.append(f"{tag_emoji} {tag}")
-        if stats_parts:
-            st.markdown(f"<div style='text-align:right;padding-top:0.5em;color:#888;font-size:16px;'>{'&nbsp;&nbsp;|&nbsp;&nbsp;'.join(stats_parts)}</div>", unsafe_allow_html=True)
+        st.markdown(" · ".join(stats_parts))
 
     # 题型标签 + 不确定按钮 + 标记按钮 同行
     title_col1, title_col2, title_col3 = st.columns([6, 2, 2])
     with title_col1:
-        title_parts = [f"**{type_str}**"]
-        if cat_str:
-            title_parts.append(f"📂 {cat_str}")
-        st.markdown(" · ".join(title_parts))
+        st.markdown("&nbsp;")
     # 答过 3 次以上才显示「不确定」开关
     total_answers = q_stats["correct_count"] + q_stats["wrong_count"]
     with title_col2:
@@ -381,6 +400,7 @@ def _show_consolidation_running():
     st.markdown("---")
 
     # ---- 导航按钮（上一题、下一题、保存、提交按钮同行） ----
+    st.markdown('<div class="question-nav-bar">', unsafe_allow_html=True)
     nav_cols = st.columns([1, 1, 1, 1])
     if nav_cols[0].button("◀ 上一题", use_container_width=True, disabled=(idx == 0)):
         st.session_state.consol_current = idx - 1
@@ -395,6 +415,7 @@ def _show_consolidation_running():
 
     if nav_cols[3].button("📤 提交所有答案", use_container_width=True, type="primary"):
         st.session_state.consol_confirm_submit = True
+    st.markdown('</div>', unsafe_allow_html=True)
 
     if st.session_state.get("consol_confirm_submit"):
         answered = len(st.session_state.consol_answers)

@@ -215,6 +215,15 @@ class SQLiteDataAccess(DataAccess):
         conn.execute("PRAGMA cache_size=-4000")
         return conn
 
+    @staticmethod
+    def _normalize_question(q: dict) -> dict:
+        """标准化题目字典键名：确保 index_num 和 index 双键共存（兼容旧代码）"""
+        if "index_num" in q and "index" not in q:
+            q["index"] = q["index_num"]
+        elif "index" in q and "index_num" not in q:
+            q["index_num"] = q["index"]
+        return q
+
     def _init_db(self):
         """初始化数据库表结构"""
         conn = self._get_conn()
@@ -250,6 +259,21 @@ class SQLiteDataAccess(DataAccess):
                 except sqlite3.OperationalError:
                     pass  # 列已存在，跳过
 
+            # 兼容旧库：为早期缺少 exam_type 的表补列（重复执行不报错）
+            for table, col, col_def in [
+                ("question_stats", "exam_type", "TEXT DEFAULT '心理学会咨询师四级'"),
+                ("answer_records", "exam_type", "TEXT DEFAULT '心理学会咨询师四级'"),
+                ("wrong_questions", "exam_type", "TEXT DEFAULT '心理学会咨询师四级'"),
+                ("exam_records", "exam_type", "TEXT DEFAULT '心理学会咨询师四级'"),
+                ("study_records", "exam_type", "TEXT DEFAULT '心理学会咨询师四级'"),
+                ("mock_exam_records", "exam_type", "TEXT DEFAULT '心理学会咨询师四级'"),
+                ("drafts", "exam_type", "TEXT DEFAULT '心理学会咨询师四级'"),
+            ]:
+                try:
+                    cur.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_def}")
+                except sqlite3.OperationalError:
+                    pass  # 列已存在，跳过
+
             # 案例表
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS case_studies (
@@ -276,9 +300,11 @@ class SQLiteDataAccess(DataAccess):
                     unstable INTEGER DEFAULT 0,
                     self_uncertainty REAL DEFAULT 0.0,
                     first_answer_time TEXT,
+                    exam_type TEXT DEFAULT '心理学会咨询师四级',
                     FOREIGN KEY (question_id) REFERENCES questions(id)
                 )
             """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_question_stats_exam_type ON question_stats(exam_type)")
 
             # 答题记录表
             cur.execute("""
@@ -291,6 +317,7 @@ class SQLiteDataAccess(DataAccess):
                     session_id TEXT,
                     category TEXT,
                     timestamp TEXT NOT NULL,
+                    exam_type TEXT DEFAULT '心理学会咨询师四级',
                     FOREIGN KEY (question_id) REFERENCES questions(id)
                 )
             """)
@@ -302,17 +329,21 @@ class SQLiteDataAccess(DataAccess):
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS wrong_questions (
                     question_id TEXT PRIMARY KEY,
+                    exam_type TEXT DEFAULT '心理学会咨询师四级',
                     FOREIGN KEY (question_id) REFERENCES questions(id)
                 )
             """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_wrong_questions_exam_type ON wrong_questions(exam_type)")
 
             # 考试记录表
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS exam_records (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    data TEXT NOT NULL
+                    data TEXT NOT NULL,
+                    exam_type TEXT DEFAULT '心理学会咨询师四级'
                 )
             """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_exam_records_exam_type ON exam_records(exam_type)")
 
             # 背题记录表
             cur.execute("""
@@ -325,17 +356,21 @@ class SQLiteDataAccess(DataAccess):
                     wrong INTEGER,
                     start_time TEXT,
                     end_time TEXT,
-                    details TEXT
+                    details TEXT,
+                    exam_type TEXT DEFAULT '心理学会咨询师四级'
                 )
             """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_study_records_exam_type ON study_records(exam_type)")
 
             # 模拟考试记录表
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS mock_exam_records (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    data TEXT NOT NULL
+                    data TEXT NOT NULL,
+                    exam_type TEXT DEFAULT '心理学会咨询师四级'
                 )
             """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_mock_exam_records_exam_type ON mock_exam_records(exam_type)")
 
             # 配置表
             cur.execute("""
@@ -352,10 +387,12 @@ class SQLiteDataAccess(DataAccess):
                     prefix TEXT NOT NULL,
                     draft_id TEXT NOT NULL,
                     data TEXT NOT NULL,
-                    saved_at TEXT NOT NULL
+                    saved_at TEXT NOT NULL,
+                    exam_type TEXT DEFAULT '心理学会咨询师四级'
                 )
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_drafts_prefix ON drafts(prefix)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_drafts_exam_type ON drafts(exam_type)")
 
             conn.commit()
         except Exception:
@@ -380,6 +417,7 @@ class SQLiteDataAccess(DataAccess):
             for row in rows:
                 q = dict(row)
                 q["options"] = json.loads(q["options"])
+                self._normalize_question(q)
                 questions.append(q)
             return questions
         finally:
@@ -396,6 +434,7 @@ class SQLiteDataAccess(DataAccess):
                 return {}
             q = dict(row)
             q["options"] = json.loads(q["options"])
+            self._normalize_question(q)
             return q
         finally:
             conn.close()
@@ -413,7 +452,7 @@ class SQLiteDataAccess(DataAccess):
                 """, (
                     q.get("id", ""),
                     q.get("source_file", ""),
-                    q.get("index", 0),
+                    q.get("index_num", q.get("index", 0)),
                     q.get("type", "single"),
                     q.get("question", ""),
                     json.dumps(q.get("options", {}), ensure_ascii=False),
@@ -463,6 +502,7 @@ class SQLiteDataAccess(DataAccess):
             for row in rows:
                 q = dict(row)
                 q["options"] = json.loads(q["options"])
+                self._normalize_question(q)
                 questions.append(q)
             return questions
         finally:
@@ -525,6 +565,7 @@ class SQLiteDataAccess(DataAccess):
             for row in rows:
                 q = dict(row)
                 q["options"] = json.loads(q["options"])
+                self._normalize_question(q)
                 questions.append(q)
             return questions
         finally:
@@ -1513,14 +1554,15 @@ class SQLiteDataAccess(DataAccess):
         try:
             cur = conn.cursor()
             cur.execute("""
-                INSERT OR REPLACE INTO drafts (id, prefix, draft_id, data, saved_at)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT OR REPLACE INTO drafts (id, prefix, draft_id, data, saved_at, exam_type)
+                VALUES (?, ?, ?, ?, ?, ?)
             """, (
                 f"{prefix}_{draft_id}",
                 prefix,
                 draft_id,
                 json.dumps(data, ensure_ascii=False, indent=2),
                 datetime.now().isoformat(),
+                exam_type or "心理学会咨询师四级",
             ))
             conn.commit()
         except Exception:
