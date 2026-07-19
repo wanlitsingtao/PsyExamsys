@@ -34,6 +34,14 @@ CATEGORY_ICONS = {
 }
 
 
+def _get_cached_qstats(qid):
+    """从 session_state 缓存获取题目统计；缓存缺失时回查数据库，避免切换考试类型后显示 0/0"""
+    cache = st.session_state.get("spec_stats_cache", {})
+    if qid in cache:
+        return cache[qid]
+    return get_question_stats(qid)
+
+
 def show_specialized():
     questions = st.session_state.questions
     if not questions:
@@ -362,6 +370,7 @@ def _resume_spec_draft(draft, questions):
 
 def _show_spec_running():
     """显示专项训练进行中的界面（与背题系统统一）"""
+    _exam_type = st.session_state.get("exam_type", "心理学会咨询师四级")
     # ---- 自动保存：每 5 分钟静默保存 ----
     _now = time.time()
     if _now - st.session_state.get("spec_last_auto_save", _now) >= 300:
@@ -378,9 +387,11 @@ def _show_spec_running():
     category = st.session_state.spec_category
     mode = st.session_state.get("spec_mode", "specialized")
 
-    # 缓存答题统计（避免每次渲染读文件）
-    if "spec_stats_cache" not in st.session_state:
-        st.session_state.spec_stats_cache = load_question_stats(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
+    # 缓存答题统计（避免每次渲染读文件），同时按 exam_type 隔离并在切换后刷新
+    if ("spec_stats_cache" not in st.session_state or
+            st.session_state.get("spec_stats_cache_exam_type") != _exam_type):
+        st.session_state.spec_stats_cache = load_question_stats(exam_type=_exam_type)
+        st.session_state.spec_stats_cache_exam_type = _exam_type
 
     # 标题行 + 返回按钮（同行居右；保存按钮已移至导航行）
     mode_label = "综合训练" if mode == "comprehensive" else "专项训练"
@@ -421,7 +432,7 @@ def _show_spec_running():
     type_labels = {"single": "🔵 单选题", "multi": "🟢 多选题", "judge": "🟠 判断题", "案例题": "🟣 案例题", "indefinite": "🟡 不定项选择题"}
 
     # 获取本题答题统计（从缓存读取，避免每次渲染读文件）
-    q_stats = st.session_state.spec_stats_cache.get(qid, {"correct_count": 0, "wrong_count": 0, "last_answer_time": None, "last_correct": None})
+    q_stats = _get_cached_qstats(qid)
 
     # 题号行：左侧题号，右侧历史统计
     title_cols = st.columns([1, 2])
@@ -576,8 +587,6 @@ def _show_spec_running():
             with st.expander("📖 查看解析", expanded=True):
                 st.markdown(q["explanation"])
 
-    st.markdown("---")
-
     # 导航按钮（上一题、下一题、保存、提交按钮同行，使用 on_click 回调避免双重 rerun）
     nav_cols = st.columns([1, 1, 1, 1])
 
@@ -657,7 +666,7 @@ def _show_spec_running():
     div.stButton > button {
         font-size: 10px !important; white-space: nowrap !important;
         padding-left: 0px !important; padding-right: 0px !important;
-        min-height: 22px !important;
+        min-height: 18px !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -703,7 +712,7 @@ def _show_spec_running():
                 if _uncertain:
                     _badges.append('<span style="font-size:8px;color:#ff9800;">?</span>')
                 st.markdown(
-                    f'<div style="text-align:right;height:11px;line-height:11px;overflow:hidden;">{"".join(_badges)}</div>',
+                    f'<div style="text-align:right;height:14px;line-height:14px;">{"".join(_badges)}</div>',
                     unsafe_allow_html=True,
                 )
                 if st.button(_label, key=f"spec_card_{_qi}",
@@ -794,7 +803,9 @@ def _finish_specialized():
     batch_update_wrong_and_stats(wrong_qids, correct_qids, stats_updates, uncertain_map)
 
     # 刷新统计缓存，确保结果页读到最新数据
-    st.session_state.spec_stats_cache = load_question_stats(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
+    _exam_type = st.session_state.get("exam_type", "心理学会咨询师四级")
+    st.session_state.spec_stats_cache = load_question_stats(exam_type=_exam_type)
+    st.session_state.spec_stats_cache_exam_type = _exam_type
 
     # 批量追加答题记录
     batch_add_answer_records(answer_records, exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
@@ -854,9 +865,12 @@ def _finish_specialized():
 
 def _show_spec_result():
     """显示专项训练结果"""
+    _exam_type = st.session_state.get("exam_type", "心理学会咨询师四级")
     # 守卫初始化：防止页面刷新后 session state 丢失
-    if "spec_stats_cache" not in st.session_state:
-        st.session_state.spec_stats_cache = load_question_stats(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
+    if ("spec_stats_cache" not in st.session_state or
+            st.session_state.get("spec_stats_cache_exam_type") != _exam_type):
+        st.session_state.spec_stats_cache = load_question_stats(exam_type=_exam_type)
+        st.session_state.spec_stats_cache_exam_type = _exam_type
     result = st.session_state.spec_result
     total = result["total"]
     correct = result["correct"]
@@ -959,9 +973,7 @@ def _show_spec_result():
                 if explanation:
                     st.markdown(explanation)
                 st.markdown(f"**知识板块**: {d.get('category', category)}")
-                q_stats = st.session_state.spec_stats_cache.get(
-                    d.get("id", ""), {"correct_count": 0, "wrong_count": 0}
-                )
+                q_stats = _get_cached_qstats(d.get("id", ""))
                 st.caption(f"📊 答题统计：答对 {q_stats['correct_count']} 次 / 答错 {q_stats['wrong_count']} 次")
 
     # 答题卡

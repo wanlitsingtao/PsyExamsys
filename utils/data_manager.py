@@ -1229,3 +1229,18 @@ def get_mastery_distribution(questions, exam_type=None):
         "retention_list": retention_list,
         "unstable_list": unstable_list,
     }
+
+
+def clear_exam_records(exam_type: str) -> dict:
+    """清空指定题库的所有答题记录（保留题目不变）
+
+    清除范围：answer_records, question_stats, wrong_questions,
+              exam_records, mock_exam_records, study_records, drafts
+
+    Args:
+        exam_type: 题库类型，如 "心理协会咨询师初级"
+
+    Returns:
+        dict: 各表删除的行数
+    """
+    return _get_dao().clear_exam_records(exam_type)

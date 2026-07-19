@@ -12,14 +12,16 @@ from utils.data_manager import (
     batch_update_wrong_and_stats, batch_add_answer_records,
     load_questions, load_question_stats, infer_category,
     get_mastery_distribution, load_uncertain_questions,
-    save_draft, load_drafts, delete_draft,
+    save_draft, load_drafts, delete_draft, get_question_stats,
 )
 
 
 def _get_cached_qstats(qid):
-    """从 session_state 缓存获取题目统计，带默认值"""
+    """从 session_state 缓存获取题目统计；缓存缺失时回查数据库，避免切换考试类型后显示 0/0"""
     cache = st.session_state.get("consol_stats_cache", {})
-    return cache.get(qid, {"correct_count": 0, "wrong_count": 0, "last_answer_time": None, "last_correct": None})
+    if qid in cache:
+        return cache[qid]
+    return get_question_stats(qid)
 
 
 def show_consolidation():
@@ -186,6 +188,7 @@ def _resume_consol_draft(draft: dict):
 
 def _show_consolidation_running():
     """巩固练习答题模式（操作元素与其他答题页面一致）"""
+    _exam_type = st.session_state.get("exam_type", "心理学会咨询师四级")
     # ---- 自动保存：每 5 分钟静默保存 ----
     _now = time.time()
     if _now - st.session_state.get("consol_last_auto_save", _now) >= 300:
@@ -199,17 +202,19 @@ def _show_consolidation_running():
     qid = q["id"]
     tag = q.get("_tag", "")
 
-    # 缓存答题统计（避免每题渲染时重复读盘）
-    if "consol_stats_cache" not in st.session_state:
-        st.session_state.consol_stats_cache = load_question_stats(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
+    # 缓存答题统计（避免每题渲染时重复读盘），同时按 exam_type 隔离并在切换后刷新
+    if ("consol_stats_cache" not in st.session_state or
+            st.session_state.get("consol_stats_cache_exam_type") != _exam_type):
+        st.session_state.consol_stats_cache = load_question_stats(exam_type=_exam_type)
+        st.session_state.consol_stats_cache_exam_type = _exam_type
 
     answered = len(st.session_state.consol_answers)
     unanswered = total_q - answered
 
-    # ---- 标题行 + 返回（保存按钮已移至导航行） ----
+    # ---- 标题行 + 返回按钮（同行居右；保存按钮已移至导航行） ----
     title_col, back_col = st.columns([5, 1])
     with title_col:
-        st.markdown("## 🎯 巩固练习")
+        st.markdown("### 🎯 巩固练习")
     with back_col:
         if st.button("返回", key="consol_back_running", use_container_width=True):
             st.session_state.consol_state = "idle"
@@ -220,65 +225,53 @@ def _show_consolidation_running():
 
     st.markdown("---")
 
-    # ---- 题目区（个性化内容：含掌握状态标签） ----
-    type_labels = {"single": "单选题", "multi": "多选题", "judge": "判断题", "案例题": "案例题", "indefinite": "不定项选择题"}
-    type_str = type_labels.get(q["type"], q["type"])
-    cat_str = q.get("category", infer_category(q.get("source_file", "")))
-    tag = q.get("_tag", "")
+    # 题型段标签
+    single_count = sum(1 for q_item in cq if q_item.get("type") == "single")
+    multi_count = sum(1 for q_item in cq if q_item.get("type") == "multi")
+    judge_count = sum(1 for q_item in cq if q_item.get("type") == "judge")
+    st.markdown(
+        f"🔵 单选 {single_count}题 / 🟢 多选 {multi_count}题 / 🟠 判断 {judge_count}题"
+    )
+
+    st.markdown("---")
+
+    # ---- 题目显示 ----
+    type_labels = {"single": "🔵 单选题", "multi": "🟢 多选题", "judge": "🟠 判断题", "案例题": "🟣 案例题", "indefinite": "🟡 不定项选择题"}
+    category = q.get("category", infer_category(q.get("source_file", "")))
     q_stats = _get_cached_qstats(qid)
-    status_label = "未答"
-    status_class = "status-unanswered"
-    if qid in st.session_state.consol_answers:
-        status_label = "已答"
-        status_class = "status-correct"
-    if q_stats.get("wrong_count", 0) > 0 and q_stats.get("last_correct") is False:
-        status_label = "之前答错"
-        status_class = "status-wrong"
 
-    question_card_html = f'''
-    <div class="question-card">
-      <div style="display:flex;align-items:flex-start;gap:0.9rem;flex-wrap:wrap;">
-        <div class="question-index">{idx + 1}</div>
-        <div style="flex:1;min-width:0;">
-          <div class="question-title">{q["question"]}</div>
-          <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.55rem;align-items:center;">
-            <span class="question-meta-tag">{type_str}</span>
-            <span class="question-meta-tag" style="background:#f8fafc;color:#334155;border:1px solid #cbd5e1;">{cat_str}</span>
-            <span class="question-status-chip {status_class}">{status_label}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-    '''
-    st.markdown(question_card_html, unsafe_allow_html=True)
-
-    with st.expander("📊 历史统计", expanded=False):
+    # 题号行：左侧题号，右侧历史统计
+    title_cols = st.columns([1, 2])
+    with title_cols[0]:
+        st.markdown(f"##### 第 {idx + 1}/{total_q} 题")
+    with title_cols[1]:
         stats_parts = []
         if q_stats["correct_count"] > 0 or q_stats["wrong_count"] > 0:
-            stats_parts.append(f"答对 {q_stats['correct_count']} 次")
-            stats_parts.append(f"答错 {q_stats['wrong_count']} 次")
+            stats_parts.append(f"📊 答对 {q_stats['correct_count']} 次 / 答错 {q_stats['wrong_count']} 次")
         last_correct = q_stats.get("last_correct")
         if last_correct is True:
-            stats_parts.append("上次答对")
+            stats_parts.append("🟢 上次答对")
         elif last_correct is False:
-            stats_parts.append("上次答错")
-        if tag:
+            stats_parts.append("🔴 上次答错")
+        if q.get("_tag"):
+            tag = q.get("_tag", "")
             if tag in ("消退型", "波动型"):
-                tag_emoji = "⚠️"
+                stats_parts.append("⚠️ 消退/波动型")
             elif tag == "不确定题目":
-                tag_emoji = "🎯"
+                stats_parts.append("🎯 不确定题目")
             else:
-                tag_emoji = "⏰"
-            stats_parts.append(f"{tag_emoji} {tag}")
-        st.markdown(" · ".join(stats_parts))
+                stats_parts.append("⏰ 遗忘预警")
+        if stats_parts:
+            st.markdown(f"<div style='text-align:right;padding-top:0.5em;color:#888;font-size:16px;'>{'&nbsp;&nbsp;|&nbsp;&nbsp;'.join(stats_parts)}</div>", unsafe_allow_html=True)
 
     # 题型标签 + 不确定按钮 + 标记按钮 同行
-    title_col1, title_col2, title_col3 = st.columns([6, 2, 2])
-    with title_col1:
-        st.markdown("&nbsp;")
+    type_col1, type_col2, type_col3 = st.columns([6, 2, 2])
+    with type_col1:
+        st.markdown(f"**{type_labels[q['type']]}**"
+                    f" · 📂 {category}")
     # 答过 3 次以上才显示「不确定」开关
     total_answers = q_stats["correct_count"] + q_stats["wrong_count"]
-    with title_col2:
+    with type_col2:
         if total_answers >= 3:
             toggle_key = f"consol_uncertain_toggle_{qid}"
             if toggle_key not in st.session_state:
@@ -295,7 +288,7 @@ def _show_consolidation_running():
                       value=qid in st.session_state.consol_uncertain,
                       help="标记此题为不确定",
                       on_change=_on_consol_uncertain_toggle)
-    with title_col3:
+    with type_col3:
         marked = qid in st.session_state.consol_marked
         if st.button("⭐ 标记" if marked else "☆ 标记",
                      key=f"consol_mark_{qid}",
@@ -397,25 +390,28 @@ def _show_consolidation_running():
             with st.expander("📖 查看解析", expanded=True):
                 st.markdown(q["explanation"])
 
-    st.markdown("---")
-
     # ---- 导航按钮（上一题、下一题、保存、提交按钮同行） ----
-    st.markdown('<div class="question-nav-bar">', unsafe_allow_html=True)
     nav_cols = st.columns([1, 1, 1, 1])
-    if nav_cols[0].button("◀ 上一题", use_container_width=True, disabled=(idx == 0)):
-        st.session_state.consol_current = idx - 1
-        st.rerun()
 
-    if nav_cols[1].button("下一题 ▶", use_container_width=True, disabled=(idx >= total_q - 1)):
-        st.session_state.consol_current = idx + 1
-        st.rerun()
+    def _go_prev():
+        st.session_state.consol_current = max(0, st.session_state.consol_current - 1)
 
-    if nav_cols[2].button("💾 保存", use_container_width=True):
+    def _go_next():
+        st.session_state.consol_current = min(total_q - 1, st.session_state.consol_current + 1)
+
+    def _save_callback():
         _save_consol_draft()
 
-    if nav_cols[3].button("📤 提交所有答案", use_container_width=True, type="primary"):
+    def _confirm_submit():
         st.session_state.consol_confirm_submit = True
-    st.markdown('</div>', unsafe_allow_html=True)
+
+    nav_cols[0].button("◀ 上一题", use_container_width=True,
+                       disabled=(idx == 0), on_click=_go_prev)
+    nav_cols[1].button("下一题 ▶", use_container_width=True,
+                       disabled=(idx >= total_q - 1), on_click=_go_next)
+    nav_cols[2].button("💾 保存", use_container_width=True, on_click=_save_callback)
+    nav_cols[3].button("📤 提交所有答案", use_container_width=True,
+                       type="primary", on_click=_confirm_submit)
 
     if st.session_state.get("consol_confirm_submit"):
         answered = len(st.session_state.consol_answers)
@@ -473,7 +469,7 @@ def _show_consolidation_running():
     div.stButton > button {
         font-size: 10px !important; white-space: nowrap !important;
         padding-left: 0px !important; padding-right: 0px !important;
-        min-height: 22px !important;
+        min-height: 18px !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -519,7 +515,7 @@ def _show_consolidation_running():
                 if _uncertain:
                     _badges.append('<span style="font-size:8px;color:#ff9800;">?</span>')
                 st.markdown(
-                    f'<div style="text-align:right;height:11px;line-height:11px;overflow:hidden;">{"".join(_badges)}</div>',
+                    f'<div style="text-align:right;height:14px;line-height:14px;">{"".join(_badges)}</div>',
                     unsafe_allow_html=True,
                 )
                 if st.button(_label, key=f"consol_card_{_qi}",

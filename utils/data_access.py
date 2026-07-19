@@ -1607,6 +1607,39 @@ class SQLiteDataAccess(DataAccess):
         finally:
             conn.close()
 
+    def clear_exam_records(self, exam_type: str) -> dict:
+        """清空指定题库的所有答题记录（保留题目不变）
+
+        Args:
+            exam_type: 题库类型，如 "心理协会咨询师初级"
+
+        Returns:
+            dict: 各表删除的行数 {"answer_records": N, "question_stats": N, ...}
+        """
+        tables = [
+            "answer_records",
+            "question_stats",
+            "wrong_questions",
+            "exam_records",
+            "mock_exam_records",
+            "study_records",
+            "drafts",
+        ]
+        result = {}
+        conn = self._get_conn()
+        try:
+            cur = conn.cursor()
+            for t in tables:
+                cur.execute(f'DELETE FROM "{t}" WHERE exam_type = ?', (exam_type,))
+                result[t] = cur.rowcount
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+        return result
+
 
 # ========================================
 # 工厂函数

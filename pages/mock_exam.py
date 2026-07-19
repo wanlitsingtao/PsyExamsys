@@ -13,8 +13,16 @@ from utils.data_manager import (
     batch_update_wrong_and_stats, batch_add_answer_records,
     save_mock_exam_record, infer_category, load_question_stats,
     save_draft, load_drafts, delete_draft,
-    load_case_studies, get_case_sub_questions,
+    load_case_studies, get_case_sub_questions, get_question_stats,
 )
+
+
+def _get_cached_qstats(qid):
+    """从 session_state 缓存获取题目统计；缓存缺失时回查数据库，避免切换考试类型后显示 0/0"""
+    cache = st.session_state.get("mock_stats_cache", {})
+    if qid in cache:
+        return cache[qid]
+    return get_question_stats(qid)
 
 
 def show_mock_exam():
@@ -278,6 +286,7 @@ def _resume_mock_draft(draft: dict):
 
 def _show_exam_subject(subject_key):
     """显示某一科的考试进行中界面"""
+    _exam_type = st.session_state.get("exam_type", "心理学会咨询师四级")
     # ---- 自动保存：每 5 分钟静默保存 ----
     _now = time.time()
     if _now - st.session_state.get("mock_last_auto_save", _now) >= 300:
@@ -293,9 +302,11 @@ def _show_exam_subject(subject_key):
     qid = q["id"]
     boundaries = st.session_state.mock_type_boundaries
 
-    # 缓存答题统计（避免每次渲染读文件，与专项训练一致）
-    if "mock_stats_cache" not in st.session_state:
-        st.session_state.mock_stats_cache = load_question_stats(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
+    # 缓存答题统计（避免每次渲染读文件，与专项训练一致），同时按 exam_type 隔离并在切换后刷新
+    if ("mock_stats_cache" not in st.session_state or
+            st.session_state.get("mock_stats_cache_exam_type") != _exam_type):
+        st.session_state.mock_stats_cache = load_question_stats(exam_type=_exam_type)
+        st.session_state.mock_stats_cache_exam_type = _exam_type
 
     # 标题行 + 返回按钮（同行居右；保存按钮已移至导航行）
     cfg_name = cfg["name"]
@@ -402,7 +413,7 @@ def _show_exam_subject(subject_key):
                 )
 
     # 获取本题答题统计（从缓存读取，与专项训练一致）
-    q_stats = st.session_state.mock_stats_cache.get(qid, {"correct_count": 0, "wrong_count": 0, "last_answer_time": None, "last_correct": None})
+    q_stats = _get_cached_qstats(qid)
 
     # 题号行：左侧题号，右侧历史统计（与专项训练布局一致）
     title_cols = st.columns([1, 2])
@@ -600,7 +611,7 @@ def _show_exam_subject(subject_key):
     div.stButton > button {
         font-size: 10px !important; white-space: nowrap !important;
         padding-left: 0px !important; padding-right: 0px !important;
-        min-height: 22px !important;
+        min-height: 18px !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -647,7 +658,7 @@ def _show_exam_subject(subject_key):
                 if _uncertain:
                     _badges.append('<span style="font-size:8px;color:#ff9800;">?</span>')
                 st.markdown(
-                    f'<div style="text-align:right;height:11px;line-height:11px;overflow:hidden;">{"".join(_badges)}</div>',
+                    f'<div style="text-align:right;height:14px;line-height:14px;">{"".join(_badges)}</div>',
                     unsafe_allow_html=True,
                 )
                 if st.button(_label, key=f"mock_card_{_qi}",
@@ -778,7 +789,9 @@ def _finish_subject(subject_key):
     st.session_state._data_version = st.session_state.get("_data_version", 0) + 1
 
     # 刷新统计缓存，确保后续页面读到最新数据
-    st.session_state.mock_stats_cache = load_question_stats(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
+    _exam_type = st.session_state.get("exam_type", "心理学会咨询师四级")
+    st.session_state.mock_stats_cache = load_question_stats(exam_type=_exam_type)
+    st.session_state.mock_stats_cache_exam_type = _exam_type
 
     duration_str = f"{int(duration // 60)}分{int(duration % 60)}秒"
 
@@ -841,13 +854,16 @@ def _finish_subject(subject_key):
 
 def _show_subject_result(subject_key):
     """显示某一科的成绩"""
+    _exam_type = st.session_state.get("exam_type", "心理学会咨询师四级")
     # 守卫初始化：防止页面刷新后 session state 丢失
     if "mock_marked" not in st.session_state:
         st.session_state.mock_marked = set()
     if "mock_uncertain" not in st.session_state:
         st.session_state.mock_uncertain = set()
-    if "mock_stats_cache" not in st.session_state:
-        st.session_state.mock_stats_cache = load_question_stats(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
+    if ("mock_stats_cache" not in st.session_state or
+            st.session_state.get("mock_stats_cache_exam_type") != _exam_type):
+        st.session_state.mock_stats_cache = load_question_stats(exam_type=_exam_type)
+        st.session_state.mock_stats_cache_exam_type = _exam_type
 
     cfg = MOCK_EXAM_CONFIG[subject_key]
     result = st.session_state.mock_result
@@ -972,7 +988,7 @@ def _show_subject_result(subject_key):
                 if cat_label:
                     st.markdown(f"**知识板块**：{cat_label}")
 
-                q_stats = st.session_state.mock_stats_cache.get(d.get("id", ""), {"correct_count": 0, "wrong_count": 0})
+                q_stats = _get_cached_qstats(d.get("id", ""))
                 st.caption(f"📊 答题统计：答对 {q_stats['correct_count']} 次 / 答错 {q_stats['wrong_count']} 次")
 
     # 答题卡

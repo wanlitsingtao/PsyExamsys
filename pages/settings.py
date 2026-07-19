@@ -7,6 +7,7 @@ from utils.data_manager import (
     load_config, save_config, load_questions, save_questions,
     dedup_import, get_question_count, backup_data,
     load_case_studies, save_case_studies,
+    clear_exam_records, invalidate_rerun_cache,
     EXAM_TYPE_LABELS, DEFAULT_EXAM_TYPE,
 )
 from utils.parser import batch_parse
@@ -204,6 +205,7 @@ def _show_tab_questions():
 
     # 题库管理操作
     st.markdown("#### 🗑️ 题库管理操作")
+    st.caption(f"当前目标题库: **{EXAM_TYPE_LABELS.get(st.session_state.get('exam_type', DEFAULT_EXAM_TYPE), st.session_state.get('exam_type', ''))}**")
     col_d1, col_d2, col_d3 = st.columns(3)
 
     if col_d1.button("🔄 刷新题库缓存", use_container_width=True):
@@ -212,8 +214,46 @@ def _show_tab_questions():
         st.success(f"✅ 已刷新，当前题库 {len(questions)} 题")
         st.rerun()
 
+    current_exam = st.session_state.get("exam_type", DEFAULT_EXAM_TYPE)
+    can_clear = len(questions) > 0
+    if col_d2.button("🧹 清空答题记录", use_container_width=True,
+                      disabled=not can_clear,
+                      help=f"仅清空「{EXAM_TYPE_LABELS.get(current_exam, current_exam)}」的答题记录，保留题目。其他题库不受影响。"):
+        st.session_state.confirm_clear_records = current_exam
+
     if col_d3.button("⚠️ 清空题库", use_container_width=True, disabled=(len(questions) == 0)):
         st.session_state.confirm_clear_questions = True
+
+    # 清空答题记录确认
+    if st.session_state.get("confirm_clear_records"):
+        target_exam = st.session_state.confirm_clear_records
+        target_label = EXAM_TYPE_LABELS.get(target_exam, target_exam)
+        st.error(f"⚠️ 确认清空「{target_label}」的所有答题记录吗？")
+        st.markdown("**将被清除的数据（保留题目）：**")
+        st.markdown("- 答题记录（answer_records）")
+        st.markdown("- 题目统计（question_stats，正确/错误次数等）")
+        st.markdown("- 错题本（wrong_questions）")
+        st.markdown("- 考试记录（exam_records）")
+        st.markdown("- 模拟考试记录（mock_exam_records）")
+        st.markdown("- 学习记录（study_records）")
+        st.markdown("- 答题草稿（drafts）")
+        st.markdown(f"**其他题库（如「心理学会咨询师四级」）的数据不受影响。**")
+
+        cr1, cr2 = st.columns(2)
+        if cr1.button("✅ 确认清空答题记录", use_container_width=True):
+            result = clear_exam_records(target_exam)
+            total_cleared = sum(result.values())
+            # 刷新缓存
+            invalidate_rerun_cache()
+            questions = load_questions()
+            st.session_state.questions = questions
+            st.session_state._data_version = st.session_state.get("_data_version", 0) + 1
+            st.session_state.confirm_clear_records = False
+            st.success(f"✅ 已清空「{target_label}」的 {total_cleared} 条答题记录（题目保留）")
+            st.rerun()
+        if cr2.button("❌ 取消", use_container_width=True):
+            st.session_state.confirm_clear_records = False
+            st.rerun()
 
     if st.session_state.get("confirm_clear_questions"):
         st.error("⚠️⚠️ 确认清空整个题库吗？此操作不可恢复！")

@@ -14,13 +14,16 @@ from utils.data_manager import (
     remove_wrong_question, clear_all_wrong, get_wrong_stats,
     load_questions, load_question_stats, infer_category,
     get_all_wrong_with_stats, save_exam_record, save_draft,
+    get_question_stats,
 )
 
 
 def _get_cached_qstats(qid):
-    """从 session_state 缓存获取题目统计，带默认值"""
+    """从 session_state 缓存获取题目统计；缓存缺失时回查数据库，避免切换考试类型后显示 0/0"""
     cache = st.session_state.get("wb_stats_cache", {})
-    return cache.get(qid, {"correct_count": 0, "wrong_count": 0, "last_answer_time": None, "last_correct": None})
+    if qid in cache:
+        return cache[qid]
+    return get_question_stats(qid)
 
 
 def show_wrongbook():
@@ -279,11 +282,14 @@ def _render_analysis_detail(item, idx, total):
 # ============================
 
 def _show_wrong_practice():
-    # 缓存答题统计（避免每题渲染时重复读盘）
-    if "wb_stats_cache" not in st.session_state:
-        st.session_state.wb_stats_cache = load_question_stats(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
+    _exam_type = st.session_state.get("exam_type", "心理学会咨询师四级")
+    # 缓存答题统计（避免每题渲染时重复读盘），同时按 exam_type 隔离并在切换后刷新
+    if ("wb_stats_cache" not in st.session_state or
+            st.session_state.get("wb_stats_cache_exam_type") != _exam_type):
+        st.session_state.wb_stats_cache = load_question_stats(exam_type=_exam_type)
+        st.session_state.wb_stats_cache_exam_type = _exam_type
 
-    wrong_stats = get_wrong_stats(st.session_state.get("exam_type"))
+    wrong_stats = get_wrong_stats(_exam_type)
     config = st.session_state.config
     type_labels = {"single": "🔵 单选题", "multi": "🟢 多选题", "judge": "🟠 判断题", "案例题": "🟣 案例题", "indefinite": "🟡 不定项选择题"}
 
@@ -304,7 +310,7 @@ def _show_wrong_practice():
     if ("wb_questions" not in st.session_state or st.session_state.get("wb_regenerate")) \
             and not st.session_state.get("wb_submitted"):
         count = config["wrongbook_extract_count"]
-        top_wrong = get_top_wrong_questions(count, st.session_state.get("exam_type"))
+        top_wrong = get_top_wrong_questions(count, _exam_type)
 
         if not top_wrong:
             st.warning("⚠️ 没有可提取的错题")
@@ -316,7 +322,7 @@ def _show_wrong_practice():
         st.session_state.wb_answers = {}
         st.session_state.wb_marked = set()
         # 预填不确定开关：历史标记为不确定的题目默认打开
-        _wb_stats = load_question_stats(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
+        _wb_stats = load_question_stats(exam_type=_exam_type)
         _wb_pre_uncertain = {qid for qid, s in _wb_stats.items() if s.get("self_uncertainty", 0) > 0}
         st.session_state.wb_uncertain = {q["id"] for q in st.session_state.wb_questions if q["id"] in _wb_pre_uncertain}
         st.session_state.wb_submitted = False
@@ -690,7 +696,7 @@ def _show_wrong_practice():
     div.stButton > button {
         font-size: 10px !important; white-space: nowrap !important;
         padding-left: 0px !important; padding-right: 0px !important;
-        min-height: 22px !important;
+        min-height: 18px !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -740,7 +746,7 @@ def _show_wrong_practice():
                 if _uncertain and not is_submitted:
                     _badges.append('<span style="font-size:8px;color:#ff9800;">?</span>')
                 st.markdown(
-                    f'<div style="text-align:right;height:11px;line-height:11px;overflow:hidden;">{"".join(_badges)}</div>',
+                    f'<div style="text-align:right;height:14px;line-height:14px;">{"".join(_badges)}</div>',
                     unsafe_allow_html=True,
                 )
                 if st.button(_label, key=f"wb_card_{_qi}",
