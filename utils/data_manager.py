@@ -22,6 +22,11 @@ def _get_dao():
     return _dao
 
 
+def get_questions_version() -> int:
+    """获取当前题库数据版本号（供 app.py 检测题库是否变更）"""
+    return _get_dao().get_questions_version()
+
+
 # ---- per-rerun 缓存（同一 rerun 内复用全量数据，避免重复 I/O）----
 _rerun_cache_questions = None
 _rerun_cache_stats = {}  # 按 exam_type 分别缓存

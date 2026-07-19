@@ -310,17 +310,17 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # 初始化 session_state
-from utils.data_manager import load_config, load_questions, get_available_exam_types, DEFAULT_EXAM_TYPE, invalidate_rerun_cache
+from utils.data_manager import load_config, load_questions, get_available_exam_types, DEFAULT_EXAM_TYPE, invalidate_rerun_cache, get_questions_version
 
 # 每次 rerun 开始时清除数据缓存，确保使用最新数据
 invalidate_rerun_cache()
 
-# 检测数据库文件是否被外部更新（如导入脚本、其他进程写入），自动刷新题目缓存
-_DB_PATH = Path(__file__).resolve().parent / "data" / "exmsys.db"
-_current_db_mtime = _DB_PATH.stat().st_mtime if _DB_PATH.exists() else 0
-if "_db_last_modified" not in st.session_state or st.session_state._db_last_modified != _current_db_mtime:
-    st.session_state._db_last_modified = _current_db_mtime
-    # 清除旧缓存，强制重新加载题库和可用题库列表
+# 检测题库数据版本号是否变更（仅在 save_questions 导入/替换题库时递增），
+# 答题过程中的自动保存、统计更新等不会触发，避免页面答题中途被刷出
+_db_version = get_questions_version()
+if "_db_questions_version" not in st.session_state or st.session_state._db_questions_version != _db_version:
+    st.session_state._db_questions_version = _db_version
+    # 题库版本号变了，才是真正需要刷新题库缓存
     for key in ["questions", "_cache_available_exams"]:
         st.session_state.pop(key, None)
 

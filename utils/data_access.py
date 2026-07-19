@@ -16,6 +16,9 @@ SQLITE_DB = DATA_DIR / "exmsys.db"
 # 遗忘预警阈值缓存
 _retention_threshold_cache = None
 
+# 题库数据版本号的 config 键名
+QUESTIONS_VERSION_KEY = "_questions_data_version"
+
 
 def get_retention_threshold():
     """从数据库配置读取遗忘预警阈值（距上次答对 > 此天数触发预警）"""
@@ -379,6 +382,13 @@ class SQLiteDataAccess(DataAccess):
                     value TEXT
                 )
             """)
+            # 确保题库版本号记录存在（首次创建时初始化为0）
+            cur.execute("SELECT value FROM config WHERE key = ?", (QUESTIONS_VERSION_KEY,))
+            if cur.fetchone() is None:
+                cur.execute(
+                    "INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)",
+                    (QUESTIONS_VERSION_KEY, json.dumps(0))
+                )
 
             # 草稿表
             cur.execute("""
@@ -400,6 +410,30 @@ class SQLiteDataAccess(DataAccess):
             raise
         finally:
             conn.close()
+
+    # ---- 题库版本号（用于检测题库是否被外部修改） ----
+
+    def get_questions_version(self) -> int:
+        """获取当前题库版本号（config表中维护，仅 save_questions 时递增）"""
+        conn = self._get_conn()
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT value FROM config WHERE key = ?", (QUESTIONS_VERSION_KEY,))
+            row = cur.fetchone()
+            return int(json.loads(row[0])) if row else 0
+        finally:
+            conn.close()
+
+    def _increment_questions_version_in_conn(self, conn) -> None:
+        """在已有连接上递增题库版本号（供 save_questions 内部调用）"""
+        cur = conn.cursor()
+        cur.execute("SELECT value FROM config WHERE key = ?", (QUESTIONS_VERSION_KEY,))
+        row = cur.fetchone()
+        version = (int(json.loads(row[0])) + 1) if row else 1
+        cur.execute(
+            "INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)",
+            (QUESTIONS_VERSION_KEY, json.dumps(version))
+        )
 
     # ---- 题库 ----
 
@@ -464,6 +498,8 @@ class SQLiteDataAccess(DataAccess):
                     q.get("case_study_id", ""),
                     q.get("is_case_background", 0),
                 ))
+            # 题库被替换，递增版本号（通知 app.py 刷新缓存）
+            self._increment_questions_version_in_conn(conn)
             conn.commit()
         except Exception:
             conn.rollback()
