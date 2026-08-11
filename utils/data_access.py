@@ -218,13 +218,25 @@ class SQLiteDataAccess(DataAccess):
         conn.execute("PRAGMA cache_size=-4000")
         return conn
 
+    # 题型中文→英文映射（兼容图片/PDF导入时可能使用中文类型名）
+    _TYPE_NORMALIZE_MAP = {
+        "单选题": "single",
+        "多选题": "multi",
+        "判断题": "judge",
+        "不定项选择题": "indefinite",
+    }
+
     @staticmethod
     def _normalize_question(q: dict) -> dict:
-        """标准化题目字典键名：确保 index_num 和 index 双键共存（兼容旧代码）"""
+        """标准化题目字典：确保 index_num/index 双键共存，并标准化题型为英文"""
         if "index_num" in q and "index" not in q:
             q["index"] = q["index_num"]
         elif "index" in q and "index_num" not in q:
             q["index_num"] = q["index"]
+        # 标准化题型：中文→英文
+        t = q.get("type", "")
+        if t in SQLiteDataAccess._TYPE_NORMALIZE_MAP:
+            q["type"] = SQLiteDataAccess._TYPE_NORMALIZE_MAP[t]
         return q
 
     def _init_db(self):
