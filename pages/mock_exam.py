@@ -46,12 +46,75 @@ def show_mock_exam():
         _show_exam_subject("counseling")
     elif st.session_state.mock_state == "counseling_finished":
         _show_subject_result("counseling")
+    elif st.session_state.mock_state == "junior_psychology":
+        _show_exam_subject("junior_psychology")
+    elif st.session_state.mock_state == "junior_psychology_finished":
+        _show_subject_result("junior_psychology")
     elif st.session_state.mock_state == "all_finished":
         _show_final_result()
 
 
 def _show_mock_start():
     """显示模拟考试开始界面"""
+    _exam_type = st.session_state.get("exam_type", "心理学会咨询师四级")
+    is_junior = (_exam_type == "心理协会咨询师初级")
+
+    if is_junior:
+        _show_mock_start_junior()
+    else:
+        _show_mock_start_four()
+
+    # ---- 历史草稿列表（如有） ----
+    mock_drafts = load_drafts("mock")
+    if mock_drafts:
+        st.markdown("---")
+        st.markdown("### 📂 未完成的考试（点击继续作答）")
+        SUBJECT_LABELS = {
+            "psychology": "心理学综合",
+            "counseling": "咨询实务",
+            "junior_psychology": "心理学综合",
+        }
+        for draft in mock_drafts:
+            d_id = draft.get("draft_id", "")
+            d_sub = SUBJECT_LABELS.get(draft.get("subject_key", ""), draft.get("subject_key", ""))
+            d_answered = len(draft.get("answers", {}))
+            d_total = len(draft.get("question_ids", []))
+            remaining_sec = draft.get("remaining_seconds", 0)
+            remaining_str = f"{int(remaining_sec)//60:02d}:{int(remaining_sec)%60:02d}"
+            d_saved = draft.get("saved_at", "")
+            dcol1, dcol2, dcol3 = st.columns([5, 2, 1])
+            dcol1.markdown(
+                f"**{d_sub}**　已答 {d_answered}/{d_total} 题　"
+                f"剩余时间 {remaining_str}　🕐 {d_saved}"
+            )
+            if dcol2.button("▶ 继续作答", key=f"mock_resume_{d_id}", use_container_width=True, type="primary"):
+                _resume_mock_draft(draft)
+            if dcol3.button("🗑", key=f"mock_del_draft_{d_id}", use_container_width=True, help="删除此草稿"):
+                delete_draft("mock", d_id)
+                st.rerun()
+        st.markdown("---")
+
+
+def _show_mock_start_junior():
+    """心理协会咨询师初级 — 单科制模拟考试开始界面"""
+    jcfg = MOCK_EXAM_CONFIG["junior_psychology"]
+
+    st.markdown("---")
+    st.markdown("### 🚀 心理协会咨询师初级 — 模拟考试")
+
+    j_total = jcfg["single_count"] + jcfg["multi_count"]
+    j_max = jcfg["single_count"] * jcfg["single_score"] + jcfg["multi_count"] * jcfg["multi_score"]
+    st.markdown(f"**📘 {jcfg['name']}**　共 **{j_total}** 题 | 满分 **{j_max:.0f}** 分 | 时间 **{jcfg['time_minutes']}** 分钟")
+    st.markdown(f"- 单选题 {jcfg['single_count']} 题（每题 {jcfg['single_score']} 分）")
+    st.markdown(f"- 多选题 {jcfg['multi_count']} 题（每题 {jcfg['multi_score']} 分）")
+    st.markdown(f"- 出题顺序：**单选题 → 多选题**")
+    st.markdown("---")
+    if st.button("📘 开始心理学综合", use_container_width=True, type="primary", key="start_junior_psy"):
+        _start_subject("junior_psychology")
+
+
+def _show_mock_start_four():
+    """心理学会咨询师四级 — 两科制模拟考试开始界面"""
     psy = MOCK_EXAM_CONFIG["psychology"]
     cou = MOCK_EXAM_CONFIG["counseling"]
 
@@ -82,31 +145,6 @@ def _show_mock_start():
             _start_subject("counseling")
 
     st.markdown("---")
-
-    # ---- 历史草稿列表（如有） ----
-    mock_drafts = load_drafts("mock")
-    if mock_drafts:
-        st.markdown("### 📂 未完成的考试（点击继续作答）")
-        SUBJECT_LABELS = {"psychology": "心理学综合", "counseling": "咨询实务"}
-        for draft in mock_drafts:
-            d_id = draft.get("draft_id", "")
-            d_sub = SUBJECT_LABELS.get(draft.get("subject_key", ""), draft.get("subject_key", ""))
-            d_answered = len(draft.get("answers", {}))
-            d_total = len(draft.get("question_ids", []))
-            remaining_sec = draft.get("remaining_seconds", 0)
-            remaining_str = f"{int(remaining_sec)//60:02d}:{int(remaining_sec)%60:02d}"
-            d_saved = draft.get("saved_at", "")
-            dcol1, dcol2, dcol3 = st.columns([5, 2, 1])
-            dcol1.markdown(
-                f"**{d_sub}**　已答 {d_answered}/{d_total} 题　"
-                f"剩余时间 {remaining_str}　🕐 {d_saved}"
-            )
-            if dcol2.button("▶ 继续作答", key=f"mock_resume_{d_id}", use_container_width=True, type="primary"):
-                _resume_mock_draft(draft)
-            if dcol3.button("🗑", key=f"mock_del_draft_{d_id}", use_container_width=True, help="删除此草稿"):
-                delete_draft("mock", d_id)
-                st.rerun()
-        st.markdown("---")
 
     st.markdown("### 📋 考试规则")
     st.markdown("#### 📘 第一科：心理学综合（9:30—11:30）")
@@ -153,10 +191,14 @@ def _start_subject(subject_key):
     session_id = str(uuid.uuid4())[:8]
 
     # 根据科目映射到超类过滤题目，再按优先级抽取（与专项训练完全一致）
-    super_category_map = {"psychology": "心理学综合", "counseling": "咨询实务"}
-    super_cat = super_category_map.get(subject_key, "")
-    sub_categories = SUPER_CATEGORY_MAP.get(super_cat, [])
-    filtered = [q for q in st.session_state.questions if q.get("category", "") in sub_categories]
+    if subject_key == "junior_psychology":
+        # 初级：不按超类过滤，使用当前题库全部题目（已由 app.py 按 exam_type 过滤）
+        filtered = list(st.session_state.questions)
+    else:
+        super_category_map = {"psychology": "心理学综合", "counseling": "咨询实务"}
+        super_cat = super_category_map.get(subject_key, "")
+        sub_categories = SUPER_CATEGORY_MAP.get(super_cat, [])
+        filtered = [q for q in st.session_state.questions if q.get("category", "") in sub_categories]
 
     indefinite_count = cfg.get("indefinite_count", 0)
     # 案例题按案例单位抽取：
@@ -1058,15 +1100,22 @@ def _show_subject_result(subject_key):
 
 
 def _aggregate_final_result():
-    """汇总两科成绩"""
-    # 当前科为咨询实务（已考完），前一科为心理学综合
-    current_result = st.session_state.mock_result       # 咨询实务成绩
-    prev_result = st.session_state.get("mock_prev_result")  # 心理学综合成绩
+    """汇总成绩（兼容四级两科制和初级单科制）"""
+    current_result = st.session_state.mock_result
+    subject_key = st.session_state.get("mock_subject", "")
 
-    st.session_state.mock_final_results = {
-        "psychology": prev_result,
-        "counseling": current_result,
-    }
+    if subject_key == "junior_psychology":
+        # 初级单科制：只有心理学综合一科
+        st.session_state.mock_final_results = {
+            "junior_psychology": current_result,
+        }
+    else:
+        # 四级两科制：当前科为咨询实务，前一科为心理学综合
+        prev_result = st.session_state.get("mock_prev_result")
+        st.session_state.mock_final_results = {
+            "psychology": prev_result,
+            "counseling": current_result,
+        }
     st.session_state.mock_state = "all_finished"
     st.rerun()
 
@@ -1083,10 +1132,10 @@ def _show_final_result():
     total_correct = 0
     total_questions = 0
 
-    cols = st.columns(2)
-    for i, (key, cfg_key) in enumerate([("psychology", "psychology"), ("counseling", "counseling")]):
-        res = results.get(key)
-        cfg = MOCK_EXAM_CONFIG[cfg_key]
+    num_subjects = len(results)
+    cols = st.columns(num_subjects) if num_subjects > 0 else st.columns(1)
+    for i, (key, res) in enumerate(results.items()):
+        cfg = MOCK_EXAM_CONFIG.get(key, {})
         if res:
             total_score += res.get("score", 0)
             total_max += res.get("max_score", 0)
@@ -1096,7 +1145,7 @@ def _show_final_result():
             with cols[i]:
                 accuracy = res["correct"] / res["total"] * 100 if res["total"] > 0 else 0
                 st.metric(
-                    f"📘 {cfg['name']}",
+                    f"📘 {cfg.get('name', key)}",
                     f"{res['score']:.1f}/{res['max_score']:.1f}",
                     f"{accuracy:.1f}% 正确率"
                 )

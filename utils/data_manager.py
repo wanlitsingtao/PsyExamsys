@@ -109,6 +109,19 @@ MOCK_EXAM_CONFIG = {
         "indefinite_count": 10,
         "indefinite_score": 0.8,
     },
+    # 心理协会咨询师初级专用（单科制）
+    "junior_psychology": {
+        "name": "心理学综合",
+        "time_minutes": 120,
+        "single_count": 200,
+        "single_score": 0.2,
+        "multi_count": 100,
+        "multi_score": 0.6,
+        "judge_count": 0,
+        "judge_score": 0,
+        "indefinite_count": 0,
+        "indefinite_score": 0,
+    },
 }
 
 
