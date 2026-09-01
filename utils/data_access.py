@@ -13,30 +13,36 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 # SQLite 数据库路径
 SQLITE_DB = DATA_DIR / "exmsys.db"
 
-# 遗忘预警阈值缓存
-_retention_threshold_cache = None
+# 遗忘预警阈值缓存（按库路径隔离，多用户各库配置独立）
+_retention_threshold_cache: dict = {}
 
 # 题库数据版本号的 config 键名
 QUESTIONS_VERSION_KEY = "_questions_data_version"
 
 
-def get_retention_threshold():
-    """从数据库配置读取遗忘预警阈值（距上次答对 > 此天数触发预警）"""
+def get_retention_threshold(db_path=None):
+    """从数据库配置读取遗忘预警阈值（距上次答对 > 此天数触发预警）
+
+    db_path: 用户私有库路径；None 时使用默认库。
+    """
     global _retention_threshold_cache
+    path = str(db_path) if db_path else str(SQLITE_DB)
+    if path in _retention_threshold_cache:
+        return _retention_threshold_cache[path]
     try:
         # 直接读取数据库中的 config 表
         import sqlite3
-        conn = sqlite3.connect(str(SQLITE_DB), timeout=5)
+        conn = sqlite3.connect(path, timeout=5)
         try:
             cur = conn.cursor()
             cur.execute("SELECT key, value FROM config WHERE key = 'retention_days_threshold'")
             row = cur.fetchone()
             if row:
                 value = json.loads(row[1]) if row[1] else 5
-                _retention_threshold_cache = int(value)
+                _retention_threshold_cache[path] = int(value)
             else:
-                _retention_threshold_cache = 5  # 默认值
-            return _retention_threshold_cache
+                _retention_threshold_cache[path] = 5  # 默认值
+            return _retention_threshold_cache[path]
         finally:
             conn.close()
     except Exception:
@@ -205,8 +211,9 @@ class DataAccess:
 class SQLiteDataAccess(DataAccess):
     """SQLite 数据库实现"""
 
-    def __init__(self):
-        self.db_path = str(SQLITE_DB)
+    def __init__(self, db_path=None):
+        # 多用户模式：db_path 传入用户私有库；None 时使用默认库
+        self.db_path = str(db_path) if db_path else str(SQLITE_DB)
         self._init_db()
 
     def _get_conn(self):
@@ -1084,7 +1091,7 @@ class SQLiteDataAccess(DataAccess):
             rows = cur.fetchall()
             stats = {}
             now = datetime.now()
-            threshold = get_retention_threshold()  # 提到循环外，避免每次迭代开连接
+            threshold = get_retention_threshold(self.db_path)  # 提到循环外，避免每次迭代开连接
             for row in rows:
                 qid = row["question_id"]
                 s = {
@@ -1205,7 +1212,7 @@ class SQLiteDataAccess(DataAccess):
                 "first_answer_time": row["first_answer_time"],
             }
             now = datetime.now()
-            threshold = get_retention_threshold()
+            threshold = get_retention_threshold(self.db_path)
             if s["last_correct"] is True and s["last_answer_time"]:
                 try:
                     last_time = datetime.fromisoformat(s["last_answer_time"])
@@ -1693,11 +1700,12 @@ class SQLiteDataAccess(DataAccess):
 # 工厂函数
 # ========================================
 
-def get_data_access() -> DataAccess:
+def get_data_access(db_path=None) -> DataAccess:
     """
     返回数据访问对象。
 
+    多用户模式：db_path 传入用户私有库路径；None 时使用默认库。
     当前固定使用 SQLite 数据库存储。
     JSON 数据源选项已移除。
     """
-    return SQLiteDataAccess()
+    return SQLiteDataAccess(db_path=db_path)

@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-cd /d "E:\LingMa\exmsys"
+cd /d "E:\LingMa\psych-exm\exmsys-dev"
 echo ============================================
 echo   心理咨询师考试背题系统
 echo ============================================

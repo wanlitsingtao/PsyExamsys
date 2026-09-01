@@ -13,12 +13,33 @@ from utils.data_access import get_data_access
 # 延迟初始化的 DAO 对象（固定使用 SQLite）
 _dao = None
 
+# ---- 多用户支持：当前用户私有库 ----
+# 每个用户一个独立 SQLite 库（data/users/<user_id>.db），全部数据操作路由到当前库
+USERS_DIR = Path(__file__).resolve().parent.parent / "data" / "users"
+_current_db_path = None
+
+
+def set_current_user(user_id: str):
+    """切换当前用户（登录/建号后调用）：路由到该用户私有库并重置缓存。
+
+    调用后所有 data_manager 接口自动作用在该用户自己的题库上。
+    """
+    global _current_db_path, _dao
+    _current_db_path = str(USERS_DIR / f"{user_id}.db")
+    _dao = None  # 强制按新库重建 DAO
+    invalidate_rerun_cache()
+
+
+def get_current_db_path():
+    """当前用户私有库路径（未设置时返回 None，回退默认库）"""
+    return _current_db_path
+
 
 def _get_dao():
-    """获取 SQLiteDataAccess 单例"""
+    """获取 SQLiteDataAccess 单例（路由到当前用户库）"""
     global _dao
     if _dao is None:
-        _dao = get_data_access()
+        _dao = get_data_access(db_path=_current_db_path)
     return _dao
 
 
@@ -700,12 +721,13 @@ def save_mock_exam_record(record, exam_type=None):
 # ============================
 
 def backup_data():
-    """备份数据库文件"""
+    """备份当前用户的数据库文件"""
     ensure_dirs()
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    src = DATA_DIR / "exmsys.db"
+    src = Path(_current_db_path) if _current_db_path else DATA_DIR / "exmsys.db"
     if src.exists():
-        dst = BACKUP_DIR / f"{timestamp}_exmsys.db"
+        suffix = f"_{Path(_current_db_path).stem}" if _current_db_path else ""
+        dst = BACKUP_DIR / f"{timestamp}{suffix}_exmsys.db"
         shutil.copy2(src, dst)
     return timestamp
 

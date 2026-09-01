@@ -7,6 +7,13 @@ data/*.db.*
 # 备份文件
 data/*.backup*
 
+# 多用户数据（每用户私有库 + 账户映射，属运行期数据）
+data/users/
+data/master/
+data/archive/
+data/accounts.json
+data/user_mapping.json
+
 # Python
 __pycache__/
 *.pyc

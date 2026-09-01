@@ -310,10 +310,42 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # 初始化 session_state
-from utils.data_manager import load_config, load_questions, get_available_exam_types, DEFAULT_EXAM_TYPE, invalidate_rerun_cache, get_questions_version
+from utils.data_manager import load_config, load_questions, get_available_exam_types, DEFAULT_EXAM_TYPE, invalidate_rerun_cache, get_questions_version, set_current_user
+from utils.account_manager import generate_device_fingerprint, get_or_create_user
 
 # 每次 rerun 开始时清除数据缓存，确保使用最新数据
 invalidate_rerun_cache()
+
+# ============================
+# 多用户身份识别（设备指纹 → 用户私有题库）
+# 首次访问：自动生成指纹 → 创建用户 → 克隆初始化题库模板
+# 再次访问：同一浏览器指纹不变 → 自动识别同一用户（稳定绑定）
+# ============================
+
+def _resolve_current_user():
+    """解析设备指纹并绑定/创建当前用户。每个用户拥有独立题库库文件。"""
+    if "_user_id" in st.session_state:
+        return
+    try:
+        headers = st.context.headers
+        ua = headers.get("User-Agent", "") or ""
+        platform = (headers.get("Sec-CH-UA-Platform", "")
+                    or headers.get("sec-ch-ua-platform", "") or "")
+    except Exception:
+        ua, platform = "", ""
+    raw_ua = f"{ua}|{platform}".strip("|")
+    fingerprint = generate_device_fingerprint(raw_ua)
+    user = get_or_create_user(fingerprint, raw_ua)
+    st.session_state._user_id = user["user_id"]
+    st.session_state._device_fp = fingerprint
+    set_current_user(user["user_id"])
+    # 首次进入/切换用户：强制重载该用户自己的题库与配置
+    for key in ["questions", "config", "_cache_available_exams",
+                "_db_questions_version", "_data_version", "_mnemonic_data"]:
+        st.session_state.pop(key, None)
+
+
+_resolve_current_user()
 
 # 检测题库数据版本号是否变更（仅在 save_questions 导入/替换题库时递增），
 # 答题过程中的自动保存、统计更新等不会触发，避免页面答题中途被刷出
@@ -403,6 +435,19 @@ def _perform_exam_switch(new_code):
     st.rerun()
 
 
+def _switch_user(new_user_id):
+    """账号登录/切换用户：重置当前用户库与全部会话缓存"""
+    set_current_user(new_user_id)
+    st.session_state._user_id = new_user_id
+    for key in ["questions", "config", "_cache_available_exams",
+                "_db_questions_version", "_data_version", "_mnemonic_data",
+                "_cache_wrong_stats"]:
+        st.session_state.pop(key, None)
+    _reset_exam_states_for_switch()
+    st.session_state.nav = "🏠 首页"
+    st.rerun()
+
+
 @st.dialog("⚠️ 考试正在进行中")
 def _exam_switch_confirm_dialog(active_sessions, new_code, new_label):
     """考试进行中切换题库的确认弹窗"""
@@ -424,6 +469,52 @@ def _exam_switch_confirm_dialog(active_sessions, new_code, new_label):
 # ============================
 
 st.sidebar.markdown("## 📚 心理咨询师考试背题系统")
+st.sidebar.markdown("---")
+
+# ---- 用户信息面板（多用户：设备指纹自动识别 + 可选账号绑定）----
+from utils.account_manager import AccountManager
+_acct_mgr = AccountManager()
+_bound_acct = _acct_mgr.get_bound_account(st.session_state._device_fp)
+_user_short = st.session_state._user_id
+if _bound_acct:
+    st.sidebar.markdown(
+        f"<span style='font-size:0.9rem;'>👤 <b>{_bound_acct['username']}</b>"
+        f"<br><span style='color:#888;'>ID {_user_short}</span></span>",
+        unsafe_allow_html=True,
+    )
+else:
+    st.sidebar.markdown(
+        f"<span style='font-size:0.9rem;'>👤 访客 <b>{_user_short}</b></span>",
+        unsafe_allow_html=True,
+    )
+if _bound_acct:
+    if st.sidebar.button("🔓 解绑账号", key="unbind_btn", use_container_width=True):
+        _acct_mgr.unbind_account(st.session_state._device_fp)
+        st.rerun()
+else:
+    with st.sidebar.expander("🔑 绑定 / 登录账号", expanded=False):
+        bind_tab, login_tab = st.tabs(["绑定账号", "登录账号"])
+        with bind_tab:
+            _b_user = st.text_input("用户名", key="bind_username")
+            _b_pwd = st.text_input("密码", type="password", key="bind_password")
+            if st.button("绑定", key="bind_btn", use_container_width=True):
+                _ok, _msg = _acct_mgr.bind_account(
+                    st.session_state._device_fp, _b_user, _b_pwd)
+                if _ok:
+                    st.success(_msg)
+                    st.rerun()
+                else:
+                    st.error(_msg)
+        with login_tab:
+            _l_user = st.text_input("用户名", key="login_username")
+            _l_pwd = st.text_input("密码", type="password", key="login_password")
+            if st.button("登录", key="login_btn", use_container_width=True):
+                _ok, _msg, _uid = _acct_mgr.login_account(_l_user, _l_pwd)
+                if _ok and _uid:
+                    st.success(_msg)
+                    _switch_user(_uid)
+                else:
+                    st.error(_msg)
 st.sidebar.markdown("---")
 
 if len(st.session_state.questions) == 0:
