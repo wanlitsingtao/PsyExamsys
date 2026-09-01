@@ -207,8 +207,10 @@ def _show_spec_start(questions):
 
     st.markdown("---")
 
-    # ---- 历史草稿列表（如有） ----
-    drafts = load_drafts("spec")
+    # ---- 历史草稿列表（如有，仅显示当前题库的草稿） ----
+    _cur_exam_type = st.session_state.get("exam_type", "")
+    drafts = [d for d in load_drafts("spec")
+              if not d.get("exam_type") or d.get("exam_type") == _cur_exam_type]
     if drafts:
         st.markdown("### 📂 未完成的训练（点击继续作答）")
         for draft in drafts:
@@ -729,6 +731,7 @@ def _save_spec_draft(auto_save: bool = False):
     """
     session_id = st.session_state.get("spec_session_id", "")
     draft_data = {
+        "exam_type": st.session_state.get("exam_type", ""),
         "category": st.session_state.get("spec_category", ""),
         "mode": st.session_state.get("spec_mode", "specialized"),
         "question_ids": [q["id"] for q in st.session_state.get("spec_questions", [])],

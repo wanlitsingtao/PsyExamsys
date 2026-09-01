@@ -192,9 +192,9 @@ def get_questions_by_exam_type(exam_type):
 # 案例题管理
 # ============================
 
-def load_case_studies():
-    """加载所有案例"""
-    return _get_dao().load_case_studies()
+def load_case_studies(exam_type=None):
+    """加载案例（可按 exam_type 过滤）"""
+    return _get_dao().load_case_studies(exam_type=exam_type)
 
 
 def save_case_studies(case_studies):
@@ -517,6 +517,10 @@ SUPER_CATEGORY_MAP = {
         "心理咨询会谈技术", "情绪调节与压力管理",
         "心理危机识别", "家庭教育与心理健康科普",
         "心理咨询专业伦理与相关法律规范",
+        # 三级题库板块
+        "心理咨询通用技术", "心理测量与心理评估",
+        "认知行为咨询方法", "人本主义咨询方法",
+        "团体心理辅导", "心理咨询伦理", "心理危机干预",
     ],
 }
 

@@ -462,11 +462,13 @@ def _compute_mnemonic_data():
     if st.session_state.pop("_mnemonic_force_refresh", False):
         st.session_state.pop("_mnemonic_data", None)
 
+    exam_type = st.session_state.get("exam_type", "")
     cached = st.session_state.get("_mnemonic_data")
-    if cached is not None and "scale_dimension_items" in cached:
+    # 缓存按题库隔离：exam_type 变化时必须重新计算（题库切换后自动重算）
+    if (cached is not None and "scale_dimension_items" in cached
+            and cached.get("_exam_type") == exam_type):
         return cached
 
-    exam_type = st.session_state.get("exam_type", "")
     questions = [
         q for q in load_questions()
         if q.get("exam_type") == exam_type
@@ -564,6 +566,7 @@ def _compute_mnemonic_data():
     duration_items.sort(key=lambda x: x.get("_sort", 0))
 
     data = {
+        "_exam_type": exam_type,  # 缓存归属题库标识，切换题库时自动失效
         "number_items": number_items,
         "person_items": person_items,
         "scale_dimension_items": scale_dimension_items,

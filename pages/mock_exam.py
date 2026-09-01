@@ -64,8 +64,9 @@ def _show_mock_start():
     else:
         _show_mock_start_four()
 
-    # ---- 历史草稿列表（如有） ----
-    mock_drafts = load_drafts("mock")
+    # ---- 历史草稿列表（如有，仅显示当前题库的草稿） ----
+    mock_drafts = [d for d in load_drafts("mock")
+                   if not d.get("exam_type") or d.get("exam_type") == _exam_type]
     if mock_drafts:
         st.markdown("---")
         st.markdown("### 📂 未完成的考试（点击继续作答）")
@@ -206,7 +207,7 @@ def _start_subject(subject_key):
     case_backgrounds = {}  # {case_id: background_text} 用于 UI 展示
     case_subs_selected = []  # 被选中的案例子题列表
     if indefinite_count > 0 and subject_key == "counseling":
-        cases = load_case_studies()
+        cases = load_case_studies(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
         if cases:
             # 按案例为单位随机选取，直到子题总数 >= indefinite_count
             import random
@@ -293,7 +294,7 @@ def _resume_mock_draft(draft: dict):
     # 重建案例背景缓存
     case_backgrounds = {}
     from utils.data_manager import load_case_studies, get_case_sub_questions
-    all_cases = load_case_studies()
+    all_cases = load_case_studies(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
     case_ids_in_exam = set(q.get("case_study_id", "") for q in restored_questions if q.get("case_study_id"))
     for cs in all_cases:
         if cs["id"] in case_ids_in_exam:
@@ -339,6 +340,13 @@ def _show_exam_subject(subject_key):
     eq = st.session_state.mock_questions
     total_q = len(eq)
     idx = st.session_state.mock_current
+
+    # 守卫：题目列表为空时避免 IndexError 崩溃
+    if not eq or idx >= total_q:
+        st.error("⚠️ 无法加载考试题目，可能是该科目在当前题库中没有对应题目。")
+        if st.button("返回模拟考试首页", key="mock_empty_back"):
+            _reset_mock_exam()
+        return
 
     q = eq[idx]
     qid = q["id"]
@@ -717,8 +725,14 @@ def _save_mock_draft(subject_key: str, auto_save: bool = False):
     """
     session_id = st.session_state.get("mock_session_id", "")
     now = time.time()
-    remaining_seconds = max(0, st.session_state.get("mock_end_time", now) - now)
+    # 暂停期间倒计时冻结：优先使用暂停时刻的剩余时间
+    if "mock_paused_at" in st.session_state:
+        remaining_seconds = st.session_state.get("mock_remaining_at_pause",
+                                                 max(0, st.session_state.get("mock_end_time", now) - now))
+    else:
+        remaining_seconds = max(0, st.session_state.get("mock_end_time", now) - now)
     draft_data = {
+        "exam_type": st.session_state.get("exam_type", ""),
         "subject_key": subject_key,
         "question_ids": [q["id"] for q in st.session_state.get("mock_questions", [])],
         "answers": dict(st.session_state.get("mock_answers", {})),

@@ -338,6 +338,87 @@ if "questions" not in st.session_state:
 if "_data_version" not in st.session_state:
     st.session_state._data_version = 0
 
+
+# ============================
+# 题库切换辅助（考试进行中确认 + 状态重置）
+# ============================
+
+# 模拟考试"进行中"的状态值（对应 MOCK_EXAM_CONFIG 的科目 key）
+_MOCK_ACTIVE_STATES = ("psychology", "counseling", "junior_psychology")
+_MOCK_SUBJECT_LABELS = {
+    "psychology": "心理学综合",
+    "counseling": "咨询实务",
+    "junior_psychology": "心理学综合",
+}
+
+
+def _get_active_exam_sessions():
+    """检测进行中的模拟考试/专项训练，返回 [(类型, 描述)] 列表"""
+    active = []
+    mock_state = st.session_state.get("mock_state", "idle")
+    if mock_state in _MOCK_ACTIVE_STATES:
+        active.append(("mock", f"模拟考试（{_MOCK_SUBJECT_LABELS.get(mock_state, mock_state)}）"))
+    if st.session_state.get("spec_state") == "running":
+        mode = st.session_state.get("spec_mode", "specialized")
+        if mode == "comprehensive":
+            active.append(("spec", "综合训练"))
+        else:
+            active.append(("spec", f"专项训练（{st.session_state.get('spec_category', '')}）"))
+    return active
+
+
+def _save_active_exam_drafts():
+    """将进行中的模拟考试/专项训练进度静默保存为草稿"""
+    mock_state = st.session_state.get("mock_state", "idle")
+    if mock_state in _MOCK_ACTIVE_STATES:
+        from pages.mock_exam import _save_mock_draft
+        subject_key = st.session_state.get("mock_subject", mock_state)
+        _save_mock_draft(subject_key, auto_save=True)
+    if st.session_state.get("spec_state") == "running":
+        from pages.specialized import _save_spec_draft
+        _save_spec_draft(auto_save=True)
+
+
+def _reset_exam_states_for_switch():
+    """题库切换时彻底清理模拟考试/专项训练的全部会话状态"""
+    for k in [k for k in list(st.session_state) if k.startswith("mock_")]:
+        del st.session_state[k]
+    st.session_state.mock_state = "idle"
+    for k in [k for k in list(st.session_state) if k.startswith("spec_")]:
+        del st.session_state[k]
+    st.session_state.spec_state = "idle"
+
+
+def _perform_exam_switch(new_code):
+    """执行题库切换：更新 exam_type、清缓存、重置考试状态、导航回首页"""
+    st.session_state.exam_type = new_code
+    # 清除旧数据缓存，强制重新加载（含助记助学缓存，保证按新题库生成）
+    for key in ["questions", "wb_questions", "wb_wrong_counts", "wb_answers",
+                "wb_submitted", "wb_results", "wb_mode", "wa_selected_idx",
+                "_cache_available_exams", "_mnemonic_data"]:
+        st.session_state.pop(key, None)
+    _reset_exam_states_for_switch()
+    # 导航焦点切回首页（问题1修复：切换后主页面显示首页，导航焦点也应在首页）
+    st.session_state.nav = "🏠 首页"
+    st.rerun()
+
+
+@st.dialog("⚠️ 考试正在进行中")
+def _exam_switch_confirm_dialog(active_sessions, new_code, new_label):
+    """考试进行中切换题库的确认弹窗"""
+    descs = "、".join(desc for _, desc in active_sessions)
+    st.markdown(f"当前有进行中的 **{descs}**（题库：{st.session_state.exam_type}）。")
+    st.markdown(f"是否切换到 **{new_label}** 并保存当前考试进度？")
+    st.caption("选「是」：自动保存考试进度（之后可在原题库的「未完成的考试/训练」列表中继续作答）并切换题库；"
+               "选「否」：不切换，继续当前考试。")
+    col_yes, col_no = st.columns(2)
+    if col_yes.button("✅ 是，保存进度并切换", type="primary", use_container_width=True):
+        _save_active_exam_drafts()
+        _perform_exam_switch(new_code)
+    if col_no.button("❌ 否，继续当前考试", use_container_width=True):
+        st.rerun()
+
+
 # ============================
 # 侧边栏导航（自定义，不使用 Streamlit 默认多页面标签）
 # ============================
@@ -360,21 +441,23 @@ if available_exams:
     if st.session_state.exam_type in exam_codes:
         current_idx = exam_codes.index(st.session_state.exam_type)
 
+    # 注意：不绑定 widget key。用户在确认弹窗中选「否」不切换后，
+    # 下一轮 rerun 时选择框会自动回退显示当前题库（index=current_idx），
+    # 避免选择框显示与新题库不一致的问题。
     selected_label = st.sidebar.selectbox(
         "📂 题库选择",
         exam_labels,
         index=current_idx,
-        key="exam_selector"
     )
     selected_code = exam_codes[exam_labels.index(selected_label)]
     if selected_code != st.session_state.exam_type:
-        st.session_state.exam_type = selected_code
-        # 清除旧数据缓存，强制重新加载
-        for key in ["questions", "wb_questions", "wb_wrong_counts", "wb_answers",
-                     "wb_submitted", "wb_results", "wb_mode", "wa_selected_idx",
-                     "_cache_available_exams"]:
-            st.session_state.pop(key, None)
-        st.rerun()
+        active_sessions = _get_active_exam_sessions()
+        if active_sessions:
+            # 考试/训练进行中：弹窗确认是否保存进度并切换题库；
+            # 用户未确认前不修改 exam_type，页面继续渲染当前题库的考试页面
+            _exam_switch_confirm_dialog(active_sessions, selected_code, selected_label)
+        else:
+            _perform_exam_switch(selected_code)
 
 # 根据当前 exam_type 过滤题目
 all_qs = st.session_state.questions if st.session_state.questions else load_questions()
