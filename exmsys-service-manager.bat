@@ -1,4 +1,5 @@
 @echo off
+setlocal enabledelayedexpansion
 chcp 65001 >nul
 title Exmsys 考试系统服务管理面板
 
@@ -11,7 +12,7 @@ title Exmsys 考试系统服务管理面板
 set "SERVICE_NAME=ExmsysStudy"
 set "BASE_DIR=%~dp0"
 set "BASE_DIR=%BASE_DIR:~0,-1%"
-set "APP_PORT=8510"
+set "APP_PORT=8511"
 
 :menu
 cls
@@ -24,7 +25,7 @@ echo.
 :: 检查服务状态
 sc query "%SERVICE_NAME%" >nul 2>&1
 if %errorlevel% equ 0 (
-    for /f "tokens=2 delims=: " %%a in ('sc query "%SERVICE_NAME%" ^| find "STATE"') do (
+    for /f "tokens=3 delims=: " %%a in ('sc query "%SERVICE_NAME%" ^| find "STATE"') do (
         if "%%a"=="RUNNING" (
             echo     服务状态: [● 正在运行]
             echo     访问地址: http://localhost:%APP_PORT%
@@ -32,7 +33,7 @@ if %errorlevel% equ 0 (
             echo     服务状态: [○ 已停止]
         )
     )
-    for /f "tokens=4 delims= " %%b in ('sc query "%SERVICE_NAME%" ^| find "PID"') do set "SERVICE_PID=%%b"
+    for /f "tokens=3 delims= " %%b in ('sc query "%SERVICE_NAME%" ^| find "PID"') do set "SERVICE_PID=%%b"
     if defined SERVICE_PID (
         if not "!SERVICE_PID!"=="0" (
             echo     进程 PID: %SERVICE_PID%
@@ -69,14 +70,23 @@ goto menu
 :start
 echo.
 echo   [INFO] 正在启动服务...
+for /f "tokens=3 delims=: " %%a in ('sc query "%SERVICE_NAME%" ^| find "STATE"') do set "SVC_STATE=%%a"
+if /i not "%SVC_STATE%"=="RUNNING" goto do_start
+echo   [INFO] 服务已在运行中
+set /p open="   是否打开浏览器？(Y/n): "
+if /i "!open!" neq "n" start http://localhost:%APP_PORT%
+pause
+goto menu
+
+:do_start
 sc start "%SERVICE_NAME%" >nul 2>&1
-if %errorlevel% equ 0 (
+if !errorlevel! equ 0 (
     echo   [OK] 服务启动成功！
     timeout /t 2 >nul
     set /p open="   是否打开浏览器？(Y/n): "
-    if /i "%open%" neq "n" start http://localhost:%APP_PORT%
+    if /i "!open!" neq "n" start http://localhost:%APP_PORT%
 ) else (
-    echo   [ERROR] 启动失败！
+    echo   [ERROR] 启动失败！（错误码 !errorlevel!）
     echo.
     echo   请先运行 setup-service.bat 安装服务
 )
@@ -101,11 +111,11 @@ echo   [INFO] 正在重启服务...
 sc stop "%SERVICE_NAME%" >nul 2>&1
 timeout /t 3 >nul
 sc start "%SERVICE_NAME%" >nul 2>&1
-if %errorlevel% equ 0 (
+if !errorlevel! equ 0 (
     echo   [OK] 服务重启成功！
     timeout /t 2 >nul
     set /p open="   是否打开浏览器？(Y/n): "
-    if /i "%open%" neq "n" start http://localhost:%APP_PORT%
+    if /i "!open!" neq "n" start http://localhost:%APP_PORT%
 ) else (
     echo   [ERROR] 重启失败
 )
@@ -130,7 +140,7 @@ if /i "%confirm%"=="Y" (
     sc stop "%SERVICE_NAME%" >nul 2>&1
     timeout /t 2 >nul
     C:\nssm\nssm.exe remove "%SERVICE_NAME%" confirm >nul 2>&1
-    if %errorlevel% equ 0 (
+    if !errorlevel! equ 0 (
         echo   [OK] 服务已卸载
     ) else (
         sc delete "%SERVICE_NAME%" >nul 2>&1

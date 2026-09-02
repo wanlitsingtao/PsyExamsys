@@ -11,10 +11,10 @@ title Exmsys 考试系统服务安装程序
 
 set "BASE_DIR=%~dp0"
 set "BASE_DIR=%BASE_DIR:~0,-1%"
-set "SERVICE_NAME=ExmsysStudy"
+set "SERVICE_NAME=ExmsysStudy-MultiUser"
 set "SERVICE_DESC=心理咨询师考试背题系统 - Streamlit Web 服务"
 set "PYTHON_EXE=C:\Users\wanli\AppData\Local\Python\pythoncore-3.14-64\python.exe"
-set "APP_PORT=8510"
+set "APP_PORT=8511"
 
 :: ─── 检查管理员权限 ───
 net session >nul 2>&1
