@@ -108,6 +108,12 @@ def _generate_consol_questions():
             selected.append(q_copy)
             tags[item["question_id"]] = tag
 
+    if not selected:
+        # 无可巩固题目：保持 idle，不进入答题态（防止 cq[idx] IndexError）
+        st.session_state.consol_no_candidates = True
+        return
+    st.session_state.consol_no_candidates = False
+
     st.session_state.consol_questions = selected
     st.session_state.consol_tags = tags
     st.session_state.consol_current = 0
@@ -136,6 +142,8 @@ def _show_consol_start():
 
     # ---- 开始练习 ----
     st.markdown("---")
+    if st.session_state.pop("consol_no_candidates", False):
+        st.info("当前题库暂无需要巩固的题目（消退型/波动型/遗忘预警/不确定题目均为空）。先去答题积累一些记录吧！")
     if st.button("🚀 开始巩固练习", use_container_width=True, type="primary", key="consol_start_new"):
         _generate_consol_questions()
         st.rerun()
@@ -186,8 +194,14 @@ def _resume_consol_draft(draft: dict):
 #  答题模式
 # ============================
 
+@st.fragment
 def _show_consolidation_running():
-    """巩固练习答题模式（操作元素与其他答题页面一致）"""
+    """巩固练习答题模式（操作元素与其他答题页面一致）
+
+    性能：@st.fragment 片段化——答题区内任何交互（选答案/翻题/标记/筛选答题卡）
+    仅重跑本片段，不再触发整页刷新；需要整页切换的状态（返回/提交）内部调用
+    st.rerun() 默认 app 范围，行为与改版前一致。
+    """
     _exam_type = st.session_state.get("exam_type", "心理学会咨询师四级")
     # ---- 自动保存：每 5 分钟静默保存 ----
     _now = time.time()
@@ -196,6 +210,12 @@ def _show_consolidation_running():
         st.session_state.consol_last_auto_save = _now
 
     cq = st.session_state.consol_questions
+    if not cq:
+        st.warning("⚠️ 没有可作答的题目，请返回首页重新开始。")
+        if st.button("返回", key="consol_running_empty_back", use_container_width=True):
+            st.session_state.consol_state = "idle"
+            st.rerun()
+        return
     total_q = len(cq)
     idx = st.session_state.consol_current
     q = cq[idx]
@@ -290,15 +310,18 @@ def _show_consolidation_running():
                       on_change=_on_consol_uncertain_toggle)
     with type_col3:
         marked = qid in st.session_state.consol_marked
-        if st.button("⭐ 标记" if marked else "☆ 标记",
-                     key=f"consol_mark_{qid}",
-                     help="取消标记" if marked else "标记此题",
-                     use_container_width=True):
-            if qid in st.session_state.consol_marked:
-                st.session_state.consol_marked.discard(qid)
+
+        def _toggle_mark(q=qid):
+            if q in st.session_state.consol_marked:
+                st.session_state.consol_marked.discard(q)
             else:
-                st.session_state.consol_marked.add(qid)
-            st.rerun()
+                st.session_state.consol_marked.add(q)
+
+        st.button("⭐ 标记" if marked else "☆ 标记",
+                  key=f"consol_mark_{qid}",
+                  help="取消标记" if marked else "标记此题",
+                  use_container_width=True,
+                  on_click=_toggle_mark)
 
     # 案例题子题：在题目上方展示案例背景
     case_bg = q.get("case_background", "")
@@ -421,9 +444,8 @@ def _show_consolidation_running():
         if col_c1.button("✅ 确认提交", use_container_width=True):
             _submit_consolidation()
             st.rerun()
-        if col_c2.button("❌ 继续答题", use_container_width=True):
-            st.session_state.consol_confirm_submit = False
-            st.rerun()
+        col_c2.button("❌ 继续答题", use_container_width=True,
+                      on_click=lambda: st.session_state.update(consol_confirm_submit=False))
 
     # ---- 答题卡 ----
     st.markdown("---")
@@ -433,27 +455,27 @@ def _show_consolidation_running():
     if filter_key not in st.session_state:
         st.session_state[filter_key] = "all"
 
+    def _card_filter(v):
+        def _cb():
+            st.session_state[filter_key] = v
+        return _cb
+
     fc1, fc2, fc3, fc4, fc5 = st.columns(5)
-    if fc1.button("📋 全部", key="consol_filter_all", use_container_width=True,
-                  type="primary" if st.session_state[filter_key] == "all" else "secondary"):
-        st.session_state[filter_key] = "all"
-        st.rerun()
-    if fc2.button("✅ 已答", key="consol_filter_answered", use_container_width=True,
-                  type="primary" if st.session_state[filter_key] == "answered" else "secondary"):
-        st.session_state[filter_key] = "answered"
-        st.rerun()
-    if fc3.button("⬜ 未答", key="consol_filter_unanswered", use_container_width=True,
-                  type="primary" if st.session_state[filter_key] == "unanswered" else "secondary"):
-        st.session_state[filter_key] = "unanswered"
-        st.rerun()
-    if fc4.button("⭐ 已标记", key="consol_filter_marked", use_container_width=True,
-                  type="primary" if st.session_state[filter_key] == "marked" else "secondary"):
-        st.session_state[filter_key] = "marked"
-        st.rerun()
-    if fc5.button("不确定", key="consol_filter_uncertain", use_container_width=True,
-                  type="primary" if st.session_state[filter_key] == "uncertain" else "secondary"):
-        st.session_state[filter_key] = "uncertain"
-        st.rerun()
+    fc1.button("📋 全部", key="consol_filter_all", use_container_width=True,
+               type="primary" if st.session_state[filter_key] == "all" else "secondary",
+               on_click=_card_filter("all"))
+    fc2.button("✅ 已答", key="consol_filter_answered", use_container_width=True,
+               type="primary" if st.session_state[filter_key] == "answered" else "secondary",
+               on_click=_card_filter("answered"))
+    fc3.button("⬜ 未答", key="consol_filter_unanswered", use_container_width=True,
+               type="primary" if st.session_state[filter_key] == "unanswered" else "secondary",
+               on_click=_card_filter("unanswered"))
+    fc4.button("⭐ 已标记", key="consol_filter_marked", use_container_width=True,
+               type="primary" if st.session_state[filter_key] == "marked" else "secondary",
+               on_click=_card_filter("marked"))
+    fc5.button("不确定", key="consol_filter_uncertain", use_container_width=True,
+               type="primary" if st.session_state[filter_key] == "uncertain" else "secondary",
+               on_click=_card_filter("uncertain"))
 
     filter_mode = st.session_state[filter_key]
     answered = len(st.session_state.consol_answers)
@@ -518,10 +540,10 @@ def _show_consolidation_running():
                     f'<div style="text-align:right;height:14px;line-height:14px;">{"".join(_badges)}</div>',
                     unsafe_allow_html=True,
                 )
-                if st.button(_label, key=f"consol_card_{_qi}",
-                             use_container_width=True, type=_btype):
-                    st.session_state.consol_current = _qi
-                    st.rerun()
+                st.button(_label, key=f"consol_card_{_qi}",
+                          use_container_width=True, type=_btype,
+                          on_click=lambda i=_qi: setattr(
+                              st.session_state, "consol_current", i))
 
 
 def _save_consol_draft(auto_save: bool = False):

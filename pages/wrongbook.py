@@ -281,7 +281,13 @@ def _render_analysis_detail(item, idx, total):
 #  做错题模式（原错题本答题功能）
 # ============================
 
+@st.fragment
 def _show_wrong_practice():
+    """做错题练习界面
+
+    性能：@st.fragment 片段化——答题区内交互仅重跑本片段，不整页刷新；
+    返回/提交等状态切换内部 st.rerun() 仍为整页，行为不变。
+    """
     _exam_type = st.session_state.get("exam_type", "心理学会咨询师四级")
     # 缓存答题统计（避免每题渲染时重复读盘），同时按 exam_type 隔离并在切换后刷新
     if ("wb_stats_cache" not in st.session_state or
@@ -527,17 +533,20 @@ def _show_wrong_practice():
                           on_change=_on_wb_uncertain_toggle)
         with title_col3:
             marked = qid in st.session_state.get("wb_marked", set())
-            if st.button("⭐ 标记" if marked else "☆ 标记",
-                         key=f"wb_mark_{qid}",
-                         help="取消标记" if marked else "标记此题",
-                         use_container_width=True):
+
+            def _toggle_mark(q=qid):
                 if "wb_marked" not in st.session_state:
                     st.session_state.wb_marked = set()
-                if qid in st.session_state.wb_marked:
-                    st.session_state.wb_marked.discard(qid)
+                if q in st.session_state.wb_marked:
+                    st.session_state.wb_marked.discard(q)
                 else:
-                    st.session_state.wb_marked.add(qid)
-                st.rerun()
+                    st.session_state.wb_marked.add(q)
+
+            st.button("⭐ 标记" if marked else "☆ 标记",
+                      key=f"wb_mark_{qid}",
+                      help="取消标记" if marked else "标记此题",
+                      use_container_width=True,
+                      on_click=_toggle_mark)
         # 案例题子题：在题目上方展示案例背景
         case_bg = q.get("case_background", "")
         if case_bg:
@@ -622,20 +631,22 @@ def _show_wrong_practice():
     # ---- 导航按钮（上一题、下一题、保存、提交按钮同行） ----
     nav_cols = st.columns([1, 1, 1, 1])
 
-    if nav_cols[0].button("◀ 上一题", use_container_width=True, disabled=(idx == 0)):
+    def _go_prev():
         st.session_state.wb_current = idx - 1
-        st.rerun()
 
-    if nav_cols[1].button("下一题 ▶", use_container_width=True, disabled=(idx >= total_q - 1)):
+    def _go_next():
         st.session_state.wb_current = idx + 1
-        st.rerun()
+
+    nav_cols[0].button("◀ 上一题", use_container_width=True,
+                       disabled=(idx == 0), on_click=_go_prev)
+    nav_cols[1].button("下一题 ▶", use_container_width=True,
+                       disabled=(idx >= total_q - 1), on_click=_go_next)
 
     if not is_submitted:
-        if nav_cols[2].button("💾 保存", use_container_width=True):
-            _save_wrongbook_draft()
-
-        if nav_cols[3].button("📤 提交全部答案", use_container_width=True, type="primary"):
-            st.session_state.wb_confirm_submit = True
+        nav_cols[2].button("💾 保存", use_container_width=True,
+                           on_click=_save_wrongbook_draft)
+        nav_cols[3].button("📤 提交全部答案", use_container_width=True, type="primary",
+                           on_click=lambda: st.session_state.update(wb_confirm_submit=True))
 
     if st.session_state.get("wb_confirm_submit"):
         unanswered = total_q - len(st.session_state.wb_answers)
@@ -644,9 +655,8 @@ def _show_wrong_practice():
         if col_c1.button("✅ 确认提交", use_container_width=True):
             _submit_wrongbook()
             st.rerun()
-        if col_c2.button("❌ 继续答题", use_container_width=True):
-            st.session_state.wb_confirm_submit = False
-            st.rerun()
+        col_c2.button("❌ 继续答题", use_container_width=True,
+                      on_click=lambda: st.session_state.update(wb_confirm_submit=False))
 
     # ---- 答题卡 ----
     st.markdown("---")
@@ -659,26 +669,27 @@ def _show_wrong_practice():
             st.session_state[filter_key] = "all"
 
         fc1, fc2, fc3, fc4, fc5 = st.columns(5)
-        if fc1.button("📋 全部", key="wb_filter_all", use_container_width=True,
-                      type="primary" if st.session_state[filter_key] == "all" else "secondary"):
-            st.session_state[filter_key] = "all"
-            st.rerun()
-        if fc2.button("✅ 已答", key="wb_filter_answered", use_container_width=True,
-                      type="primary" if st.session_state[filter_key] == "answered" else "secondary"):
-            st.session_state[filter_key] = "answered"
-            st.rerun()
-        if fc3.button("⬜ 未答", key="wb_filter_unanswered", use_container_width=True,
-                      type="primary" if st.session_state[filter_key] == "unanswered" else "secondary"):
-            st.session_state[filter_key] = "unanswered"
-            st.rerun()
-        if fc4.button("⭐ 已标记", key="wb_filter_marked", use_container_width=True,
-                      type="primary" if st.session_state[filter_key] == "marked" else "secondary"):
-            st.session_state[filter_key] = "marked"
-            st.rerun()
-        if fc5.button("不确定", key="wb_filter_uncertain", use_container_width=True,
-                      type="primary" if st.session_state[filter_key] == "uncertain" else "secondary"):
-            st.session_state[filter_key] = "uncertain"
-            st.rerun()
+
+        def _card_filter(v):
+            def _cb():
+                st.session_state[filter_key] = v
+            return _cb
+
+        fc1.button("📋 全部", key="wb_filter_all", use_container_width=True,
+                   type="primary" if st.session_state[filter_key] == "all" else "secondary",
+                   on_click=_card_filter("all"))
+        fc2.button("✅ 已答", key="wb_filter_answered", use_container_width=True,
+                   type="primary" if st.session_state[filter_key] == "answered" else "secondary",
+                   on_click=_card_filter("answered"))
+        fc3.button("⬜ 未答", key="wb_filter_unanswered", use_container_width=True,
+                   type="primary" if st.session_state[filter_key] == "unanswered" else "secondary",
+                   on_click=_card_filter("unanswered"))
+        fc4.button("⭐ 已标记", key="wb_filter_marked", use_container_width=True,
+                   type="primary" if st.session_state[filter_key] == "marked" else "secondary",
+                   on_click=_card_filter("marked"))
+        fc5.button("不确定", key="wb_filter_uncertain", use_container_width=True,
+                   type="primary" if st.session_state[filter_key] == "uncertain" else "secondary",
+                   on_click=_card_filter("uncertain"))
 
         filter_mode = st.session_state[filter_key]
         answered = len(st.session_state.wb_answers)
@@ -749,10 +760,10 @@ def _show_wrong_practice():
                     f'<div style="text-align:right;height:14px;line-height:14px;">{"".join(_badges)}</div>',
                     unsafe_allow_html=True,
                 )
-                if st.button(_label, key=f"wb_card_{_qi}",
-                             use_container_width=True, type=_btype):
-                    st.session_state.wb_current = _qi
-                    st.rerun()
+                st.button(_label, key=f"wb_card_{_qi}",
+                          use_container_width=True, type=_btype,
+                          on_click=lambda i=_qi: setattr(
+                              st.session_state, "wb_current", i))
 
     # 完成提示
     if is_submitted and total_q > 0:

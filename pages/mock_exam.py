@@ -327,8 +327,14 @@ def _resume_mock_draft(draft: dict):
     st.rerun()
 
 
+@st.fragment
 def _show_exam_subject(subject_key):
-    """显示某一科的考试进行中界面"""
+    """显示某一科的考试进行中界面
+
+    性能：@st.fragment 片段化——答题区内交互（选答案/翻题/标记/筛选答题卡）
+    仅重跑本片段，不整页刷新；倒计时暂停/恢复逻辑在片段内照常执行；
+    返回/提交等状态切换内部 st.rerun() 仍为整页，行为不变。
+    """
     _exam_type = st.session_state.get("exam_type", "心理学会咨询师四级")
     # ---- 自动保存：每 5 分钟静默保存 ----
     _now = time.time()
@@ -516,15 +522,18 @@ def _show_exam_subject(subject_key):
                       on_change=_on_mock_uncertain_toggle)
     with title_col3:
         marked = qid in st.session_state.mock_marked
-        if st.button("⭐ 标记" if marked else "☆ 标记",
-                     key=f"mock_mark_{qid}",
-                     help="取消标记" if marked else "标记此题",
-                     use_container_width=True):
-            if qid in st.session_state.mock_marked:
-                st.session_state.mock_marked.discard(qid)
+
+        def _toggle_mark(q=qid):
+            if q in st.session_state.mock_marked:
+                st.session_state.mock_marked.discard(q)
             else:
-                st.session_state.mock_marked.add(qid)
-            st.rerun()
+                st.session_state.mock_marked.add(q)
+
+        st.button("⭐ 标记" if marked else "☆ 标记",
+                  key=f"mock_mark_{qid}",
+                  help="取消标记" if marked else "标记此题",
+                  use_container_width=True,
+                  on_click=_toggle_mark)
     
     st.markdown(f"**{q['question']}**")
 
@@ -590,19 +599,21 @@ def _show_exam_subject(subject_key):
 
     # 导航按钮（上一题、下一题、保存、提交按钮同行）
     nav_cols = st.columns([1, 1, 1, 1])
-    if nav_cols[0].button("◀ 上一题", use_container_width=True, disabled=(idx == 0)):
+
+    def _go_prev():
         st.session_state.mock_current = idx - 1
-        st.rerun()
 
-    if nav_cols[1].button("下一题 ▶", use_container_width=True, disabled=(idx >= total_q - 1)):
+    def _go_next():
         st.session_state.mock_current = idx + 1
-        st.rerun()
 
-    if nav_cols[2].button("💾 保存", use_container_width=True):
-        _save_mock_draft(subject_key)
-
-    if nav_cols[3].button("📤 提交试卷", use_container_width=True, type="primary"):
-        st.session_state.mock_confirm_submit = True
+    nav_cols[0].button("◀ 上一题", use_container_width=True,
+                       disabled=(idx == 0), on_click=_go_prev)
+    nav_cols[1].button("下一题 ▶", use_container_width=True,
+                       disabled=(idx >= total_q - 1), on_click=_go_next)
+    nav_cols[2].button("💾 保存", use_container_width=True,
+                       on_click=lambda: _save_mock_draft(subject_key))
+    nav_cols[3].button("📤 提交试卷", use_container_width=True, type="primary",
+                       on_click=lambda: st.session_state.update(mock_confirm_submit=True))
 
     if st.session_state.get("mock_confirm_submit"):
         unanswered = total_q - len(st.session_state.mock_answers)
@@ -610,10 +621,8 @@ def _show_exam_subject(subject_key):
         col_c1, col_c2 = st.columns(2)
         if col_c1.button("✅ 确认提交", use_container_width=True):
             _finish_subject(subject_key)
-            return
-        if col_c2.button("❌ 继续答题", use_container_width=True):
-            st.session_state.mock_confirm_submit = False
-            st.rerun()
+        col_c2.button("❌ 继续答题", use_container_width=True,
+                      on_click=lambda: st.session_state.update(mock_confirm_submit=False))
 
     # 答题卡
     st.markdown("---")
@@ -624,27 +633,27 @@ def _show_exam_subject(subject_key):
     if filter_key not in st.session_state:
         st.session_state[filter_key] = "all"
 
+    def _card_filter(v):
+        def _cb():
+            st.session_state[filter_key] = v
+        return _cb
+
     fc1, fc2, fc3, fc4, fc5 = st.columns(5)
-    if fc1.button("📋 全部", key="mock_filter_all", use_container_width=True,
-                  type="primary" if st.session_state[filter_key] == "all" else "secondary"):
-        st.session_state[filter_key] = "all"
-        st.rerun()
-    if fc2.button("✅ 已答", key="mock_filter_answered", use_container_width=True,
-                  type="primary" if st.session_state[filter_key] == "answered" else "secondary"):
-        st.session_state[filter_key] = "answered"
-        st.rerun()
-    if fc3.button("⬜ 未答", key="mock_filter_unanswered", use_container_width=True,
-                  type="primary" if st.session_state[filter_key] == "unanswered" else "secondary"):
-        st.session_state[filter_key] = "unanswered"
-        st.rerun()
-    if fc4.button("⭐ 已标记", key="mock_filter_marked", use_container_width=True,
-                  type="primary" if st.session_state[filter_key] == "marked" else "secondary"):
-        st.session_state[filter_key] = "marked"
-        st.rerun()
-    if fc5.button("不确定", key="mock_filter_uncertain", use_container_width=True,
-                  type="primary" if st.session_state[filter_key] == "uncertain" else "secondary"):
-        st.session_state[filter_key] = "uncertain"
-        st.rerun()
+    fc1.button("📋 全部", key="mock_filter_all", use_container_width=True,
+               type="primary" if st.session_state[filter_key] == "all" else "secondary",
+               on_click=_card_filter("all"))
+    fc2.button("✅ 已答", key="mock_filter_answered", use_container_width=True,
+               type="primary" if st.session_state[filter_key] == "answered" else "secondary",
+               on_click=_card_filter("answered"))
+    fc3.button("⬜ 未答", key="mock_filter_unanswered", use_container_width=True,
+               type="primary" if st.session_state[filter_key] == "unanswered" else "secondary",
+               on_click=_card_filter("unanswered"))
+    fc4.button("⭐ 已标记", key="mock_filter_marked", use_container_width=True,
+               type="primary" if st.session_state[filter_key] == "marked" else "secondary",
+               on_click=_card_filter("marked"))
+    fc5.button("不确定", key="mock_filter_uncertain", use_container_width=True,
+               type="primary" if st.session_state[filter_key] == "uncertain" else "secondary",
+               on_click=_card_filter("uncertain"))
 
     filter_mode = st.session_state[filter_key]
     answered = len(st.session_state.mock_answers)
@@ -711,10 +720,10 @@ def _show_exam_subject(subject_key):
                     f'<div style="text-align:right;height:14px;line-height:14px;">{"".join(_badges)}</div>',
                     unsafe_allow_html=True,
                 )
-                if st.button(_label, key=f"mock_card_{_qi}",
-                             use_container_width=True, type=_btype):
-                    st.session_state.mock_current = _qi
-                    st.rerun()
+                st.button(_label, key=f"mock_card_{_qi}",
+                          use_container_width=True, type=_btype,
+                          on_click=lambda i=_qi: setattr(
+                              st.session_state, "mock_current", i))
 
 
 

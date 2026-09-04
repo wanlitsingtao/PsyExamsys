@@ -603,11 +603,12 @@ def _render_uncertain_tab():
             st.session_state.mnemonic_all_expanded = (
                 not st.session_state.get("mnemonic_all_expanded", False)
             )
-            st.rerun()
+            # fragment 内按钮点击本身会触发本片段重跑，无需 st.rerun()（会升级为整页刷新）
     with top_c3:
         if st.button("刷新列表", use_container_width=True, key="mnemonic_refresh_uncertain",
                      help="关闭不确定开关后手动刷新以移除该题"):
-            st.rerun()
+            # fragment 内按钮点击本身会触发本片段重跑，无需 st.rerun()（会升级为整页刷新）
+            pass
     st.markdown("---")
 
     # 按知识板块分组展示

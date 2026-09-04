@@ -642,8 +642,17 @@ def show_correlation():
                      help="重新加载最新答题数据并计算相关性"):
             st.rerun()
 
-    # ── 加载数据 ──
-    records, q_map = _load_corr_data(exam_type)
+    # ── 加载数据（缓存：仅在 _data_version/exam_type 变化时重算，避免每次 rerun 全量遍历）──
+    version = st.session_state.get("_data_version", 0)
+    corr_cache = st.session_state.get("_corr_cache", {})
+    if corr_cache.get("_version") == version and corr_cache.get("_exam_type") == exam_type:
+        records, q_map = corr_cache["records"], corr_cache["q_map"]
+    else:
+        records, q_map = _load_corr_data(exam_type)
+        st.session_state._corr_cache = {
+            "_version": version, "_exam_type": exam_type,
+            "records": records, "q_map": q_map,
+        }
 
     if not records:
         st.info("📊 尚无足够的答题数据来进行相关性分析。请先完成一些题目后再来查看。")

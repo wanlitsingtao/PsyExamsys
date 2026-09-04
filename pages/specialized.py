@@ -370,8 +370,13 @@ def _resume_spec_draft(draft, questions):
     st.rerun()
 
 
+@st.fragment
 def _show_spec_running():
-    """显示专项训练进行中的界面（与背题系统统一）"""
+    """显示专项训练进行中的界面（与背题系统统一）
+
+    性能：@st.fragment 片段化——答题区内交互仅重跑本片段，不整页刷新；
+    返回/提交等状态切换内部 st.rerun() 仍为整页，行为不变。
+    """
     _exam_type = st.session_state.get("exam_type", "心理学会咨询师四级")
     # ---- 自动保存：每 5 分钟静默保存 ----
     _now = time.time()
@@ -380,8 +385,16 @@ def _show_spec_running():
         st.session_state.spec_last_auto_save = _now
 
     sq = st.session_state.spec_questions
-    total_q = len(sq)
     idx = st.session_state.spec_current
+    if not sq or idx >= len(sq):
+        st.warning("⚠️ 没有可作答的题目，请返回首页重新开始。")
+        if st.button("返回", key="spec_running_empty_back", use_container_width=True):
+            st.session_state.spec_state = "idle"
+            for key in [k for k in st.session_state if k.startswith("spec_")]:
+                del st.session_state[key]
+            st.rerun()
+        return
+    total_q = len(sq)
 
     q = sq[idx]
     qid = q["id"]
@@ -487,15 +500,18 @@ def _show_spec_running():
                       on_change=_on_spec_uncertain_toggle)
     with type_col3:
         marked = qid in st.session_state.spec_marked
-        if st.button("⭐ 标记" if marked else "☆ 标记",
-                     key=f"spec_mark_{qid}",
-                     help="取消标记" if marked else "标记此题",
-                     use_container_width=True):
-            if qid in st.session_state.spec_marked:
-                st.session_state.spec_marked.discard(qid)
+
+        def _toggle_mark(q=qid):
+            if q in st.session_state.spec_marked:
+                st.session_state.spec_marked.discard(q)
             else:
-                st.session_state.spec_marked.add(qid)
-            st.rerun()
+                st.session_state.spec_marked.add(q)
+
+        st.button("⭐ 标记" if marked else "☆ 标记",
+                  key=f"spec_mark_{qid}",
+                  help="取消标记" if marked else "标记此题",
+                  use_container_width=True,
+                  on_click=_toggle_mark)
     
     # 案例题子题：在题目上方展示案例背景
     case_bg = q.get("case_background", "")
@@ -618,10 +634,9 @@ def _show_spec_running():
         col_c1, col_c2 = st.columns(2)
         if col_c1.button("✅ 确认提交", use_container_width=True):
             _finish_specialized()
-            return
-        if col_c2.button("❌ 继续答题", use_container_width=True):
-            st.session_state.spec_confirm_submit = False
             st.rerun()
+        col_c2.button("❌ 继续答题", use_container_width=True,
+                      on_click=lambda: st.session_state.update(spec_confirm_submit=False))
 
     # ---- 答题卡 ----
     st.markdown("---")
@@ -632,27 +647,27 @@ def _show_spec_running():
     if filter_key not in st.session_state:
         st.session_state[filter_key] = "all"
 
+    def _card_filter(v):
+        def _cb():
+            st.session_state[filter_key] = v
+        return _cb
+
     fc1, fc2, fc3, fc4, fc5 = st.columns(5)
-    if fc1.button("📋 全部", key="spec_filter_all", use_container_width=True,
-                  type="primary" if st.session_state[filter_key] == "all" else "secondary"):
-        st.session_state[filter_key] = "all"
-        st.rerun()
-    if fc2.button("✅ 已答", key="spec_filter_answered", use_container_width=True,
-                  type="primary" if st.session_state[filter_key] == "answered" else "secondary"):
-        st.session_state[filter_key] = "answered"
-        st.rerun()
-    if fc3.button("⬜ 未答", key="spec_filter_unanswered", use_container_width=True,
-                  type="primary" if st.session_state[filter_key] == "unanswered" else "secondary"):
-        st.session_state[filter_key] = "unanswered"
-        st.rerun()
-    if fc4.button("⭐ 已标记", key="spec_filter_marked", use_container_width=True,
-                  type="primary" if st.session_state[filter_key] == "marked" else "secondary"):
-        st.session_state[filter_key] = "marked"
-        st.rerun()
-    if fc5.button("不确定", key="spec_filter_uncertain", use_container_width=True,
-                  type="primary" if st.session_state[filter_key] == "uncertain" else "secondary"):
-        st.session_state[filter_key] = "uncertain"
-        st.rerun()
+    fc1.button("📋 全部", key="spec_filter_all", use_container_width=True,
+               type="primary" if st.session_state[filter_key] == "all" else "secondary",
+               on_click=_card_filter("all"))
+    fc2.button("✅ 已答", key="spec_filter_answered", use_container_width=True,
+               type="primary" if st.session_state[filter_key] == "answered" else "secondary",
+               on_click=_card_filter("answered"))
+    fc3.button("⬜ 未答", key="spec_filter_unanswered", use_container_width=True,
+               type="primary" if st.session_state[filter_key] == "unanswered" else "secondary",
+               on_click=_card_filter("unanswered"))
+    fc4.button("⭐ 已标记", key="spec_filter_marked", use_container_width=True,
+               type="primary" if st.session_state[filter_key] == "marked" else "secondary",
+               on_click=_card_filter("marked"))
+    fc5.button("不确定", key="spec_filter_uncertain", use_container_width=True,
+               type="primary" if st.session_state[filter_key] == "uncertain" else "secondary",
+               on_click=_card_filter("uncertain"))
 
     filter_mode = st.session_state[filter_key]
     answered = len(st.session_state.spec_answers)
@@ -717,10 +732,10 @@ def _show_spec_running():
                     f'<div style="text-align:right;height:14px;line-height:14px;">{"".join(_badges)}</div>',
                     unsafe_allow_html=True,
                 )
-                if st.button(_label, key=f"spec_card_{_qi}",
-                             use_container_width=True, type=_btype):
-                    st.session_state.spec_current = _qi
-                    st.rerun()
+                st.button(_label, key=f"spec_card_{_qi}",
+                          use_container_width=True, type=_btype,
+                          on_click=lambda i=_qi: setattr(
+                              st.session_state, "spec_current", i))
 
 
 

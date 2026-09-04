@@ -32,9 +32,99 @@ st.markdown(f"""
         padding-left: clamp(0.75rem, 2vw, 1.25rem);
         padding-right: clamp(0.75rem, 2vw, 1.25rem);
     }}
-    div[data-testid="stSidebar"] {{
-        width: 20rem !important;
-        min-width: 20rem !important;
+    /* ============ 侧边栏整体布局（适配 Streamlit 1.57 DOM） ============ */
+    /* 说明：不再强制 width，保留原生 300px 默认 + 拖拽记忆（localStorage sidebarWidth） */
+    /* 说明：全局根字号 18px 会把 Streamlit 内部 rem 间距放大（1rem=18px），
+       此处用固定 px 收紧头部/留白，避免顶部空隙与底部死区 */
+    /* 头部：固定高度收起（默认 3.75rem 被 18px 根字号放大到 67.5px），去掉下方 1rem 空隙 */
+    section[data-testid="stSidebar"][aria-expanded="true"] [data-testid="stSidebarHeader"] {{
+        height: 46px !important;
+        min-height: 46px !important;
+        max-height: 46px !important;
+        padding: 0 0.5rem !important;
+        margin-bottom: 0 !important;
+        align-items: center !important;
+    }}
+    /* 折叠按钮自身不再占用上下大 margin */
+    section[data-testid="stSidebar"][aria-expanded="true"] [data-testid="stSidebarCollapseButton"] {{
+        margin: 0 !important;
+    }}
+    /* 无 st.logo 时隐藏占位块，标题区更紧凑 */
+    [data-testid="stLogoSpacer"] {{ display: none !important; }}
+    /* header 固定顶部；stSidebarUserContent 单独滚动（内容超高不裁底、不滚动走头部） */
+    [data-testid="stSidebarContent"] {{
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
+    }}
+    [data-testid="stSidebarUserContent"] {{
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        scrollbar-width: thin !important;
+        /* 原默认 padding-bottom 6rem(=108px) 是底部死区，收紧 */
+        padding-bottom: 0.75rem !important;
+    }}
+    /* 1.57 实际结构：uc > 匿名div(st-emotion) > stVerticalBlock > 顶层元素
+       逐层改为纵向 flex 并撑满高度，供最后一个块（账号容器）吸底 */
+    [data-testid="stSidebarUserContent"] > div {{
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+    }}
+    [data-testid="stSidebarUserContent"] > div > div[data-testid="stVerticalBlock"] {{
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+    }}
+    /* 顶层元素不允许纵向压缩：空间不足时应滚动而非挤压内容 */
+    [data-testid="stSidebarUserContent"] > div > div[data-testid="stVerticalBlock"] > * {{
+        flex-shrink: 0 !important;
+    }}
+    /* 账号容器（顶层最后一个块）吸底：空间足够贴底，不足时随内容滚动
+       overflow:hidden 用于裁掉「折叠 expander 隐藏内容」造成的幽灵滚动溢出（约5px） */
+    [data-testid="stSidebarUserContent"] > div > div[data-testid="stVerticalBlock"] > :last-child {{
+        margin-top: auto !important;
+        overflow: hidden !important;
+    }}
+    /* 账号信息卡片 */
+    .sx-user-card {{
+        border: 1px solid rgba(148, 163, 184, 0.4) !important;
+        border-radius: 0.7rem !important;
+        padding: 0.5rem 0.75rem !important;
+        background: linear-gradient(180deg, #f8fafc, #f1f5f9) !important;
+        margin: 0.1rem 0 0.35rem !important;
+        line-height: 1.5 !important;
+    }}
+    /* 侧边栏内导航 radio 紧凑化 */
+    [data-testid="stSidebarUserContent"] div[data-testid="stRadio"] label {{
+        padding: 0.18rem 0.2rem !important;
+    }}
+    /* 侧边栏标题紧凑：单行不换行（默认 H2 在 300px 宽下会折两行） */
+    [data-testid="stSidebarUserContent"] h2 {{
+        font-size: 0.95rem !important;
+        line-height: 1.3 !important;
+        margin: 0.1rem 0 0.3rem !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }}
+    /* 侧边栏内 hr 缩小间距 */
+    [data-testid="stSidebarUserContent"] hr {{
+        margin: 0.35rem 0 !important;
+    }}
+    /* 侧边栏 selectbox/selectboxLabel 紧凑 */
+    [data-testid="stSidebarUserContent"] .stSelectbox {{
+        margin-bottom: 0.1rem !important;
+    }}
+    [data-testid="stSidebarUserContent"] [data-testid="stWidgetLabel"] {{
+        font-size: 0.92rem !important;
+        margin-bottom: 0.15rem !important;
     }}
 
     /* 统一按钮间距与圆角 */
@@ -289,10 +379,6 @@ st.markdown(f"""
             max-width: 92vw !important;
             width: 92vw;
         }}
-        div[data-testid="stSidebar"] {{
-            width: 18rem !important;
-            min-width: 18rem !important;
-        }}
     }}
     @media (max-width: 900px) {{
         .block-container {{
@@ -301,11 +387,17 @@ st.markdown(f"""
             padding-left: 0.5rem;
             padding-right: 0.5rem;
         }}
-        div[data-testid="stSidebar"] {{
+        /* 窄屏抽屉：仅展开态占满全宽；折叠态保持原生窄轨（1.57 中 stSidebar 为 <section>） */
+        section[data-testid="stSidebar"][aria-expanded="true"] {{
             width: 100% !important;
             min-width: 100% !important;
+            max-width: 100% !important;
         }}
     }}
+    /* 隐藏 Streamlit 默认多页面导航（放首块 CSS 尽早生效，配合 config.toml 双重保险） */
+    [data-testid="stSidebarNav"] {{ display: none !important; }}
+    [data-testid="stSidebarNavItems"] {{ display: none !important; }}
+    [data-testid="stSidebarNavSeparator"] {{ display: none !important; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -471,52 +563,6 @@ def _exam_switch_confirm_dialog(active_sessions, new_code, new_label):
 st.sidebar.markdown("## 📚 心理咨询师考试背题系统")
 st.sidebar.markdown("---")
 
-# ---- 用户信息面板（多用户：设备指纹自动识别 + 可选账号绑定）----
-from utils.account_manager import AccountManager
-_acct_mgr = AccountManager()
-_bound_acct = _acct_mgr.get_bound_account(st.session_state._device_fp)
-_user_short = st.session_state._user_id
-if _bound_acct:
-    st.sidebar.markdown(
-        f"<span style='font-size:0.9rem;'>👤 <b>{_bound_acct['username']}</b>"
-        f"<br><span style='color:#888;'>ID {_user_short}</span></span>",
-        unsafe_allow_html=True,
-    )
-else:
-    st.sidebar.markdown(
-        f"<span style='font-size:0.9rem;'>👤 访客 <b>{_user_short}</b></span>",
-        unsafe_allow_html=True,
-    )
-if _bound_acct:
-    if st.sidebar.button("🔓 解绑账号", key="unbind_btn", use_container_width=True):
-        _acct_mgr.unbind_account(st.session_state._device_fp)
-        st.rerun()
-else:
-    with st.sidebar.expander("🔑 绑定 / 登录账号", expanded=False):
-        bind_tab, login_tab = st.tabs(["绑定账号", "登录账号"])
-        with bind_tab:
-            _b_user = st.text_input("用户名", key="bind_username")
-            _b_pwd = st.text_input("密码", type="password", key="bind_password")
-            if st.button("绑定", key="bind_btn", use_container_width=True):
-                _ok, _msg = _acct_mgr.bind_account(
-                    st.session_state._device_fp, _b_user, _b_pwd)
-                if _ok:
-                    st.success(_msg)
-                    st.rerun()
-                else:
-                    st.error(_msg)
-        with login_tab:
-            _l_user = st.text_input("用户名", key="login_username")
-            _l_pwd = st.text_input("密码", type="password", key="login_password")
-            if st.button("登录", key="login_btn", use_container_width=True):
-                _ok, _msg, _uid = _acct_mgr.login_account(_l_user, _l_pwd)
-                if _ok and _uid:
-                    st.success(_msg)
-                    _switch_user(_uid)
-                else:
-                    st.error(_msg)
-st.sidebar.markdown("---")
-
 if len(st.session_state.questions) == 0:
     st.sidebar.warning("⚠️ 题库为空，请先在配置管理中导入题库")
 
@@ -601,7 +647,57 @@ selected = st.sidebar.radio("导航", nav_labels, key="nav", index=nav_default_i
 selected_key = nav_keys[nav_labels.index(selected)]
 
 st.sidebar.markdown("---")
-st.sidebar.caption("心理咨询师考试背题系统 v2.0")
+
+# ---- 账号面板（置于导航之后；CSS 让整个容器吸底显示）----
+# 统一放入 st.container()：便于整组贴底 + 后续整体美化
+with st.sidebar.container():
+    from utils.account_manager import AccountManager
+    _acct_mgr = AccountManager()
+    _bound_acct = _acct_mgr.get_bound_account(st.session_state._device_fp)
+    _user_short = st.session_state._user_id
+    if _bound_acct:
+        st.markdown(
+            f"<div class='sx-user-card'>"
+            f"<div style='font-weight:600;'>👤 {_bound_acct['username']}</div>"
+            f"<div style='font-size:0.78rem;color:#7a8aa5;'>ID {_user_short} · 已绑定，可跨设备同步</div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+        if st.button("🔓 解绑账号", key="unbind_btn", use_container_width=True):
+            _acct_mgr.unbind_account(st.session_state._device_fp)
+            st.rerun()
+    else:
+        st.markdown(
+            f"<div class='sx-user-card'>"
+            f"<div style='font-weight:600;'>👤 访客 {_user_short}</div>"
+            f"<div style='font-size:0.78rem;color:#7a8aa5;'>本机临时账号 · 可绑定后跨设备同步</div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+        with st.expander("🔑 绑定 / 登录账号", expanded=False):
+            bind_tab, login_tab = st.tabs(["绑定账号", "登录账号"])
+            with bind_tab:
+                _b_user = st.text_input("用户名", key="bind_username")
+                _b_pwd = st.text_input("密码", type="password", key="bind_password")
+                if st.button("绑定", key="bind_btn", use_container_width=True):
+                    _ok, _msg = _acct_mgr.bind_account(
+                        st.session_state._device_fp, _b_user, _b_pwd)
+                    if _ok:
+                        st.success(_msg)
+                        st.rerun()
+                    else:
+                        st.error(_msg)
+            with login_tab:
+                _l_user = st.text_input("用户名", key="login_username")
+                _l_pwd = st.text_input("密码", type="password", key="login_password")
+                if st.button("登录", key="login_btn", use_container_width=True):
+                    _ok, _msg, _uid = _acct_mgr.login_account(_l_user, _l_pwd)
+                    if _ok and _uid:
+                        st.success(_msg)
+                        _switch_user(_uid)
+                    else:
+                        st.error(_msg)
+    st.caption("心理咨询师考试背题系统 v2.0")
 
 # ============================
 # 页面路由（隐藏 Streamlit 默认的 pages/ 标签）

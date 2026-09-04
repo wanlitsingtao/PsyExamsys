@@ -28,6 +28,7 @@ def set_current_user(user_id: str):
     _current_db_path = str(USERS_DIR / f"{user_id}.db")
     _dao = None  # 强制按新库重建 DAO
     invalidate_rerun_cache()
+    _invalidate_version_cache()
 
 
 def get_current_db_path():
@@ -43,9 +44,33 @@ def _get_dao():
     return _dao
 
 
+# ---- 题库版本号缓存（按 db_path 隔离）----
+# 版本号仅在 save_questions（导入/替换题库）时递增，答题/统计过程不变。
+# 之前每次 rerun 都实时读盘（每次新建连接 + 4 条 PRAGMA + SELECT），
+# 实测约 259ms/次，是勾选答案卡顿的头号元凶。这里改为模块级缓存，
+# 仅在 save_questions / set_current_user 时失效，跨 rerun 复用。
+_version_cache = {}  # {db_path: version}
+
+
 def get_questions_version() -> int:
-    """获取当前题库数据版本号（供 app.py 检测题库是否变更）"""
-    return _get_dao().get_questions_version()
+    """获取当前题库数据版本号（供 app.py 检测题库是否变更）。
+
+    带 per-db 缓存：版本号只在导入/替换题库时递增，答题过程不变，
+    无需每次 rerun 实时读盘。
+    """
+    db_path = _current_db_path
+    if db_path is not None and db_path in _version_cache:
+        return _version_cache[db_path]
+    version = _get_dao().get_questions_version()
+    if db_path is not None:
+        _version_cache[db_path] = version
+    return version
+
+
+def _invalidate_version_cache():
+    """题库版本号缓存失效（save_questions / set_current_user 时调用）"""
+    global _version_cache
+    _version_cache = {}
 
 
 # ---- per-rerun 缓存（同一 rerun 内复用全量数据，避免重复 I/O）----
@@ -168,6 +193,7 @@ def load_questions():
 def save_questions(questions):
     """保存题库（通过 DataAccess 抽象层）"""
     _get_dao().save_questions(questions)
+    _invalidate_version_cache()  # 版本号已递增，清除缓存
 
 
 def get_question_count(exam_type=None):
