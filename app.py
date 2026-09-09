@@ -29,6 +29,8 @@ st.markdown(f"""
         max-width: min({MAX_CONTENT_WIDTH_PX}px, {CONTENT_WIDTH_RATIO * 100:.0f}vw) !important;
         width: min(100%, {MAX_CONTENT_WIDTH_PX}px);
         margin: 0 auto;
+        /* 主内容区顶部留白：默认 6rem(=108px@18px根字号) 过大，对齐侧边栏头部 46px */
+        padding-top: 46px !important;
         padding-left: clamp(0.75rem, 2vw, 1.25rem);
         padding-right: clamp(0.75rem, 2vw, 1.25rem);
     }}
@@ -118,13 +120,17 @@ st.markdown(f"""
     [data-testid="stSidebarUserContent"] hr {{
         margin: 0.35rem 0 !important;
     }}
-    /* 侧边栏 selectbox/selectboxLabel 紧凑 */
-    [data-testid="stSidebarUserContent"] .stSelectbox {{
-        margin-bottom: 0.1rem !important;
-    }}
+    /* 侧边栏 widget 标签字号 */
     [data-testid="stSidebarUserContent"] [data-testid="stWidgetLabel"] {{
         font-size: 0.92rem !important;
-        margin-bottom: 0.15rem !important;
+    }}
+    /* 题库选择(selectbox)：与上方分割线、下方下拉列表的间距适当放宽 */
+    [data-testid="stSidebarUserContent"] .stSelectbox {{
+        margin-top: 0.5rem !important;
+        margin-bottom: 0.42rem !important;
+    }}
+    [data-testid="stSidebarUserContent"] .stSelectbox [data-testid="stWidgetLabel"] {{
+        margin-bottom: 0.45rem !important;
     }}
 
     /* 统一按钮间距与圆角 */
@@ -514,7 +520,17 @@ def _reset_exam_states_for_switch():
 
 
 def _perform_exam_switch(new_code):
-    """执行题库切换：更新 exam_type、清缓存、重置考试状态、导航回首页"""
+    """执行题库切换：保留当前模块不变，仅切换题库。
+
+    实现要点：
+    1) 在 pop 缓存前先记录当前 nav（即用户当前所在模块）；
+    2) 切题库后显式把 nav 恢复回该模块，避免 Streamlit 在 value 不在 options 时
+       自动重置 nav 导致跳到首页/错位。
+    考试/训练进行中切题库时，会先由 _exam_switch_confirm_dialog 保存进度。
+    """
+    # 1) 记录当前模块（与 2) 的恢复是双重保险）
+    _preserved_nav = st.session_state.get("nav", "首页")
+    # 2) 切换题库
     st.session_state.exam_type = new_code
     # 清除旧数据缓存，强制重新加载（含助记助学缓存，保证按新题库生成）
     for key in ["questions", "wb_questions", "wb_wrong_counts", "wb_answers",
@@ -522,8 +538,8 @@ def _perform_exam_switch(new_code):
                 "_cache_available_exams", "_mnemonic_data"]:
         st.session_state.pop(key, None)
     _reset_exam_states_for_switch()
-    # 导航焦点切回首页（问题1修复：切换后主页面显示首页，导航焦点也应在首页）
-    st.session_state.nav = "🏠 首页"
+    # 3) 显式恢复 nav，确保切题库后导航按钮和右侧页面都不变
+    st.session_state.nav = _preserved_nav
     st.rerun()
 
 
@@ -536,7 +552,7 @@ def _switch_user(new_user_id):
                 "_cache_wrong_stats"]:
         st.session_state.pop(key, None)
     _reset_exam_states_for_switch()
-    st.session_state.nav = "🏠 首页"
+    st.session_state.nav = "首页"  # 导航值使用模块 key
     st.rerun()
 
 
@@ -596,9 +612,21 @@ if available_exams:
         else:
             _perform_exam_switch(selected_code)
 
-# 根据当前 exam_type 过滤题目
+# 根据当前 exam_type 过滤题目（供各页面使用；st.session_state.questions 始终为该题库的题）
 all_qs = st.session_state.questions if st.session_state.questions else load_questions()
 st.session_state.questions = [q for q in all_qs if q.get("exam_type") == st.session_state.exam_type]
+
+# 失配自愈：若按当前 exam_type 过滤结果为空但全量题库非空，说明 st.session_state.questions
+# 残留了上一个题库（或当前 exam_type 已失效，如导入题库/切换后），强制用全量重新过滤并校正
+# exam_type，避免误报「题库为空」。正常情况（过滤结果非空）不会走这里，无额外 I/O 开销。
+if not st.session_state.questions:
+    _all_full = load_questions()
+    if _all_full:
+        _avail = get_available_exam_types()
+        if st.session_state.exam_type not in [c for c, _ in _avail] and _avail:
+            # exam_type 在当前题库中已不存在：回退到第一个可用题库，避免页面指向空库
+            st.session_state.exam_type = _avail[0][0]
+        st.session_state.questions = [q for q in _all_full if q.get("exam_type") == st.session_state.exam_type]
 st.sidebar.markdown("---")
 
 # 导航菜单
@@ -623,14 +651,29 @@ if _cur != st.session_state.get(_vkey, -1) or _cache_key not in st.session_state
 wrong_stats = st.session_state[_cache_key]
 wrong_badge = f" ({wrong_stats['total']})" if wrong_stats['total'] > 0 else ""
 
-nav_labels = []
-nav_keys = []
-for key, icon in menu_items.items():
-    if key == "错题本":
-        nav_labels.append(f"{icon} {key}{wrong_badge}")
+nav_keys = list(menu_items.keys())
+
+# 归一化旧 session 的 nav 值：上一版 radio 的 value 是带图标的 label（如"🎯 专项训练"），
+# 新版改为模块 key（如"专项训练"），旧 value 不在 options 时 Streamlit 会自动重置 nav 为
+# options[0]（即"首页"），导致切题库后右侧跳回首页。这里逐项匹配模块名子串，把旧值
+# 规整成模块 key，消除 Streamlit 的自动重置，确保切题库不改变当前模块。
+if "nav" in st.session_state and st.session_state.nav not in nav_keys:
+    _old_nav = st.session_state.nav
+    for _k in nav_keys:
+        if _k in _old_nav:
+            st.session_state.nav = _k
+            break
     else:
-        nav_labels.append(f"{icon} {key}")
-    nav_keys.append(key)
+        # 旧值无法识别，fallback 到首页（与首次访问默认一致）
+        st.session_state.nav = nav_keys[0]
+
+# 用模块 key 作为导航 radio 的值，format_func 负责显示带角标的标签。
+# 这样当切换题库保留当前模块时，即使"错题本"角标数量变化，导航值(模块 key)也不会失效。
+def _nav_label(key: str) -> str:
+    icon = menu_items[key]
+    if key == "错题本":
+        return f"{icon} {key}{wrong_badge}"
+    return f"{icon} {key}"
 
 # 支持从按钮跳转（快速入口）
 nav_key_from_button = st.session_state.pop("nav_to", None)
@@ -641,10 +684,10 @@ if nav_key_from_button:
             nav_default_index = i
             break
 
-selected = st.sidebar.radio("导航", nav_labels, key="nav", index=nav_default_index)
-
-# 映射回 key
-selected_key = nav_keys[nav_labels.index(selected)]
+selected_key = st.sidebar.radio(
+    "导航", nav_keys, key="nav", index=nav_default_index,
+    format_func=_nav_label,
+)
 
 st.sidebar.markdown("---")
 
