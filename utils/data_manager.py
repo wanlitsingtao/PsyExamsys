@@ -23,9 +23,21 @@ def set_current_user(user_id: str):
     """切换当前用户（登录/建号后调用）：路由到该用户私有库并重置缓存。
 
     调用后所有 data_manager 接口自动作用在该用户自己的题库上。
+
+    ⚠️ 幂等设计（2026-09-14）：若当前**已经**路由到同一用户库，则直接返回，
+    不重建 DAO、不清缓存。这样 app.py 可以在**每一帧**安全地调用它，用于
+    校正跨 session 的模块级全局变量（_current_db_path 会被其他 session 覆盖），
+    同时不带来任何额外开销。
+
+    为什么必须每帧校正：_current_db_path 是模块级全局变量，Streamlit 多个
+    session（多标签页/多浏览器）共享同一进程，会互相覆盖；且代码热重载会
+    把它重置为 None。任一情况都会让后续读库落到默认空库，表现为"题库为空"。
     """
     global _current_db_path, _dao
-    _current_db_path = str(USERS_DIR / f"{user_id}.db")
+    new_path = str(USERS_DIR / f"{user_id}.db")
+    if _current_db_path == new_path and _dao is not None:
+        return  # 已就位，保持缓存与 DAO 复用（避免每帧读盘/重建）
+    _current_db_path = new_path
     _dao = None  # 强制按新库重建 DAO
     invalidate_rerun_cache()
     _invalidate_version_cache()
@@ -74,16 +86,24 @@ def _invalidate_version_cache():
 
 
 # ---- per-rerun 缓存（同一 rerun 内复用全量数据，避免重复 I/O）----
+# 注意：这些是**模块级全局变量**，Streamlit 多 session（多标签页/多浏览器）在同一
+# 进程内共享，彼此会互相覆盖。因此每个缓存都记录其归属的库路径（*_db），
+# 读取时校验路径一致才复用，避免串库（读到别人的题库/空库）。
 _rerun_cache_questions = None
+_rerun_cache_questions_db = None
 _rerun_cache_stats = {}  # 按 exam_type 分别缓存
+_rerun_cache_stats_db = None
 _rerun_cache_version = 0
 
 
 def invalidate_rerun_cache():
     """每次 Streamlit rerun 开始时调用，清除数据缓存"""
-    global _rerun_cache_questions, _rerun_cache_stats, _rerun_cache_version
+    global _rerun_cache_questions, _rerun_cache_questions_db
+    global _rerun_cache_stats, _rerun_cache_stats_db, _rerun_cache_version
     _rerun_cache_questions = None
+    _rerun_cache_questions_db = None
     _rerun_cache_stats = {}
+    _rerun_cache_stats_db = None
     _rerun_cache_version += 1
 
 
@@ -182,11 +202,16 @@ def ensure_dirs():
 # ============================
 
 def load_questions():
-    """加载题库（通过 DataAccess 抽象层，per-rerun 缓存）"""
-    global _rerun_cache_questions
-    if _rerun_cache_questions is not None:
+    """加载题库（通过 DataAccess 抽象层，per-rerun 缓存）
+
+    缓存按库路径（_current_db_path）校验：若缓存的题库来自别的用户库
+    （模块级全局变量被其他 session 覆盖），则强制重读，避免串库或读到空库。
+    """
+    global _rerun_cache_questions, _rerun_cache_questions_db
+    if _rerun_cache_questions is not None and _rerun_cache_questions_db == _current_db_path:
         return _rerun_cache_questions
     _rerun_cache_questions = _get_dao().load_questions()
+    _rerun_cache_questions_db = _current_db_path
     return _rerun_cache_questions
 
 
@@ -929,11 +954,19 @@ def extract_questions(questions, dan_count=40, duo_count=30, pan_count=30,
 
 
 def load_question_stats(exam_type=None):
-    """加载题目答题统计（通过 DataAccess 抽象层，per-rerun 缓存按 exam_type 隔离）"""
-    global _rerun_cache_stats
+    """加载题目答题统计（通过 DataAccess 抽象层，per-rerun 缓存按 exam_type 隔离）
+
+    缓存同时按库路径（_current_db_path）校验，防止模块级全局缓存被其他
+    session 覆盖后读到别的用户的统计（串库）。
+    """
+    global _rerun_cache_stats, _rerun_cache_stats_db
     # 防御性初始化：如果缓存被意外设为 None，自动恢复为空字典
     if _rerun_cache_stats is None:
         _rerun_cache_stats = {}
+    # 库切换（含跨 session 覆盖）时，丢弃旧库的统计缓存
+    if _rerun_cache_stats_db != _current_db_path:
+        _rerun_cache_stats = {}
+        _rerun_cache_stats_db = _current_db_path
     cache_key = exam_type or "__all__"
     if cache_key in _rerun_cache_stats:
         return _rerun_cache_stats[cache_key]

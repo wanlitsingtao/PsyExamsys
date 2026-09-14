@@ -519,6 +519,12 @@ class SQLiteDataAccess(DataAccess):
                 ))
             # 题库被替换，递增版本号（通知 app.py 刷新缓存）
             self._increment_questions_version_in_conn(conn)
+            # 标记状态：空列表 → 用户主动清空题库；非空 → 已加载题库。
+            # ensure_user_db_initialized 通过该标记判断是否应从 master 兜底克隆。
+            cur.execute(
+                "INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)",
+                ("_user_cleared_db", "true" if not questions else "false"),
+            )
             conn.commit()
         except Exception:
             conn.rollback()

@@ -98,10 +98,143 @@ st.markdown(f"""
     .sx-user-card {{
         border: 1px solid rgba(148, 163, 184, 0.4) !important;
         border-radius: 0.7rem !important;
-        padding: 0.5rem 0.75rem !important;
+        padding: 0.55rem 0.75rem !important;
         background: linear-gradient(180deg, #f8fafc, #f1f5f9) !important;
-        margin: 0.1rem 0 0.35rem !important;
+        /* 底部留白拉大，避免与下方操作按钮边界相撞 */
+        margin: 0.15rem 0 0.55rem !important;
         line-height: 1.5 !important;
+    }}
+    /* 卡片之后的按钮组补足上间距（与卡片 margin 叠加，双重保障） */
+    [data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sx-user-card) {{
+        margin-bottom: 0.3rem !important;
+    }}
+    /* 渐变色头像方块（首字母），借鉴 bid-buddy-dev */
+    .sx-user-avatar {{
+        display: inline-flex;
+        width: 1.7rem; height: 1.7rem;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #4f46e5, #8b5cf6);
+        color: white;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.95rem;
+        flex-shrink: 0;
+    }}
+    /* 副信息：user_id / 状态文案 */
+    .sx-user-sub {{
+        font-size: 0.74rem;
+        color: #64748b;
+        margin-top: 2px;
+    }}
+    /* KPI 网格：答题数 / 错题数（两列） */
+    .sx-kpi-grid {{
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.45rem;
+        margin: 0.4rem 0 0.55rem;
+    }}
+    .sx-kpi-box {{
+        background: rgba(255, 255, 255, 0.7);
+        border: 1px solid #dbe5f2;
+        border-radius: 8px;
+        padding: 0.4rem 0.55rem;
+        text-align: center;
+    }}
+    .sx-kpi-label {{
+        color: #64748b;
+        font-size: 0.72rem;
+        line-height: 1.2;
+    }}
+    .sx-kpi-value {{
+        color: #1f2937;
+        font-size: 1.05rem;
+        font-weight: 700;
+        line-height: 1.25;
+        margin-top: 1px;
+    }}
+    /* ============ 侧边栏账号按钮：固定配色，不跟随主题/页面变化 ============ */
+    /* 说明：不能用 st.markdown("<div class='...'>") 做包裹容器——Streamlit 每个元素独立渲染，
+       那个 div 是封闭空元素，包不住后面的按钮。必须用真实存在的容器做作用域：[data-testid="stSidebar"]。
+       选择器用后代（不带 >），因为 button 外面还套了一层 wrapper 组件。
+       specificity (0,2,1) 高于专项训练红色 CSS 的 (0,1,2)，可稳定压制。 */
+    [data-testid="stSidebar"] [data-testid="stButton"] button {{
+        background: #ffffff !important;
+        background-image: none !important;
+        color: #0f172a !important;
+        border: 1px solid rgba(148, 163, 184, 0.4) !important;
+        box-shadow: none !important;
+    }}
+    [data-testid="stSidebar"] [data-testid="stButton"] button:hover {{
+        background: #f1f5f9 !important;
+        background-image: none !important;
+        color: #0f172a !important;
+        border-color: rgba(100, 116, 139, 0.5) !important;
+    }}
+    /* 「确认解绑」是 primary，但故意不做主题色高亮，仍用中性灰蓝（避免破坏整体协调） */
+    [data-testid="stSidebar"] [data-testid="stButton"] button[data-testid="baseButton-primary"] {{
+        background: linear-gradient(135deg, #475569, #334155) !important;
+        background-image: linear-gradient(135deg, #475569, #334155) !important;
+        color: #ffffff !important;
+        border: 1px solid transparent !important;
+    }}
+    [data-testid="stSidebar"] [data-testid="stButton"] button[data-testid="baseButton-primary"]:hover {{
+        background: linear-gradient(135deg, #334155, #1e293b) !important;
+        background-image: linear-gradient(135deg, #334155, #1e293b) !important;
+    }}
+
+    /* 账号操作按钮组：两列等宽 */
+    .sx-action-row {{
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.4rem;
+        margin: 0.35rem 0;
+    }}
+    /* 解绑二次确认区 */
+    .sx-unbind-confirm {{
+        background: #fff7ed;
+        border: 1px solid #fed7aa;
+        border-radius: 8px;
+        padding: 0.45rem 0.55rem;
+        margin: 0.3rem 0 0.4rem;
+        font-size: 0.78rem;
+        color: #9a3412;
+    }}
+    /* 表单弹窗：缩小 padding、紧凑 */
+    [data-testid="stSidebar"] [data-testid="stExpander"] details {{
+        border: 1px solid #dbe5f2 !important;
+        border-radius: 10px !important;
+        background: rgba(255, 255, 255, 0.55) !important;
+    }}
+    [data-testid="stSidebar"] [data-testid="stExpander"] summary {{
+        font-weight: 600 !important;
+        font-size: 0.92rem !important;
+    }}
+    /* 底部版本号居中 */
+    .sx-footer {{
+        text-align: center;
+        color: #94a3b8;
+        font-size: 0.75rem;
+        margin-top: 0.5rem;
+        letter-spacing: 0.02em;
+    }}
+    /* sidebar 内的 text_input / password_input 字号略缩 */
+    [data-testid="stSidebar"] input[type="text"],
+    [data-testid="stSidebar"] input[type="password"] {{
+        font-size: 0.88rem !important;
+    }}
+    /* sidebar 内 form_submit_button 紧凑 */
+    [data-testid="stSidebar"] [data-testid="stFormSubmitButton"] button {{
+        min-height: 2.2rem !important;
+        font-size: 0.88rem !important;
+    }}
+    /* 账号面板按钮：单行显示，去掉换行（中文+emoji 容易撑爆容器宽度） */
+    [data-testid="stSidebar"] button[kind="secondary"],
+    [data-testid="stSidebar"] button[kind="primary"] {{
+        white-space: nowrap !important;
+        padding-left: 0.4rem !important;
+        padding-right: 0.4rem !important;
+        font-size: 0.86rem !important;
     }}
     /* 侧边栏内导航 radio 紧凑化 */
     [data-testid="stSidebarUserContent"] div[data-testid="stRadio"] label {{
@@ -345,6 +478,9 @@ st.markdown(f"""
         margin-bottom: 1rem !important;
     }}
 
+    /* 主区按钮美化（Streamlit 1.57 button container 实际是 div[data-testid="stButton"]，
+       这里用 class 选择器 div.stButton 是历史遗留错误选择器，本来就一直未生效。
+       保持原状，不动 selector，避免引入意外样式变化。） */
     div.stButton > button {{
         border-radius: 0.85rem !important;
         padding: 0.75rem 1rem !important;
@@ -409,7 +545,7 @@ st.markdown(f"""
 
 # 初始化 session_state
 from utils.data_manager import load_config, load_questions, get_available_exam_types, DEFAULT_EXAM_TYPE, invalidate_rerun_cache, get_questions_version, set_current_user
-from utils.account_manager import generate_device_fingerprint, get_or_create_user
+from utils.account_manager import generate_device_fingerprint, get_or_create_user, ensure_user_db_initialized
 
 # 每次 rerun 开始时清除数据缓存，确保使用最新数据
 invalidate_rerun_cache()
@@ -421,29 +557,53 @@ invalidate_rerun_cache()
 # ============================
 
 def _resolve_current_user():
-    """解析设备指纹并绑定/创建当前用户。每个用户拥有独立题库库文件。"""
-    if "_user_id" in st.session_state:
-        return
-    try:
-        headers = st.context.headers
-        ua = headers.get("User-Agent", "") or ""
-        platform = (headers.get("Sec-CH-UA-Platform", "")
-                    or headers.get("sec-ch-ua-platform", "") or "")
-    except Exception:
-        ua, platform = "", ""
-    raw_ua = f"{ua}|{platform}".strip("|")
-    fingerprint = generate_device_fingerprint(raw_ua)
-    user = get_or_create_user(fingerprint, raw_ua)
-    st.session_state._user_id = user["user_id"]
-    st.session_state._device_fp = fingerprint
-    set_current_user(user["user_id"])
-    # 首次进入/切换用户：强制重载该用户自己的题库与配置
-    for key in ["questions", "config", "_cache_available_exams",
-                "_db_questions_version", "_data_version", "_mnemonic_data"]:
-        st.session_state.pop(key, None)
+    """解析设备指纹并绑定/创建当前用户。每个用户拥有独立题库库文件。
+
+    ⚠️ 2026-09-14 关键修复：本函数**每一帧都会执行路由同步**，不再因为
+    session 里已有 _user_id 就整体跳过。
+
+    原因：data_manager 的 _current_db_path 是**模块级全局变量**，
+      (a) 会被其他 session（多标签页/多浏览器，同进程共享）覆盖；
+      (b) 代码热重载时会被重置为 None；
+    而旧逻辑 "_user_id 已存在 → 直接 return" 会跳过 set_current_user，
+    于是后续所有读库都落到默认空库 data/exmsys.db → 页面报"题库为空"。
+
+    现在拆成两段：
+      1) 身份解析（生成/查找 user_id）—— 仅首次执行；
+      2) 数据路由同步 —— 每帧无条件执行（set_current_user 已幂等，无额外开销）。
+    """
+    if "_user_id" not in st.session_state:
+        try:
+            headers = st.context.headers
+            ua = headers.get("User-Agent", "") or ""
+            platform = (headers.get("Sec-CH-UA-Platform", "")
+                        or headers.get("sec-ch-ua-platform", "") or "")
+        except Exception:
+            ua, platform = "", ""
+        raw_ua = f"{ua}|{platform}".strip("|")
+        fingerprint = generate_device_fingerprint(raw_ua)
+        user = get_or_create_user(fingerprint, raw_ua)
+        st.session_state._user_id = user["user_id"]
+        st.session_state._device_fp = fingerprint
+        # 首次进入/切换用户：强制重载该用户自己的题库与配置
+        for key in ["questions", "config", "_cache_available_exams",
+                    "_db_questions_version", "_data_version", "_mnemonic_data"]:
+            st.session_state.pop(key, None)
+
+    # 每帧同步数据路由（幂等）：修复跨 session 全局变量污染 / 热重载丢路由
+    set_current_user(st.session_state._user_id)
 
 
 _resolve_current_user()
+
+# 兜底：若当前用户私有库是「残留空库」（从未真正使用过），自动从 master 模板克隆题库。
+# 区分主动清空题库（config 有大量已用 key）的关键：这里不会破坏用户主动清空的意图。
+# 初始化完成时清掉 session 里的题库与配置缓存，让后续 load_questions 读到新克隆的数据。
+_init_res = ensure_user_db_initialized(st.session_state._user_id)
+if _init_res.get("initialized"):
+    for key in ["questions", "config", "_cache_available_exams",
+                "_db_questions_version", "_data_version", "_mnemonic_data"]:
+        st.session_state.pop(key, None)
 
 # 检测题库数据版本号是否变更（仅在 save_questions 导入/替换题库时递增），
 # 答题过程中的自动保存、统计更新等不会触发，避免页面答题中途被刷出
@@ -551,8 +711,17 @@ def _switch_user(new_user_id):
                 "_db_questions_version", "_data_version", "_mnemonic_data",
                 "_cache_wrong_stats"]:
         st.session_state.pop(key, None)
+    # 关闭账号面板的展开态
+    for k in ("sx_show_bind", "sx_show_login", "sx_show_unbind_confirm"):
+        st.session_state.pop(k, None)
+    # 清掉旧登录身份缓存（下一个渲染帧会按新 user_id 重新反查）
+    st.session_state.pop("_current_username", None)
+    st.session_state.pop("_current_user_bound_fp", None)
     _reset_exam_states_for_switch()
-    st.session_state.nav = "首页"  # 导航值使用模块 key
+    # 切账号后导航回首页。⚠️ sidebar.radio(key="nav") 在本帧已实例化，
+    # 不能直接 st.session_state.nav = ...（会触发 StreamlitAPIException）。
+    # 改用 nav_to 标志位，让 rerun 后到下一帧通过 nav_default_index 选中目标模块。
+    st.session_state.nav_to = "首页"
     st.rerun()
 
 
@@ -578,9 +747,6 @@ def _exam_switch_confirm_dialog(active_sessions, new_code, new_label):
 
 st.sidebar.markdown("## 📚 心理咨询师考试背题系统")
 st.sidebar.markdown("---")
-
-if len(st.session_state.questions) == 0:
-    st.sidebar.warning("⚠️ 题库为空，请先在配置管理中导入题库")
 
 # 题库选择器（缓存 available_exams，仅在导入题目后刷新）
 if "_cache_available_exams" not in st.session_state:
@@ -627,6 +793,11 @@ if not st.session_state.questions:
             # exam_type 在当前题库中已不存在：回退到第一个可用题库，避免页面指向空库
             st.session_state.exam_type = _avail[0][0]
         st.session_state.questions = [q for q in _all_full if q.get("exam_type") == st.session_state.exam_type]
+
+# —— 空题库提示（放在「过滤 + 自愈」之后，避免缓存/时序导致的误报）——
+# 只有走完上面两步后仍为空，才说明当前用户库确实没有题目。
+if len(st.session_state.questions) == 0:
+    st.sidebar.warning("⚠️ 题库为空，请先在配置管理中导入题库")
 st.sidebar.markdown("---")
 
 # 导航菜单
@@ -692,55 +863,190 @@ selected_key = st.sidebar.radio(
 st.sidebar.markdown("---")
 
 # ---- 账号面板（置于导航之后；CSS 让整个容器吸底显示）----
-# 统一放入 st.container()：便于整组贴底 + 后续整体美化
+# 参考 bid-buddy-dev 的设计语言重做：渐变头像 + 两列按钮 + 表单弹窗 + 解绑二次确认。
+# 关键设计（2026-09-14 升级）：
+#   「已登录用户」≠「设备已绑定」。
+#   - 已登录用户 = st.session_state._current_username 有值（来自 login/bind）
+#   - 设备已绑定 = 当前设备指纹出现在 by_device 中
+#   登录成功后会同步把当前设备指纹登记到该账号，下次浏览器自动识别也是该用户。
+#   显示策略：已登录 → "用户 wanli" + 绑定的原始指纹 + "可跨设备同步"；
+#           未登录 → "访客 xxx"。
 with st.sidebar.container():
     from utils.account_manager import AccountManager
     _acct_mgr = AccountManager()
     _bound_acct = _acct_mgr.get_bound_account(st.session_state._device_fp)
-    _user_short = st.session_state._user_id
-    if _bound_acct:
-        st.markdown(
-            f"<div class='sx-user-card'>"
-            f"<div style='font-weight:600;'>👤 {_bound_acct['username']}</div>"
-            f"<div style='font-size:0.78rem;color:#7a8aa5;'>ID {_user_short} · 已绑定，可跨设备同步</div>"
-            f"</div>",
-            unsafe_allow_html=True,
-        )
-        if st.button("🔓 解绑账号", key="unbind_btn", use_container_width=True):
-            _acct_mgr.unbind_account(st.session_state._device_fp)
-            st.rerun()
+
+    # 当前用户身份（优先用 session_state 缓存，未登录时按 user_id 反查）
+    _current_username = st.session_state.get("_current_username")
+    _current_user_bound_fp = st.session_state.get("_current_user_bound_fp", "")
+    if not _current_username:
+        # session 干净时（如首次访问），按 user_id 反查
+        _acct_by_uid = _acct_mgr.get_account_for_user_id(st.session_state._user_id or "")
+        if _acct_by_uid:
+            _current_username = _acct_by_uid["username"]
+            _current_user_bound_fp = _acct_by_uid["bound_device"]
+            # 回填 session_state，避免每帧重查
+            st.session_state._current_username = _current_username
+            st.session_state._current_user_bound_fp = _current_user_bound_fp
+
+    _user_short = st.session_state._user_id or "未分配"
+
+    # ============ 用户卡片（借鉴 bid-buddy-dev 渐变头像）============
+    if _current_username:
+        # 已登录：显示 "用户 wanli"，副标题用 ID 而非指纹
+        _disp_name = _current_username
+        _avatar_letter = "U"   # 固定 U = user（已登录）
+        _sub_text = f"ID {_user_short}"
     else:
-        st.markdown(
-            f"<div class='sx-user-card'>"
-            f"<div style='font-weight:600;'>👤 访客 {_user_short}</div>"
-            f"<div style='font-size:0.78rem;color:#7a8aa5;'>本机临时账号 · 可绑定后跨设备同步</div>"
-            f"</div>",
-            unsafe_allow_html=True,
-        )
-        with st.expander("🔑 绑定 / 登录账号", expanded=False):
-            bind_tab, login_tab = st.tabs(["绑定账号", "登录账号"])
-            with bind_tab:
-                _b_user = st.text_input("用户名", key="bind_username")
-                _b_pwd = st.text_input("密码", type="password", key="bind_password")
-                if st.button("绑定", key="bind_btn", use_container_width=True):
-                    _ok, _msg = _acct_mgr.bind_account(
-                        st.session_state._device_fp, _b_user, _b_pwd)
-                    if _ok:
-                        st.success(_msg)
+        # 未登录（仅访客）
+        _disp_name = f"访客 {_user_short[:8]}"
+        _avatar_letter = "V"   # 固定 V = visitor（未登录）
+        _sub_text = f"ID {_user_short}"
+
+    st.markdown(
+        f"<div class='sx-user-card'>"
+        f"<div style='display:flex;align-items:center;gap:0.5rem;'>"
+        f"<div class='sx-user-avatar'>{_avatar_letter}</div>"
+        f"<div style='min-width:0;'>"
+        f"<div style='font-weight:700;font-size:0.98rem;color:#1f2937;'>"
+        f"{_disp_name}</div>"
+        f"<div class='sx-user-sub'>{_sub_text}</div>"
+        f"</div>"
+        f"</div>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    # ============ 状态化标志：解绑二次确认 / 表单展开 ============
+    _show_bind = st.session_state.get("sx_show_bind", False)
+    _show_login = st.session_state.get("sx_show_login", False)
+    _show_unbind_confirm = st.session_state.get("sx_show_unbind_confirm", False)
+
+    # ============ 账号操作按钮组 ============
+    if _current_username:
+        # 已登录：两列 [解绑] [切换]
+        with st.container():
+            st.markdown("<div class='sx-acct-btns'>", unsafe_allow_html=True)
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button("解绑", key="btn_unbind", use_container_width=True):
+                    st.session_state.sx_show_unbind_confirm = True
+                    st.session_state.sx_show_bind = False
+                    st.session_state.sx_show_login = False
+                    st.rerun()
+            with c2:
+                if st.button("切换", key="btn_switch_acct", use_container_width=True):
+                    # 切换等同于先解绑再绑别的：直接展开登录表单即可（不立即解绑）
+                    st.session_state.sx_show_login = True
+                    st.session_state.sx_show_bind = False
+                    st.session_state.sx_show_unbind_confirm = False
+                    st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        # 解绑二次确认（黄色警告区）
+        if _show_unbind_confirm:
+            st.markdown(
+                "<div class='sx-unbind-confirm'>"
+                "⚠️ 解绑后当前设备不再关联账号 <b>{}</b>，账号和密码数据将被清除，"
+                "但 <b>题库答题数据保留</b>（需在另一设备登录同名账号才能看到）。"
+                "</div>".format(_current_username),
+                unsafe_allow_html=True,
+            )
+            with st.container():
+                st.markdown("<div class='sx-acct-btns'>", unsafe_allow_html=True)
+                cu1, cu2 = st.columns(2)
+                with cu1:
+                    if st.button("确认解绑", key="btn_confirm_unbind", type="primary", use_container_width=True):
+                        # 解绑账号：清掉当前设备的 by_device 记录，并清 session_state 用户身份
+                        _acct_mgr.unbind_account(st.session_state._device_fp)
+                        st.session_state._current_username = None
+                        st.session_state._current_user_bound_fp = ""
+                        st.session_state.sx_show_unbind_confirm = False
+                        st.success("已解绑")
                         st.rerun()
+                with cu2:
+                    if st.button("取消", key="btn_cancel_unbind", use_container_width=True):
+                        st.session_state.sx_show_unbind_confirm = False
+                        st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
+    else:
+        # 未绑定：两列 [绑定账号] [账号登录]
+        with st.container():
+            st.markdown("<div class='sx-acct-btns'>", unsafe_allow_html=True)
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button("绑定账号", key="btn_show_bind", use_container_width=True):
+                    st.session_state.sx_show_bind = not _show_bind
+                    st.session_state.sx_show_login = False
+                    st.rerun()
+            with c2:
+                if st.button("账号登录", key="btn_show_login", use_container_width=True):
+                    st.session_state.sx_show_login = not _show_login
+                    st.session_state.sx_show_bind = False
+                    st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        # ---- 绑定账号表单（双密码校验）----
+        if _show_bind:
+            with st.expander("绑定账号", expanded=True):
+                st.markdown("将当前设备与一个易记的用户名绑定，方便跨设备登录。")
+                with st.form("sx_bind_form", clear_on_submit=False):
+                    _b_user = st.text_input("用户名", key="bind_username")
+                    _b_pwd = st.text_input("密码", type="password", key="bind_password")
+                    _b_pwd2 = st.text_input("确认密码", type="password", key="bind_password2")
+                    _b_submitted = st.form_submit_button("确定绑定", use_container_width=True)
+                if _b_submitted:
+                    if not _b_user or not _b_pwd:
+                        st.error("用户名和密码不能为空")
+                    elif _b_pwd != _b_pwd2:
+                        st.error("两次输入的密码不一致")
                     else:
-                        st.error(_msg)
-            with login_tab:
-                _l_user = st.text_input("用户名", key="login_username")
-                _l_pwd = st.text_input("密码", type="password", key="login_password")
-                if st.button("登录", key="login_btn", use_container_width=True):
-                    _ok, _msg, _uid = _acct_mgr.login_account(_l_user, _l_pwd)
-                    if _ok and _uid:
-                        st.success(_msg)
-                        _switch_user(_uid)
+                        _ok, _msg = _acct_mgr.bind_account(
+                            st.session_state._device_fp, _b_user, _b_pwd
+                        )
+                        if _ok:
+                            # 绑定成功后即视为已登录，写入 session_state
+                            st.session_state._current_username = _b_user.strip()
+                            st.session_state._current_user_bound_fp = st.session_state._device_fp
+                            st.session_state.sx_show_bind = False
+                            st.success(_msg + " 已自动登录。")
+                            st.rerun()
+                        else:
+                            st.error(_msg)
+
+        # ---- 账号登录表单 ----
+        if _show_login:
+            with st.expander("账号登录", expanded=True):
+                st.markdown("使用已绑定的用户名和密码登录。")
+                with st.form("sx_login_form", clear_on_submit=False):
+                    _l_user = st.text_input("用户名", key="login_username")
+                    _l_pwd = st.text_input("密码", type="password", key="login_password")
+                    _l_submitted = st.form_submit_button("登录", use_container_width=True)
+                if _l_submitted:
+                    if not _l_user or not _l_pwd:
+                        st.error("用户名和密码不能为空")
                     else:
-                        st.error(_msg)
-    st.caption("心理咨询师考试背题系统 v2.0")
+                        # login_account 自动登记当前设备指纹到该账号
+                        _ok, _msg, _uid = _acct_mgr.login_account(
+                            _l_user, _l_pwd, device_fingerprint=st.session_state._device_fp
+                        )
+                        if _ok and _uid:
+                            # 写入 session_state：登录身份 + 该账号原始绑定指纹
+                            st.session_state._current_username = _l_user.strip()
+                            _acct_info = _acct_mgr.get_account_for_user_id(_uid)
+                            if _acct_info:
+                                st.session_state._current_user_bound_fp = _acct_info["bound_device"]
+                            st.session_state.sx_show_login = False
+                            st.success(_msg)
+                            _switch_user(_uid)
+                        else:
+                            st.error(_msg)
+
+    # ============ 底部版本号（居中）============
+    st.markdown(
+        "<div class='sx-footer'>心理咨询师考试背题系统 v2.0</div>",
+        unsafe_allow_html=True,
+    )
 
 # ============================
 # 页面路由（隐藏 Streamlit 默认的 pages/ 标签）
