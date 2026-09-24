@@ -16,6 +16,7 @@ from utils.data_manager import (
     get_all_wrong_with_stats, save_exam_record, save_draft,
     get_question_stats,
 )
+from utils.answer_card import render_answer_card
 
 
 def _get_cached_qstats(qid):
@@ -389,26 +390,185 @@ def _show_wrong_practice():
 
     st.markdown("---")
 
+    # ---- 答题区：答题中左题右卡；提交后单列浏览（结果态不使用答题卡）----
     if is_submitted:
-        # ======== 已提交状态：显示结果 ========
-        result = st.session_state.wb_results.get(qid, {})
-        correct = result.get("correct", False)
+        main_col, card_col = st.container(), None
+    else:
+        main_col, card_col = st.columns([3.05, 1], gap="large")
 
-        # 选项间距（与 mock_exam 一致）
-        st.markdown("""
-        <style>
-        div[data-testid="stRadio"] > div { gap: 0.75em; }
-        div[data-testid="stRadio"] > div > label { padding: 0.3em 0; }
-        div[data-testid="stCheckbox"] > label { padding: 0.3em 0; }
-        </style>
-        """, unsafe_allow_html=True)
+    with main_col:
+        if is_submitted:
+            # ======== 已提交状态：显示结果 ========
+            result = st.session_state.wb_results.get(qid, {})
+            correct = result.get("correct", False)
 
-        # 题号行：左侧题号，右侧历史统计（与 mock_exam 一致）
-        title_cols = st.columns([1, 2])
-        with title_cols[0]:
-            st.markdown(f"##### 第 {idx+1}/{total_q} 题")
-        with title_cols[1]:
+            # 选项间距（与 mock_exam 一致）
+            st.markdown("""
+            <style>
+            div[data-testid="stRadio"] > div { gap: 0.75em; }
+            div[data-testid="stRadio"] > div > label { padding: 0.3em 0; }
+            div[data-testid="stCheckbox"] > label { padding: 0.3em 0; }
+            </style>
+            """, unsafe_allow_html=True)
+
+            # 题号行：左侧题号，右侧历史统计（与 mock_exam 一致）
+            title_cols = st.columns([1, 2])
+            with title_cols[0]:
+                st.markdown(f"##### 第 {idx+1}/{total_q} 题")
+            with title_cols[1]:
+                q_stats = _get_cached_qstats(qid)
+                stats_parts = []
+                if q_stats["correct_count"] > 0 or q_stats["wrong_count"] > 0:
+                    stats_parts.append(f"答对 {q_stats['correct_count']} 次 / 答错 {q_stats['wrong_count']} 次")
+                last_correct = q_stats.get("last_correct")
+                if last_correct is True:
+                    stats_parts.append("🟢 上次答对")
+                elif last_correct is False:
+                    stats_parts.append("🔴 上次答错")
+                if q_stats.get("retention_due"):
+                    stats_parts.append("⏰ 遗忘预警")
+                if q_stats.get("unstable"):
+                    history = q_stats.get("answer_history", [])
+                    if history and not history[-1]:
+                        stats_parts.append("⚠️ 消退型")
+                    else:
+                        stats_parts.append("⚠️ 波动型")
+                if stats_parts:
+                    st.markdown(f"<div style='text-align:right;padding-top:0.5em;color:#888;font-size:13px;'>{'&nbsp;·&nbsp;'.join(stats_parts)}</div>", unsafe_allow_html=True)
+
+            # 题型标签行
+            st.markdown(f"**{type_labels[q['type']]}**"
+                        f"{' · 📂 ' + q.get('category', infer_category(q.get('source_file', ''))) if q.get('category') or q.get('source_file') else ''}")
+
+            # 案例题子题：在题目上方展示案例背景
+            case_bg = q.get("case_background", "")
+            if case_bg:
+                with st.expander("📋 **案例背景**", expanded=True):
+                    st.markdown(case_bg)
+
+            st.markdown(f"**{q['question']}**")
+
+            if correct:
+                st.success("✅ **回答正确！**")
+            else:
+                st.error("❌ **回答错误！**")
+
+            options = q["options"]
+            opt_keys = sorted(options.keys())
+
+            for k in opt_keys:
+                user_ans = st.session_state.wb_answers.get(qid, "")
+                is_selected = k in user_ans
+                is_correct_key = k in q["answer"]
+
+                if q["type"] in ("multi", "案例题", "indefinite"):
+                    if is_selected and is_correct_key:
+                        st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]}</p>',
+                                    unsafe_allow_html=True)
+                    elif is_selected and not is_correct_key:
+                        st.markdown(f'{k}: {options[k]}')
+                    elif not is_selected and is_correct_key:
+                        st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]} (漏选)</p>',
+                                    unsafe_allow_html=True)
+                    else:
+                        st.markdown(f'{k}: {options[k]}')
+                else:
+                    if is_selected and is_correct_key:
+                        st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]}</p>',
+                                    unsafe_allow_html=True)
+                    elif is_selected and not is_correct_key:
+                        st.markdown(f'<p style="color:#b71c1c;font-weight:bold;">❌ {k}: {options[k]} (错选)</p>',
+                                    unsafe_allow_html=True)
+                    elif not is_selected and is_correct_key:
+                        st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]}</p>',
+                                    unsafe_allow_html=True)
+                    else:
+                        st.markdown(f'{k}: {options[k]}')
+
+            correct_display = get_answer_display(q["type"], q["answer"], options)
+            st.markdown(
+                f'<div style="background:#e8f5e9;border-left:4px solid #1b5e20;padding:8px 12px;'
+                f'border-radius:4px;margin:4px 0;">'
+                f'<span style="color:#1b5e20;font-weight:bold;">✅ 正确答案：{correct_display}</span></div>',
+                unsafe_allow_html=True,
+            )
+
+            if q.get("explanation"):
+                with st.expander("📖 查看解析", expanded=True):
+                    st.markdown(q["explanation"])
+
+            if st.button("✅ 我已掌握本题（从错题本移除）", use_container_width=True):
+                remove_wrong_question(qid)
+                wq_updated = [w for w in st.session_state.wb_questions if w["id"] != qid]
+                st.session_state.wb_questions = wq_updated
+                if not wq_updated:
+                    st.session_state.wb_submitted = False
+                if st.session_state.wb_current >= len(st.session_state.wb_questions):
+                    st.session_state.wb_current = max(0, len(st.session_state.wb_questions) - 1)
+                st.rerun()
+
+        else:
+            # ======== 未提交状态：答题模式 ========
+            # 获取答题统计（提前到不确定开关之前）
             q_stats = _get_cached_qstats(qid)
+            total_answers = q_stats["correct_count"] + q_stats["wrong_count"]
+
+            # 题型标签 + 不确定按钮 + 标记按钮 同行
+            title_col1, title_col2, title_col3 = st.columns([5, 2.5, 2.5])
+            with title_col1:
+                st.markdown(f"##### 第 {idx+1}/{total_q} 题  |  ⚠️ 答错 {wrong_count} 次")
+                st.markdown(f"**{type_labels[q['type']]}**"
+                            f"{' · 📂 ' + q.get('category', infer_category(q.get('source_file', ''))) if q.get('category') or q.get('source_file') else ''}")
+            with title_col2:
+                if total_answers >= 3:
+                    if "wb_uncertain" not in st.session_state:
+                        st.session_state.wb_uncertain = set()
+
+                    toggle_key = f"wb_uncertain_toggle_{qid}"
+                    if toggle_key not in st.session_state:
+                        st.session_state[toggle_key] = qid in st.session_state.wb_uncertain
+
+                    def _on_wb_uncertain_toggle():
+                        if st.session_state[toggle_key]:
+                            st.session_state.wb_uncertain.add(qid)
+                        else:
+                            st.session_state.wb_uncertain.discard(qid)
+
+                    st.toggle("不确定",
+                              key=toggle_key,
+                              value=qid in st.session_state.wb_uncertain,
+                              help="标记此题为不确定",
+                              on_change=_on_wb_uncertain_toggle)
+            with title_col3:
+                marked = qid in st.session_state.get("wb_marked", set())
+
+                def _toggle_mark(q=qid):
+                    if "wb_marked" not in st.session_state:
+                        st.session_state.wb_marked = set()
+                    if q in st.session_state.wb_marked:
+                        st.session_state.wb_marked.discard(q)
+                    else:
+                        st.session_state.wb_marked.add(q)
+
+                st.button("⭐ 标记" if marked else "☆ 标记",
+                          key=f"wb_mark_{qid}",
+                          help="取消标记" if marked else "标记此题",
+                          use_container_width=True,
+                          on_click=_toggle_mark)
+            # 案例题子题：在题目上方展示案例背景
+            case_bg = q.get("case_background", "")
+            if case_bg:
+                with st.expander("📋 **案例背景**", expanded=True):
+                    st.markdown(case_bg)
+            st.markdown(f"**{q['question']}**")
+            # 正文区按钮字号与不确定开关一致（答题卡区有 10px 覆盖）
+            st.markdown("""
+            <style>
+            div.stButton > button {
+                font-size: 13px !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
             stats_parts = []
             if q_stats["correct_count"] > 0 or q_stats["wrong_count"] > 0:
                 stats_parts.append(f"答对 {q_stats['correct_count']} 次 / 答错 {q_stats['wrong_count']} 次")
@@ -417,6 +577,7 @@ def _show_wrong_practice():
                 stats_parts.append("🟢 上次答对")
             elif last_correct is False:
                 stats_parts.append("🔴 上次答错")
+            # 掌握状态标签
             if q_stats.get("retention_due"):
                 stats_parts.append("⏰ 遗忘预警")
             if q_stats.get("unstable"):
@@ -426,344 +587,102 @@ def _show_wrong_practice():
                 else:
                     stats_parts.append("⚠️ 波动型")
             if stats_parts:
-                st.markdown(f"<div style='text-align:right;padding-top:0.5em;color:#888;font-size:16px;'>{'&nbsp;&nbsp;|&nbsp;&nbsp;'.join(stats_parts)}</div>", unsafe_allow_html=True)
+                st.caption("📊 " + " · ".join(stats_parts))
 
-        # 题型标签行
-        st.markdown(f"**{type_labels[q['type']]}**"
-                    f"{' · 📂 ' + q.get('category', infer_category(q.get('source_file', ''))) if q.get('category') or q.get('source_file') else ''}")
-
-        # 案例题子题：在题目上方展示案例背景
-        case_bg = q.get("case_background", "")
-        if case_bg:
-            with st.expander("📋 **案例背景**", expanded=True):
-                st.markdown(case_bg)
-
-        st.markdown(f"**{q['question']}**")
-
-        if correct:
-            st.success("✅ **回答正确！**")
-        else:
-            st.error("❌ **回答错误！**")
-
-        options = q["options"]
-        opt_keys = sorted(options.keys())
-
-        for k in opt_keys:
+            options = q["options"]
+            opt_keys = sorted(options.keys())
             user_ans = st.session_state.wb_answers.get(qid, "")
-            is_selected = k in user_ans
-            is_correct_key = k in q["answer"]
 
-            if q["type"] in ("multi", "案例题", "indefinite"):
-                if is_selected and is_correct_key:
-                    st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]}</p>',
-                                unsafe_allow_html=True)
-                elif is_selected and not is_correct_key:
-                    st.markdown(f'{k}: {options[k]}')
-                elif not is_selected and is_correct_key:
-                    st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]} (漏选)</p>',
-                                unsafe_allow_html=True)
-                else:
-                    st.markdown(f'{k}: {options[k]}')
-            else:
-                if is_selected and is_correct_key:
-                    st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]}</p>',
-                                unsafe_allow_html=True)
-                elif is_selected and not is_correct_key:
-                    st.markdown(f'<p style="color:#b71c1c;font-weight:bold;">❌ {k}: {options[k]} (错选)</p>',
-                                unsafe_allow_html=True)
-                elif not is_selected and is_correct_key:
-                    st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]}</p>',
-                                unsafe_allow_html=True)
-                else:
-                    st.markdown(f'{k}: {options[k]}')
+            if q["type"] in ("single", "judge"):
+                options_list = [f"{k}: {options[k]}" for k in opt_keys]
+                idx_in_list = None
+                for i, opt in enumerate(options_list):
+                    if opt.startswith(user_ans + ":"):
+                        idx_in_list = i
+                        break
 
-        correct_display = get_answer_display(q["type"], q["answer"], options)
-        st.markdown(
-            f'<div style="background:#e8f5e9;border-left:4px solid #1b5e20;padding:8px 12px;'
-            f'border-radius:4px;margin:4px 0;">'
-            f'<span style="color:#1b5e20;font-weight:bold;">✅ 正确答案：{correct_display}</span></div>',
-            unsafe_allow_html=True,
-        )
-
-        if q.get("explanation"):
-            with st.expander("📖 查看解析", expanded=True):
-                st.markdown(q["explanation"])
-
-        if st.button("✅ 我已掌握本题（从错题本移除）", use_container_width=True):
-            remove_wrong_question(qid)
-            wq_updated = [w for w in st.session_state.wb_questions if w["id"] != qid]
-            st.session_state.wb_questions = wq_updated
-            if not wq_updated:
-                st.session_state.wb_submitted = False
-            if st.session_state.wb_current >= len(st.session_state.wb_questions):
-                st.session_state.wb_current = max(0, len(st.session_state.wb_questions) - 1)
-            st.rerun()
-
-    else:
-        # ======== 未提交状态：答题模式 ========
-        # 获取答题统计（提前到不确定开关之前）
-        q_stats = _get_cached_qstats(qid)
-        total_answers = q_stats["correct_count"] + q_stats["wrong_count"]
-
-        # 题型标签 + 不确定按钮 + 标记按钮 同行
-        title_col1, title_col2, title_col3 = st.columns([6, 2, 2])
-        with title_col1:
-            st.markdown(f"##### 第 {idx+1}/{total_q} 题  |  ⚠️ 答错 {wrong_count} 次")
-            st.markdown(f"**{type_labels[q['type']]}**"
-                        f"{' · 📂 ' + q.get('category', infer_category(q.get('source_file', ''))) if q.get('category') or q.get('source_file') else ''}")
-        with title_col2:
-            if total_answers >= 3:
-                if "wb_uncertain" not in st.session_state:
-                    st.session_state.wb_uncertain = set()
-
-                toggle_key = f"wb_uncertain_toggle_{qid}"
-                if toggle_key not in st.session_state:
-                    st.session_state[toggle_key] = qid in st.session_state.wb_uncertain
-
-                def _on_wb_uncertain_toggle():
-                    if st.session_state[toggle_key]:
-                        st.session_state.wb_uncertain.add(qid)
-                    else:
-                        st.session_state.wb_uncertain.discard(qid)
-
-                st.toggle("不确定",
-                          key=toggle_key,
-                          value=qid in st.session_state.wb_uncertain,
-                          help="标记此题为不确定",
-                          on_change=_on_wb_uncertain_toggle)
-        with title_col3:
-            marked = qid in st.session_state.get("wb_marked", set())
-
-            def _toggle_mark(q=qid):
-                if "wb_marked" not in st.session_state:
-                    st.session_state.wb_marked = set()
-                if q in st.session_state.wb_marked:
-                    st.session_state.wb_marked.discard(q)
-                else:
-                    st.session_state.wb_marked.add(q)
-
-            st.button("⭐ 标记" if marked else "☆ 标记",
-                      key=f"wb_mark_{qid}",
-                      help="取消标记" if marked else "标记此题",
-                      use_container_width=True,
-                      on_click=_toggle_mark)
-        # 案例题子题：在题目上方展示案例背景
-        case_bg = q.get("case_background", "")
-        if case_bg:
-            with st.expander("📋 **案例背景**", expanded=True):
-                st.markdown(case_bg)
-        st.markdown(f"**{q['question']}**")
-        # 正文区按钮字号与不确定开关一致（答题卡区有 10px 覆盖）
-        st.markdown("""
-        <style>
-        div.stButton > button {
-            font-size: 13px !important;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-        stats_parts = []
-        if q_stats["correct_count"] > 0 or q_stats["wrong_count"] > 0:
-            stats_parts.append(f"答对 {q_stats['correct_count']} 次 / 答错 {q_stats['wrong_count']} 次")
-        last_correct = q_stats.get("last_correct")
-        if last_correct is True:
-            stats_parts.append("🟢 上次答对")
-        elif last_correct is False:
-            stats_parts.append("🔴 上次答错")
-        # 掌握状态标签
-        if q_stats.get("retention_due"):
-            stats_parts.append("⏰ 遗忘预警")
-        if q_stats.get("unstable"):
-            history = q_stats.get("answer_history", [])
-            if history and not history[-1]:
-                stats_parts.append("⚠️ 消退型")
-            else:
-                stats_parts.append("⚠️ 波动型")
-        if stats_parts:
-            st.caption("📊 " + " · ".join(stats_parts))
-
-        options = q["options"]
-        opt_keys = sorted(options.keys())
-        user_ans = st.session_state.wb_answers.get(qid, "")
-
-        if q["type"] in ("single", "judge"):
-            options_list = [f"{k}: {options[k]}" for k in opt_keys]
-            idx_in_list = None
-            for i, opt in enumerate(options_list):
-                if opt.startswith(user_ans + ":"):
-                    idx_in_list = i
-                    break
-
-            selected_opt = st.radio(
-                "请选择答案：",
-                options_list,
-                key=f"wb_radio_{qid}",
-                index=idx_in_list,
-                label_visibility="collapsed",
-            )
-            if selected_opt:
-                selected_key = selected_opt.split(":")[0]
-                if st.session_state.wb_answers.get(qid) != selected_key:
-                    st.session_state.wb_answers[qid] = selected_key
-
-        elif q["type"] in ("multi", "案例题", "indefinite"):
-            cols = st.columns(2)
-            selected_keys = []
-            for i, k in enumerate(opt_keys):
-                col = cols[i % 2]
-                checked = col.checkbox(
-                    f"{k}: {options[k]}",
-                    key=f"wb_cb_{qid}_{k}",
-                    value=(k in user_ans),
+                selected_opt = st.radio(
+                    "请选择答案：",
+                    options_list,
+                    key=f"wb_radio_{qid}",
+                    index=idx_in_list,
+                    label_visibility="collapsed",
                 )
-                if checked:
-                    selected_keys.append(k)
+                if selected_opt:
+                    selected_key = selected_opt.split(":")[0]
+                    if st.session_state.wb_answers.get(qid) != selected_key:
+                        st.session_state.wb_answers[qid] = selected_key
 
-            if selected_keys:
-                ans_str = "".join(sorted(selected_keys))
-                if st.session_state.wb_answers.get(qid) != ans_str:
-                    st.session_state.wb_answers[qid] = ans_str
-                st.caption(f"已选: {', '.join(selected_keys)}")
-            else:
-                st.caption("请选择至少一个选项")
+            elif q["type"] in ("multi", "案例题", "indefinite"):
+                cols = st.columns(2)
+                selected_keys = []
+                for i, k in enumerate(opt_keys):
+                    col = cols[i % 2]
+                    checked = col.checkbox(
+                        f"{k}: {options[k]}",
+                        key=f"wb_cb_{qid}_{k}",
+                        value=(k in user_ans),
+                    )
+                    if checked:
+                        selected_keys.append(k)
 
-    st.markdown("---")
+                if selected_keys:
+                    ans_str = "".join(sorted(selected_keys))
+                    if st.session_state.wb_answers.get(qid) != ans_str:
+                        st.session_state.wb_answers[qid] = ans_str
+                    st.caption(f"已选: {', '.join(selected_keys)}")
+                else:
+                    st.caption("请选择至少一个选项")
 
-    # ---- 导航按钮（上一题、下一题、保存、提交按钮同行） ----
-    nav_cols = st.columns([1, 1, 1, 1])
+        st.markdown("---")
 
-    def _go_prev():
-        st.session_state.wb_current = idx - 1
+        # ---- 导航按钮（上一题、下一题、保存、提交按钮同行） ----
+        nav_cols = st.columns([1, 1, 1, 1])
 
-    def _go_next():
-        st.session_state.wb_current = idx + 1
+        def _go_prev():
+            st.session_state.wb_current = idx - 1
 
-    nav_cols[0].button("◀ 上一题", use_container_width=True,
-                       disabled=(idx == 0), on_click=_go_prev)
-    nav_cols[1].button("下一题 ▶", use_container_width=True,
-                       disabled=(idx >= total_q - 1), on_click=_go_next)
+        def _go_next():
+            st.session_state.wb_current = idx + 1
 
-    if not is_submitted:
-        nav_cols[2].button("💾 保存", use_container_width=True,
-                           on_click=_save_wrongbook_draft)
-        nav_cols[3].button("📤 提交全部答案", use_container_width=True, type="primary",
-                           on_click=lambda: st.session_state.update(wb_confirm_submit=True))
+        nav_cols[0].button("◀ 上一题", use_container_width=True,
+                           disabled=(idx == 0), on_click=_go_prev)
+        nav_cols[1].button("下一题 ▶", use_container_width=True,
+                           disabled=(idx >= total_q - 1), on_click=_go_next)
 
-    if st.session_state.get("wb_confirm_submit"):
-        unanswered = total_q - len(st.session_state.wb_answers)
-        st.warning(f"⚠️ 还有 {unanswered} 题未答，确认提交吗？未答题将计为错误。")
-        col_c1, col_c2 = st.columns(2)
-        if col_c1.button("✅ 确认提交", use_container_width=True):
-            _submit_wrongbook()
-            st.rerun()
-        col_c2.button("❌ 继续答题", use_container_width=True,
-                      on_click=lambda: st.session_state.update(wb_confirm_submit=False))
+        if not is_submitted:
+            nav_cols[2].button("💾 保存", use_container_width=True,
+                               on_click=_save_wrongbook_draft)
+            nav_cols[3].button("📤 提交全部答案", use_container_width=True, type="primary",
+                               on_click=lambda: st.session_state.update(wb_confirm_submit=True))
 
-    # ---- 答题卡 ----
-    st.markdown("---")
-    st.markdown("#### 📌 答题卡" + ("（🟢=正确 🔴=错误/漏答）" if is_submitted else ""))
+        if st.session_state.get("wb_confirm_submit"):
+            unanswered = total_q - len(st.session_state.wb_answers)
+            st.warning(f"⚠️ 还有 {unanswered} 题未答，确认提交吗？未答题将计为错误。")
+            col_c1, col_c2 = st.columns(2)
+            if col_c1.button("✅ 确认提交", use_container_width=True):
+                _submit_wrongbook()
+                st.rerun()
+            col_c2.button("❌ 继续答题", use_container_width=True,
+                          on_click=lambda: st.session_state.update(wb_confirm_submit=False))
 
-    # 筛选 + 进度（仅答题中出现）
+    # ---- 答题卡：仅答题中显示（提交后结果页为单列浏览，不再渲染答题卡）----
     if not is_submitted:
         filter_key = "wb_card_filter"
         if filter_key not in st.session_state:
             st.session_state[filter_key] = "all"
-
-        fc1, fc2, fc3, fc4, fc5 = st.columns(5)
-
-        def _card_filter(v):
-            def _cb():
-                st.session_state[filter_key] = v
-            return _cb
-
-        fc1.button("📋 全部", key="wb_filter_all", use_container_width=True,
-                   type="primary" if st.session_state[filter_key] == "all" else "secondary",
-                   on_click=_card_filter("all"))
-        fc2.button("✅ 已答", key="wb_filter_answered", use_container_width=True,
-                   type="primary" if st.session_state[filter_key] == "answered" else "secondary",
-                   on_click=_card_filter("answered"))
-        fc3.button("⬜ 未答", key="wb_filter_unanswered", use_container_width=True,
-                   type="primary" if st.session_state[filter_key] == "unanswered" else "secondary",
-                   on_click=_card_filter("unanswered"))
-        fc4.button("⭐ 已标记", key="wb_filter_marked", use_container_width=True,
-                   type="primary" if st.session_state[filter_key] == "marked" else "secondary",
-                   on_click=_card_filter("marked"))
-        fc5.button("不确定", key="wb_filter_uncertain", use_container_width=True,
-                   type="primary" if st.session_state[filter_key] == "uncertain" else "secondary",
-                   on_click=_card_filter("uncertain"))
-
-        filter_mode = st.session_state[filter_key]
-        answered = len(st.session_state.wb_answers)
-        marked_count = len(st.session_state.get("wb_marked", set()))
-        uncertain_count = len(st.session_state.get("wb_uncertain", set()))
-        st.progress(answered / total_q, text=f"已答 {answered}/{total_q}"
-            + (f" · 已标记 {marked_count}" if marked_count else "")
-            + (f" · 不确定 {uncertain_count}" if uncertain_count else ""))
-    else:
-        filter_mode = "all"
-
-    # ======== 答题卡网格（Streamlit 原生按钮，不会打开新标签页）========
-    st.markdown("""
-    <style>
-    div.stButton > button {
-        font-size: 10px !important; white-space: nowrap !important;
-        padding-left: 0px !important; padding-right: 0px !important;
-        min-height: 18px !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    _cols = 10
-    for _row in range((total_q + _cols - 1) // _cols):
-        _rcols = st.columns(_cols)
-        for _ci in range(_cols):
-            _qi = _row * _cols + _ci
-            with _rcols[_ci]:
-                if _qi >= total_q:
-                    st.markdown("&nbsp;", unsafe_allow_html=True)
-                    continue
-                _qit = wq[_qi]
-                _qid = _qit["id"]
-
-                _vis = True
-                if filter_mode == "answered" and _qid not in st.session_state.wb_answers:
-                    _vis = False
-                if filter_mode == "unanswered" and _qid in st.session_state.wb_answers:
-                    _vis = False
-                if filter_mode == "marked" and _qid not in st.session_state.get("wb_marked", set()):
-                    _vis = False
-                if filter_mode == "uncertain" and _qid not in st.session_state.get("wb_uncertain", set()):
-                    _vis = False
-                if not _vis:
-                    st.markdown("&nbsp;", unsafe_allow_html=True)
-                    continue
-
-                _answered = _qid in st.session_state.wb_answers
-                _marked = _qid in st.session_state.get("wb_marked", set())
-                _uncertain = _qid in st.session_state.get("wb_uncertain", set())
-                _current = _qi == idx
-                _is_correct = st.session_state.wb_results.get(_qid, {}).get("correct", False)
-
-                _label = str(_qi + 1)
-                if _current:
-                    _label = f"▶{_label}"
-
-                if is_submitted:
-                    _btype = "primary" if _is_correct else "secondary"
-                else:
-                    _btype = "primary" if _answered else "secondary"
-                # 标记/不确定：固定高度角标行（所有按钮对齐，提交后不显示）
-                _badges = []
-                if _marked and not is_submitted:
-                    _badges.append('<span style="font-size:8px;color:#ff9800;">⭐</span>')
-                if _uncertain and not is_submitted:
-                    _badges.append('<span style="font-size:8px;color:#ff9800;">?</span>')
-                st.markdown(
-                    f'<div style="text-align:right;height:14px;line-height:14px;">{"".join(_badges)}</div>',
-                    unsafe_allow_html=True,
-                )
-                st.button(_label, key=f"wb_card_{_qi}",
-                          use_container_width=True, type=_btype,
-                          on_click=lambda i=_qi: setattr(
-                              st.session_state, "wb_current", i))
+        with card_col:
+            render_answer_card(
+                state_prefix="wb",
+                questions=wq,
+                answers=st.session_state.wb_answers,
+                marked=st.session_state.get("wb_marked", set()),
+                uncertain=st.session_state.get("wb_uncertain", set()),
+                current_idx=idx,
+                filter_mode=st.session_state.get(filter_key, "all"),
+                filter_state_key=filter_key,
+                submitted=False,
+            )
 
     # 完成提示
     if is_submitted and total_q > 0:
@@ -872,7 +791,8 @@ def _show_wrong_practice():
                        "wb_answers", "wb_wrong_counts", "wb_current",
                        "wb_marked", "wb_uncertain", "wb_regenerate",
                        "wb_confirm_submit", "wb_confirm_clear",
-                       "wb_session_id", "wb_cached_total"):
+                       "wb_session_id", "wb_cached_total",
+                       "wb_card_filter"):
                 st.session_state.pop(k, None)
             st.rerun()
 

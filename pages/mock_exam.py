@@ -15,6 +15,7 @@ from utils.data_manager import (
     save_draft, load_drafts, delete_draft,
     load_case_studies, get_case_sub_questions, get_question_stats,
 )
+from utils.answer_card import render_answer_card
 
 
 def _get_cached_qstats(qid):
@@ -452,285 +453,210 @@ def _show_exam_subject(subject_key):
     </style>
     """, unsafe_allow_html=True)
 
-    # 题目显示
-    type_labels = {"single": "🔵 单选题", "multi": "🟢 多选题", "judge": "🟠 判断题", "案例题": "🟣 案例题", "indefinite": "🟡 不定项选择题"}
-    category = q.get('category', infer_category(q.get('source_file', '')))
+    # ---- 答题区：左栏题目区 / 右栏答题卡（右栏与左栏等高、滚动时常驻可见）----
+    main_col, card_col = st.columns([3.05, 1], gap="large")
 
-    # 案例题子题：在题目上方展示案例背景
-    case_study_id = q.get("case_study_id", "")
-    if case_study_id:
-        bg_text = st.session_state.get("mock_case_backgrounds", {}).get(case_study_id, "")
-        if bg_text:
-            with st.expander("📋 **案例背景**", expanded=True):
-                st.markdown(
-                    f"""<div style="background:#f3e5f5;padding:14px 16px;border-radius:8px;
-                    border-left:5px solid #9c27b0;font-size:16px;line-height:1.8;">{bg_text}</div>""",
-                    unsafe_allow_html=True,
-                )
+    with main_col:
+        # 题目显示
+        type_labels = {"single": "🔵 单选题", "multi": "🟢 多选题", "judge": "🟠 判断题", "案例题": "🟣 案例题", "indefinite": "🟡 不定项选择题"}
+        category = q.get('category', infer_category(q.get('source_file', '')))
 
-    # 获取本题答题统计（从缓存读取，与专项训练一致）
-    q_stats = _get_cached_qstats(qid)
+        # 案例题子题：在题目上方展示案例背景
+        case_study_id = q.get("case_study_id", "")
+        if case_study_id:
+            bg_text = st.session_state.get("mock_case_backgrounds", {}).get(case_study_id, "")
+            if bg_text:
+                with st.expander("📋 **案例背景**", expanded=True):
+                    st.markdown(
+                        f"""<div style="background:#f3e5f5;padding:14px 16px;border-radius:8px;
+                        border-left:5px solid #9c27b0;font-size:16px;line-height:1.8;">{bg_text}</div>""",
+                        unsafe_allow_html=True,
+                    )
 
-    # 题号行：左侧题号，右侧历史统计（与专项训练布局一致）
-    title_cols = st.columns([1, 2])
-    with title_cols[0]:
-        st.markdown(f"##### 第 {idx+1}/{total_q} 题")
-    with title_cols[1]:
-        stats_parts = []
-        if q_stats["correct_count"] > 0 or q_stats["wrong_count"] > 0:
-            stats_parts.append(f"📊 答对 {q_stats['correct_count']} 次 / 答错 {q_stats['wrong_count']} 次")
-        last_correct = q_stats.get("last_correct")
-        if last_correct is True:
-            stats_parts.append("🟢 上次答对")
-        elif last_correct is False:
-            stats_parts.append("🔴 上次答错")
-        # 掌握状态标签
-        if q_stats.get("retention_due"):
-            stats_parts.append("⏰ 遗忘预警")
-        if q_stats.get("unstable"):
-            history = q_stats.get("answer_history", [])
-            if history and not history[-1]:
-                stats_parts.append("⚠️ 消退型")
-            else:
-                stats_parts.append("⚠️ 波动型")
-        if stats_parts:
-            st.markdown(f"<div style='text-align:right;padding-top:0.5em;color:#888;font-size:16px;'>{'&nbsp;&nbsp;|&nbsp;&nbsp;'.join(stats_parts)}</div>", unsafe_allow_html=True)
-    
-    # 题型标签 + 不确定按钮 + 标记按钮 同行
-    title_col1, title_col2, title_col3 = st.columns([6, 2, 2])
-    # 答过 3 次以上才显示「不确定」开关
-    total_answers = q_stats["correct_count"] + q_stats["wrong_count"]
-    with title_col1:
-        st.markdown(f"**{type_labels.get(q['type'], q['type'])}**"
-                    f"{' · 📂 ' + category if category else ''}")
-    with title_col2:
-        if total_answers >= 3:
-            toggle_key = f"mock_uncertain_toggle_{qid}"
-            if toggle_key not in st.session_state:
-                st.session_state[toggle_key] = qid in st.session_state.mock_uncertain
+        # 获取本题答题统计（从缓存读取，与专项训练一致）
+        q_stats = _get_cached_qstats(qid)
 
-            def _on_mock_uncertain_toggle():
-                if st.session_state[toggle_key]:
-                    st.session_state.mock_uncertain.add(qid)
+        # 题号行：左侧题号，右侧历史统计（与专项训练布局一致）
+        title_cols = st.columns([1, 2])
+        with title_cols[0]:
+            st.markdown(f"##### 第 {idx+1}/{total_q} 题")
+        with title_cols[1]:
+            stats_parts = []
+            if q_stats["correct_count"] > 0 or q_stats["wrong_count"] > 0:
+                stats_parts.append(f"📊 答对 {q_stats['correct_count']} 次 / 答错 {q_stats['wrong_count']} 次")
+            last_correct = q_stats.get("last_correct")
+            if last_correct is True:
+                stats_parts.append("🟢 上次答对")
+            elif last_correct is False:
+                stats_parts.append("🔴 上次答错")
+            # 掌握状态标签
+            if q_stats.get("retention_due"):
+                stats_parts.append("⏰ 遗忘预警")
+            if q_stats.get("unstable"):
+                history = q_stats.get("answer_history", [])
+                if history and not history[-1]:
+                    stats_parts.append("⚠️ 消退型")
                 else:
-                    st.session_state.mock_uncertain.discard(qid)
-
-            st.toggle("不确定",
-                      key=toggle_key,
-                      value=qid in st.session_state.mock_uncertain,
-                      help="标记此题为不确定",
-                      on_change=_on_mock_uncertain_toggle)
-    with title_col3:
-        marked = qid in st.session_state.mock_marked
-
-        def _toggle_mark(q=qid):
-            if q in st.session_state.mock_marked:
-                st.session_state.mock_marked.discard(q)
-            else:
-                st.session_state.mock_marked.add(q)
-
-        st.button("⭐ 标记" if marked else "☆ 标记",
-                  key=f"mock_mark_{qid}",
-                  help="取消标记" if marked else "标记此题",
-                  use_container_width=True,
-                  on_click=_toggle_mark)
+                    stats_parts.append("⚠️ 波动型")
+            if stats_parts:
+                st.markdown(f"<div style='text-align:right;padding-top:0.5em;color:#888;font-size:13px;'>{'&nbsp;·&nbsp;'.join(stats_parts)}</div>", unsafe_allow_html=True)
     
-    st.markdown(f"**{q['question']}**")
+        # 题型标签 + 不确定按钮 + 标记按钮 同行
+        title_col1, title_col2, title_col3 = st.columns([5, 2.5, 2.5])
+        # 答过 3 次以上才显示「不确定」开关
+        total_answers = q_stats["correct_count"] + q_stats["wrong_count"]
+        with title_col1:
+            st.markdown(f"**{type_labels.get(q['type'], q['type'])}**"
+                        f"{' · 📂 ' + category if category else ''}")
+        with title_col2:
+            if total_answers >= 3:
+                toggle_key = f"mock_uncertain_toggle_{qid}"
+                if toggle_key not in st.session_state:
+                    st.session_state[toggle_key] = qid in st.session_state.mock_uncertain
 
-    # 选项行距：1.5倍
-    st.markdown("""
-    <style>
-    div[data-testid="stRadio"] label,
-    div[data-testid="stCheckbox"] label {
-        line-height: 1.5;
-    }
-    /* 正文区按钮字号与不确定开关一致（答题卡区有 10px 覆盖） */
-    div.stButton > button {
-        font-size: 13px !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+                def _on_mock_uncertain_toggle():
+                    if st.session_state[toggle_key]:
+                        st.session_state.mock_uncertain.add(qid)
+                    else:
+                        st.session_state.mock_uncertain.discard(qid)
 
-    options = q["options"]
-    opt_keys = sorted(options.keys())
-    user_ans = st.session_state.mock_answers.get(qid, "")
+                st.toggle("不确定",
+                          key=toggle_key,
+                          value=qid in st.session_state.mock_uncertain,
+                          help="标记此题为不确定",
+                          on_change=_on_mock_uncertain_toggle)
+        with title_col3:
+            marked = qid in st.session_state.mock_marked
 
-    if q["type"] in ("single", "judge"):
-        options_list = [f"{k}: {options[k]}" for k in opt_keys]
-        idx_in_list = None
-        for i, opt in enumerate(options_list):
-            if opt.startswith(user_ans + ":"):
-                idx_in_list = i
-                break
+            def _toggle_mark(q=qid):
+                if q in st.session_state.mock_marked:
+                    st.session_state.mock_marked.discard(q)
+                else:
+                    st.session_state.mock_marked.add(q)
 
-        selected_opt = st.radio(
-            "请选择答案：",
-            options_list,
-            key=f"mock_radio_{qid}",
-            index=idx_in_list,
-            label_visibility="collapsed",
-        )
-        if selected_opt:
-            selected_key = selected_opt.split(":")[0]
-            if st.session_state.mock_answers.get(qid) != selected_key:
-                st.session_state.mock_answers[qid] = selected_key
-    elif q["type"] in ("multi", "案例题", "indefinite"):
-        cols = st.columns(2)
-        selected_keys = []
-        for i, k in enumerate(opt_keys):
-            col = cols[i % 2]
-            checked = col.checkbox(
-                f"{k}: {options[k]}",
-                key=f"mock_cb_{qid}_{k}",
-                value=(k in user_ans),
+            st.button("⭐ 标记" if marked else "☆ 标记",
+                      key=f"mock_mark_{qid}",
+                      help="取消标记" if marked else "标记此题",
+                      use_container_width=True,
+                      on_click=_toggle_mark)
+    
+        st.markdown(f"**{q['question']}**")
+
+        # 选项行距：1.5倍
+        st.markdown("""
+        <style>
+        div[data-testid="stRadio"] label,
+        div[data-testid="stCheckbox"] label {
+            line-height: 1.5;
+        }
+        /* 正文区按钮字号与不确定开关一致（答题卡区有 10px 覆盖） */
+        div.stButton > button {
+            font-size: 13px !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        options = q["options"]
+        opt_keys = sorted(options.keys())
+        user_ans = st.session_state.mock_answers.get(qid, "")
+
+        if q["type"] in ("single", "judge"):
+            options_list = [f"{k}: {options[k]}" for k in opt_keys]
+            idx_in_list = None
+            for i, opt in enumerate(options_list):
+                if opt.startswith(user_ans + ":"):
+                    idx_in_list = i
+                    break
+
+            selected_opt = st.radio(
+                "请选择答案：",
+                options_list,
+                key=f"mock_radio_{qid}",
+                index=idx_in_list,
+                label_visibility="collapsed",
             )
-            if checked:
-                selected_keys.append(k)
+            if selected_opt:
+                selected_key = selected_opt.split(":")[0]
+                if st.session_state.mock_answers.get(qid) != selected_key:
+                    st.session_state.mock_answers[qid] = selected_key
+        elif q["type"] in ("multi", "案例题", "indefinite"):
+            cols = st.columns(2)
+            selected_keys = []
+            for i, k in enumerate(opt_keys):
+                col = cols[i % 2]
+                checked = col.checkbox(
+                    f"{k}: {options[k]}",
+                    key=f"mock_cb_{qid}_{k}",
+                    value=(k in user_ans),
+                )
+                if checked:
+                    selected_keys.append(k)
 
-        if selected_keys:
-            ans_str = "".join(sorted(selected_keys))
-            if st.session_state.mock_answers.get(qid) != ans_str:
-                st.session_state.mock_answers[qid] = ans_str
-            st.caption(f"已选: {', '.join(selected_keys)}")
-        else:
-            st.caption("请选择至少一个选项")
+            if selected_keys:
+                ans_str = "".join(sorted(selected_keys))
+                if st.session_state.mock_answers.get(qid) != ans_str:
+                    st.session_state.mock_answers[qid] = ans_str
+                st.caption(f"已选: {', '.join(selected_keys)}")
+            else:
+                st.caption("请选择至少一个选项")
 
-    st.markdown("---")
+        st.markdown("---")
 
-    # 导航按钮（上一题、下一题、保存、提交按钮同行）
-    nav_cols = st.columns([1, 1, 1, 1])
+        # 导航按钮（上一题、下一题、保存、提交按钮同行）
+        nav_cols = st.columns([1, 1, 1, 1])
 
-    def _go_prev():
-        st.session_state.mock_current = idx - 1
+        def _go_prev():
+            st.session_state.mock_current = idx - 1
 
-    def _go_next():
-        st.session_state.mock_current = idx + 1
+        def _go_next():
+            st.session_state.mock_current = idx + 1
 
-    nav_cols[0].button("◀ 上一题", use_container_width=True,
-                       disabled=(idx == 0), on_click=_go_prev)
-    nav_cols[1].button("下一题 ▶", use_container_width=True,
-                       disabled=(idx >= total_q - 1), on_click=_go_next)
-    nav_cols[2].button("💾 保存", use_container_width=True,
-                       on_click=lambda: _save_mock_draft(subject_key))
-    nav_cols[3].button("📤 提交试卷", use_container_width=True, type="primary",
-                       on_click=lambda: st.session_state.update(mock_confirm_submit=True))
+        nav_cols[0].button("◀ 上一题", use_container_width=True,
+                           disabled=(idx == 0), on_click=_go_prev)
+        nav_cols[1].button("下一题 ▶", use_container_width=True,
+                           disabled=(idx >= total_q - 1), on_click=_go_next)
+        nav_cols[2].button("💾 保存", use_container_width=True,
+                           on_click=lambda: _save_mock_draft(subject_key))
+        nav_cols[3].button("📤 提交试卷", use_container_width=True, type="primary",
+                           on_click=lambda: st.session_state.update(mock_confirm_submit=True))
 
-    if st.session_state.get("mock_confirm_submit"):
-        unanswered = total_q - len(st.session_state.mock_answers)
-        st.warning(f"⚠️ 还有 {unanswered} 题未答，确认提交吗？（未答题不计为错题，但本题不得分）")
-        col_c1, col_c2 = st.columns(2)
-        if col_c1.button("✅ 确认提交", use_container_width=True):
-            _finish_subject(subject_key)
-        col_c2.button("❌ 继续答题", use_container_width=True,
-                      on_click=lambda: st.session_state.update(mock_confirm_submit=False))
+        if st.session_state.get("mock_confirm_submit"):
+            unanswered = total_q - len(st.session_state.mock_answers)
+            st.warning(f"⚠️ 还有 {unanswered} 题未答，确认提交吗？（未答题不计为错题，但本题不得分）")
+            col_c1, col_c2 = st.columns(2)
+            if col_c1.button("✅ 确认提交", use_container_width=True):
+                _finish_subject(subject_key)
+            col_c2.button("❌ 继续答题", use_container_width=True,
+                          on_click=lambda: st.session_state.update(mock_confirm_submit=False))
 
-    # 答题卡
-    st.markdown("---")
-    st.markdown("#### 📌 答题卡")
-
-    # 筛选按钮
+    # ---- 答题卡：右栏常驻 ----
     filter_key = "mock_card_filter"
     if filter_key not in st.session_state:
         st.session_state[filter_key] = "all"
 
-    def _card_filter(v):
-        def _cb():
-            st.session_state[filter_key] = v
-        return _cb
-
-    fc1, fc2, fc3, fc4, fc5 = st.columns(5)
-    fc1.button("📋 全部", key="mock_filter_all", use_container_width=True,
-               type="primary" if st.session_state[filter_key] == "all" else "secondary",
-               on_click=_card_filter("all"))
-    fc2.button("✅ 已答", key="mock_filter_answered", use_container_width=True,
-               type="primary" if st.session_state[filter_key] == "answered" else "secondary",
-               on_click=_card_filter("answered"))
-    fc3.button("⬜ 未答", key="mock_filter_unanswered", use_container_width=True,
-               type="primary" if st.session_state[filter_key] == "unanswered" else "secondary",
-               on_click=_card_filter("unanswered"))
-    fc4.button("⭐ 已标记", key="mock_filter_marked", use_container_width=True,
-               type="primary" if st.session_state[filter_key] == "marked" else "secondary",
-               on_click=_card_filter("marked"))
-    fc5.button("不确定", key="mock_filter_uncertain", use_container_width=True,
-               type="primary" if st.session_state[filter_key] == "uncertain" else "secondary",
-               on_click=_card_filter("uncertain"))
-
-    filter_mode = st.session_state[filter_key]
-    answered = len(st.session_state.mock_answers)
-    marked_count = len(st.session_state.mock_marked)
-    uncertain_count = len(st.session_state.mock_uncertain)
-    st.progress(answered / total_q, text=f"已答 {answered}/{total_q}"
-        + (f" · 已标记 {marked_count}" if marked_count else "")
-        + (f" · 不确定 {uncertain_count}" if uncertain_count else ""))
-
-    # 答题卡导航格子（Streamlit 原生按钮，不会打开新标签页）
-    st.markdown("""
-    <style>
-    /* 答题卡按钮小字号不换行 */
-    div.stButton > button {
-        font-size: 10px !important; white-space: nowrap !important;
-        padding-left: 0px !important; padding-right: 0px !important;
-        min-height: 18px !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    _cols = 10
-    for _row in range((total_q + _cols - 1) // _cols):
-        _rcols = st.columns(_cols)
-        for _ci in range(_cols):
-            _qi = _row * _cols + _ci
-            with _rcols[_ci]:
-                if _qi >= total_q:
-                    st.markdown("&nbsp;", unsafe_allow_html=True)
-                    continue
-                _qit = eq[_qi]
-                _qid = _qit["id"]
-
-                # 筛选逻辑
-                _vis = True
-                if filter_mode == "answered" and _qid not in st.session_state.mock_answers:
-                    _vis = False
-                if filter_mode == "unanswered" and _qid in st.session_state.mock_answers:
-                    _vis = False
-                if filter_mode == "marked" and _qid not in st.session_state.mock_marked:
-                    _vis = False
-                if filter_mode == "uncertain" and _qid not in st.session_state.mock_uncertain:
-                    _vis = False
-                if not _vis:
-                    st.markdown("&nbsp;", unsafe_allow_html=True)
-                    continue
-
-                _answered = _qid in st.session_state.mock_answers
-                _marked = _qid in st.session_state.mock_marked
-                _uncertain = _qid in st.session_state.mock_uncertain
-                _current = _qi == idx
-
-                _label = str(_qi + 1)
-                if _current:
-                    _label = f"▶{_label}"
-
-                _btype = "primary" if _answered else "secondary"
-                # 标记/不确定：固定高度角标行（所有按钮对齐）
-                _badges = []
-                if _marked:
-                    _badges.append('<span style="font-size:8px;color:#ff9800;">⭐</span>')
-                if _uncertain:
-                    _badges.append('<span style="font-size:8px;color:#ff9800;">?</span>')
-                st.markdown(
-                    f'<div style="text-align:right;height:14px;line-height:14px;">{"".join(_badges)}</div>',
-                    unsafe_allow_html=True,
-                )
-                st.button(_label, key=f"mock_card_{_qi}",
-                          use_container_width=True, type=_btype,
-                          on_click=lambda i=_qi: setattr(
-                              st.session_state, "mock_current", i))
+    with card_col:
+        render_answer_card(
+            state_prefix="mock",
+            questions=eq,
+            answers=st.session_state.mock_answers,
+            marked=st.session_state.mock_marked,
+            uncertain=st.session_state.mock_uncertain,
+            current_idx=idx,
+            filter_mode=st.session_state[filter_key],
+        )
 
 
 
 def _save_mock_draft(subject_key: str, auto_save: bool = False):
     """将当前模拟考试状态保存为草稿
-    
-    auto_save=True: 后台静默保存，不暂停倒计时，不rerun，不显示提示
+
+    auto_save=True: 后台静默保存，不暂停倒计时，不显示提示
+    auto_save=False: 手动保存（由「💾 保存」按钮的 on_click 回调触发）——
+        只设置状态标志与暂停标记，**不调用 st.rerun()**：
+        回调内的 st.rerun() 是 no-op，且会弹出
+        "Calling st.rerun() within a callback is a no-op." 警告。
+        回调结束后 Streamlit 会自动重跑，届时由本片段开头读取
+        mock_draft_saved 标志展示「已保存」提示（与专项训练/巩固练习一致）。
     """
     session_id = st.session_state.get("mock_session_id", "")
     now = time.time()
@@ -755,12 +681,13 @@ def _save_mock_draft(subject_key: str, auto_save: bool = False):
     save_draft("mock", session_id, draft_data)
     st.session_state.mock_draft_id = session_id
     if auto_save:
-        return  # 静默保存，不暂停，不rerun
+        return  # 静默保存，不暂停，不显示提示
     st.session_state.mock_draft_saved = True
-    # 暂停倒计时
+    # 暂停倒计时（下次重跑时由本片段读取并冻结显示）
     st.session_state.mock_paused_at = now
     st.session_state.mock_remaining_at_pause = remaining_seconds
-    st.rerun()
+    # 注意：此处不调用 st.rerun()——本函数由按钮 on_click 回调触发，
+    # 回调内 st.rerun() 是 no-op 且会弹警告；回调结束后 Streamlit 自动重跑。
 
 
 def _finish_subject(subject_key):
@@ -942,184 +869,121 @@ def _show_subject_result(subject_key):
 
     accuracy = correct / total * 100
 
-    st.markdown(f"# 📊 {cfg['name']} - 成绩报告")
-    st.markdown("---")
-
-    cols = st.columns([1.2, 1.8, 1, 1])
-    cols[0].metric("✅ 正确", f"{correct}/{total}", f"{accuracy:.1f}%")
-    cols[1].metric("📊 得分", f"{score:.1f} / {max_score:.1f}")
-    cols[2].metric("⏱️ 用时", duration)
-    cols[3].metric("📈 准确率", f"{accuracy:.1f}%")
-
-    # 分题型统计
-    st.markdown("---")
-    st.markdown("### 分题型统计")
-
-    type_stats = {}
-    for d in details:
-        tp = d["type"]
-        if tp not in type_stats:
-            type_stats[tp] = {"total": 0, "correct": 0, "score": 0.0}
-        type_stats[tp]["total"] += 1
-        if d["is_correct"]:
-            type_stats[tp]["correct"] += 1
-            type_stats[tp]["score"] += d["score"]
-
-    type_names = {"single": "单选题", "multi": "多选题", "judge": "判断题", "案例题": "案例题"}
-
-    for tp, stats in type_stats.items():
-        pct = stats["correct"] / stats["total"] * 100 if stats["total"] > 0 else 0
-        st.markdown(f"**{type_names.get(tp, tp)}**: {stats['correct']}/{stats['total']} 正确 ({pct:.1f}%)")
-        st.progress(stats["correct"] / max(stats["total"], 1))
-
-    # 知识板块统计
-    if cat_stats:
+    # ---- 成绩报告 + 错题回顾（单列浏览，结果页不使用答题卡）----
+    with st.container():
+        st.markdown(f"# 📊 {cfg['name']} - 成绩报告")
         st.markdown("---")
-        st.markdown("### 📂 知识板块分析")
-        for cat, stats in sorted(cat_stats.items()):
+        cols = st.columns([1.2, 1.8, 1, 1])
+        cols[0].metric("✅ 正确", f"{correct}/{total}", f"{accuracy:.1f}%")
+        cols[1].metric("📊 得分", f"{score:.1f} / {max_score:.1f}")
+        cols[2].metric("⏱️ 用时", duration)
+        cols[3].metric("📈 准确率", f"{accuracy:.1f}%")
+        # 分题型统计
+        st.markdown("---")
+        st.markdown("### 分题型统计")
+        type_stats = {}
+        for d in details:
+            tp = d["type"]
+            if tp not in type_stats:
+                type_stats[tp] = {"total": 0, "correct": 0, "score": 0.0}
+            type_stats[tp]["total"] += 1
+            if d["is_correct"]:
+                type_stats[tp]["correct"] += 1
+                type_stats[tp]["score"] += d["score"]
+        type_names = {"single": "单选题", "multi": "多选题", "judge": "判断题", "案例题": "案例题"}
+        for tp, stats in type_stats.items():
             pct = stats["correct"] / stats["total"] * 100 if stats["total"] > 0 else 0
-            st.markdown(f"**{cat}**: {stats['correct']}/{stats['total']} 正确 ({pct:.1f}%)")
+            st.markdown(f"**{type_names.get(tp, tp)}**: {stats['correct']}/{stats['total']} 正确 ({pct:.1f}%)")
             st.progress(stats["correct"] / max(stats["total"], 1))
-
-    # 错题回顾
-    st.markdown("---")
-    wrong_details = [d for d in details if not d["is_correct"]]
-    if wrong_details:
-        st.markdown(f"### ❌ 错题回顾 ({len(wrong_details)}题)")
-        for i, d in enumerate(wrong_details):
-            tp_label = {"single": "单选", "multi": "多选", "judge": "判断", "案例题": "案例题"}.get(d["type"], d["type"])
-            cat_label = d.get("category", "")
-            user_ans = d.get("user_answer", "").strip().upper()
-            correct_ans = d["correct_answer"].strip().upper()
-            options = d.get("options", {})
-            opt_keys = sorted(options.keys())
-
-            with st.expander(f"{i+1}. [{tp_label}] {d['question'][:60]}...", expanded=True):
-                st.markdown(f"**题目**: {d['question']}")
-
-                # 显示所有选项，用颜色标记
-                # 注意：单选/判断题 correct_ans 是单个字母（如 "A"），必须用 ==不能用 in
-                # 多选/案例题 correct_ans 是多个字母（如 "ABC"），用 in 判断
-                is_multi = d["type"] in ("multi", "案例题", "indefinite")
-                for k in opt_keys:
-                    is_user_selected = k in user_ans
-                    is_correct_key = (k in correct_ans) if is_multi else (k == correct_ans)
-
-                    if is_multi:
-                        if is_user_selected and is_correct_key:
-                            st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]}</p>',
-                                        unsafe_allow_html=True)
-                        elif is_user_selected and not is_correct_key:
-                            st.markdown(f'<p style="color:#b71c1c;font-weight:bold;">❌️ {k}: {options[k]} (错选)</p>',
-                                        unsafe_allow_html=True)
-                        elif not is_user_selected and is_correct_key:
-                            st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]} (漏选)</p>',
-                                        unsafe_allow_html=True)
+        # 知识板块统计
+        if cat_stats:
+            st.markdown("---")
+            st.markdown("### 📂 知识板块分析")
+            for cat, stats in sorted(cat_stats.items()):
+                pct = stats["correct"] / stats["total"] * 100 if stats["total"] > 0 else 0
+                st.markdown(f"**{cat}**: {stats['correct']}/{stats['total']} 正确 ({pct:.1f}%)")
+                st.progress(stats["correct"] / max(stats["total"], 1))
+        # 错题回顾（单列逐题浏览）
+        st.markdown("---")
+        review_idxs = [i for i, d in enumerate(details) if not d["is_correct"]]
+        if review_idxs:
+            st.markdown(f"### ❌ 错题回顾 ({len(review_idxs)}题)")
+            expand_all = True
+            for i, qi in enumerate(review_idxs):
+                d = details[qi]
+                wn = qi + 1
+                tp_label = {"single": "单选", "multi": "多选", "judge": "判断", "案例题": "案例题"}.get(d["type"], d["type"])
+                cat_label = d.get("category", "")
+                user_ans = d.get("user_answer", "").strip().upper()
+                correct_ans = d["correct_answer"].strip().upper()
+                options = d.get("options", {})
+                opt_keys = sorted(options.keys())
+                with st.expander(f"{wn}. [{tp_label}] {d['question'][:60]}...", expanded=expand_all):
+                    st.markdown(f"**题目**: {d['question']}")
+                    # 显示所有选项，用颜色标记
+                    # 注意：单选/判断题 correct_ans 是单个字母（如 "A"），必须用 ==不能用 in
+                    # 多选/案例题 correct_ans 是多个字母（如 "ABC"），用 in 判断
+                    is_multi = d["type"] in ("multi", "案例题", "indefinite")
+                    for k in opt_keys:
+                        is_user_selected = k in user_ans
+                        is_correct_key = (k in correct_ans) if is_multi else (k == correct_ans)
+                        if is_multi:
+                            if is_user_selected and is_correct_key:
+                                st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]}</p>',
+                                            unsafe_allow_html=True)
+                            elif is_user_selected and not is_correct_key:
+                                st.markdown(f'<p style="color:#b71c1c;font-weight:bold;">❌️ {k}: {options[k]} (错选)</p>',
+                                            unsafe_allow_html=True)
+                            elif not is_user_selected and is_correct_key:
+                                st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]} (漏选)</p>',
+                                            unsafe_allow_html=True)
+                            else:
+                                st.markdown(f'{k}: {options[k]}')
                         else:
-                            st.markdown(f'{k}: {options[k]}')
+                            if is_user_selected and is_correct_key:
+                                st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]}</p>',
+                                            unsafe_allow_html=True)
+                            elif is_user_selected and not is_correct_key:
+                                st.markdown(f'{k}: {options[k]}')
+                            elif not is_user_selected and is_correct_key:
+                                st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]}</p>',
+                                            unsafe_allow_html=True)
+                            else:
+                                st.markdown(f'{k}: {options[k]}')
+                    # 你的答案（含选项内容）
+                    if user_ans:
+                        user_display = get_answer_display(d["type"], user_ans, options)
+                        st.error(f"**你的答案**：{user_display}")
                     else:
-                        if is_user_selected and is_correct_key:
-                            st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]}</p>',
-                                        unsafe_allow_html=True)
-                        elif is_user_selected and not is_correct_key:
-                            st.markdown(f'{k}: {options[k]}')
-                        elif not is_user_selected and is_correct_key:
-                            st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]}</p>',
-                                        unsafe_allow_html=True)
-                        else:
-                            st.markdown(f'{k}: {options[k]}')
-
-                # 你的答案（含选项内容）
-                if user_ans:
-                    user_display = get_answer_display(d["type"], user_ans, options)
-                    st.error(f"**你的答案**：{user_display}")
-                else:
-                    st.error("**你的答案**：未作答")
-
-                # 正确答案（含选项内容）
-                correct_display = get_answer_display(d["type"], correct_ans, options)
-                st.markdown(
-                    f'<div style="background:#e8f5e9;border-left:4px solid #1b5e20;padding:8px 12px;'
-                    f'border-radius:4px;margin:4px 0;">'
-                    f'<span style="color:#1b5e20;font-weight:bold;">✅ 正确答案：{correct_display}</span></div>',
-                    unsafe_allow_html=True,
-                )
-
-                # 解析（直接跟在正确答案后面）
-                explanation = d.get("explanation", "")
-                if explanation:
-                    st.markdown(explanation)
-
-                if cat_label:
-                    st.markdown(f"**知识板块**：{cat_label}")
-
-                q_stats = _get_cached_qstats(d.get("id", ""))
-                st.caption(f"📊 答题统计：答对 {q_stats['correct_count']} 次 / 答错 {q_stats['wrong_count']} 次")
-
-    # 答题卡
-    st.markdown("---")
-    st.markdown("#### 📌 答题卡（🟢=正确 🔴=错误/漏答）")
-    eq = st.session_state.mock_questions
-    total_q = len(eq)
-    cols_per_row = 10
-    rows = (total_q + cols_per_row - 1) // cols_per_row
-    details_by_idx = {d["index"]: d for d in details}
-    nav_html = '<div style="display:flex;flex-direction:column;gap:2px;">'
-    for row in range(rows):
-        nav_html += '<div style="display:flex;gap:2px;">'
-        for col_idx in range(cols_per_row):
-            q_idx = row * cols_per_row + col_idx
-            if q_idx >= total_q:
-                nav_html += '<div style="flex:1;min-width:0;"></div>'
-                continue
-            q_item = eq[q_idx]
-            d = details_by_idx.get(q_idx + 1, {})
-            is_correct = d.get("is_correct", False)
-            bg = "#c8e6c9" if is_correct else "#ffcdd2"
-            tc = "#1b5e20" if is_correct else "#b71c1c"
-            
-            # 案例题子题：左侧紫色竖条标记
-            case_border = ""
-            if q_item.get("case_study_id"):
-                case_border = "border-left:4px solid #9c27b0 !important;"
-            
-            # 标记题角标 + 不确定角标
-            is_marked = q_item["id"] in st.session_state.mock_marked
-            is_uncertain = q_item["id"] in st.session_state.mock_uncertain
-            if is_uncertain:
-                indicators = '<sup style="font-size:8px;color:#9c27b0;">❓</sup>'
-                border_style = "1px solid #ddd"
-            elif is_marked:
-                indicators = '<sup style="font-size:8px;">⭐</sup>'
-                border_style = "2px solid #ff9800"
-            else:
-                indicators = ''
-                border_style = "1px solid #ddd"
-            
-            nav_html += f'''
-            <div style="flex:1;min-width:0;">
-                <div style="display:block;width:100%;background:{bg};color:{tc};border:{border_style};
-                          border-radius:3px;font-size:12px;min-height:30px;line-height:30px;
-                          text-align:center;position:relative;{case_border}">
-                    {q_idx + 1}{indicators}
-                </div>
-            </div>'''
-        nav_html += '</div>'
-    nav_html += '</div>'
-    st.markdown(nav_html, unsafe_allow_html=True)
-
-    # 下一科 / 返回
-    st.markdown("---")
-    if subject_key == "psychology":
-        col1, col2, col3 = st.columns([1, 2, 1])
-        if col2.button("📗 进入咨询实务", key="mock_go_counseling", use_container_width=True, type="primary"):
-            _start_subject("counseling")
-    else:
-        col1, col2, col3 = st.columns(3)
-        if col2.button("🏠 查看总成绩", key="mock_view_final", use_container_width=True, type="primary"):
-            _aggregate_final_result()
-        if col3.button("🔄 重新考试", key="mock_retry_exam", use_container_width=True):
-            _reset_mock_exam()
+                        st.error("**你的答案**：未作答")
+                    # 正确答案（含选项内容）
+                    correct_display = get_answer_display(d["type"], correct_ans, options)
+                    st.markdown(
+                        f'<div style="background:#e8f5e9;border-left:4px solid #1b5e20;padding:8px 12px;'
+                        f'border-radius:4px;margin:4px 0;">'
+                        f'<span style="color:#1b5e20;font-weight:bold;">✅ 正确答案：{correct_display}</span></div>',
+                        unsafe_allow_html=True,
+                    )
+                    # 解析（直接跟在正确答案后面）
+                    explanation = d.get("explanation", "")
+                    if explanation:
+                        st.markdown(explanation)
+                    if cat_label:
+                        st.markdown(f"**知识板块**：{cat_label}")
+                    q_stats = _get_cached_qstats(d.get("id", ""))
+                    st.caption(f"📊 答题统计：答对 {q_stats['correct_count']} 次 / 答错 {q_stats['wrong_count']} 次")
+        # 下一科 / 返回
+        st.markdown("---")
+        if subject_key == "psychology":
+            col1, col2, col3 = st.columns([1, 2, 1])
+            if col2.button("📗 进入咨询实务", key="mock_go_counseling", use_container_width=True, type="primary"):
+                _start_subject("counseling")
+        else:
+            col1, col2, col3 = st.columns(3)
+            if col2.button("🏠 查看总成绩", key="mock_view_final", use_container_width=True, type="primary"):
+                _aggregate_final_result()
+            if col3.button("🔄 重新考试", key="mock_retry_exam", use_container_width=True):
+                _reset_mock_exam()
 
 
 def _aggregate_final_result():

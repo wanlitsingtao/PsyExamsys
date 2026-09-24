@@ -546,6 +546,10 @@ st.markdown(f"""
 # 初始化 session_state
 from utils.data_manager import load_config, load_questions, get_available_exam_types, DEFAULT_EXAM_TYPE, invalidate_rerun_cache, get_questions_version, set_current_user
 from utils.account_manager import generate_device_fingerprint, get_or_create_user, ensure_user_db_initialized
+from utils.answer_card import CARD_CSS
+
+# 答题卡右栏样式（模拟考试/专项训练/巩固练习/错题本 共用一套，收在一处避免各页重复注入）
+st.markdown(CARD_CSS, unsafe_allow_html=True)
 
 # 每次 rerun 开始时清除数据缓存，确保使用最新数据
 invalidate_rerun_cache()
