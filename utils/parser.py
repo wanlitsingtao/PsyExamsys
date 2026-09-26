@@ -229,11 +229,12 @@ def _finalize_question(q):
     # 移除答案中的不可见字符（Word 文档导入时常见的零宽空格等格式污染）
     q["answer"] = _sanitize_answer(q["answer"])
 
-    # 生成MD5用于去重
+    # 生成内容指纹 MD5（用于去重、以及判定「是不是同一道题」）
     content = q["question"] + str(sorted(q["options"].items())) + q["answer"]
-    md5_hash = hashlib.md5(content.encode("utf-8")).hexdigest()
-    q["md5"] = md5_hash
-    q["id"] = md5_hash[:12]
+    q["md5"] = hashlib.md5(content.encode("utf-8")).hexdigest()
+    # 注意：题目 ID 不在这里生成。
+    # 单库多租户下 ID 由导入层按 owner 作用域分配（data_access.make_question_id），
+    # 且一经分配【永不变更】—— 这样管理员改题目内容不会切断用户的统计与错题历史。
 
 
 def batch_parse(docx_dir, progress_callback=None):

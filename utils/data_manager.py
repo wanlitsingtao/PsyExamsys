@@ -1,113 +1,120 @@
 """
 数据管理器 - 管理题库、错题库、配置、答题记录、考试记录
             通过 DataAccess 抽象层访问数据（当前使用 SQLite）
+
+单库多租户（2026-09-24 起）：
+  全系统只连一个库 data/exmsys.db，不再有「每用户一个 db 文件」。
+  用户隔离靠 DataAccess 内部的 user_id / owner_id，路由由 set_current_user() 完成。
 """
+import os
 import random
 import shutil
 import time
 from pathlib import Path
 from datetime import datetime
 
-from utils.data_access import get_data_access
+from utils.data_access import get_data_access, SQLITE_DB, PUBLIC_OWNER
 
-# 延迟初始化的 DAO 对象（固定使用 SQLite）
+# 延迟初始化的 DAO 对象（单库，进程内单例）
 _dao = None
 
-# ---- 多用户支持：当前用户私有库 ----
-# 每个用户一个独立 SQLite 库（data/users/<user_id>.db），全部数据操作路由到当前库
-USERS_DIR = Path(__file__).resolve().parent.parent / "data" / "users"
-_current_db_path = None
+# ---- 多用户支持：当前用户（同一库内按 user_id 隔离）----
+_current_user_id = None
 
 
 def set_current_user(user_id: str):
-    """切换当前用户（登录/建号后调用）：路由到该用户私有库并重置缓存。
+    """切换当前用户（登录/建号后调用）：把用户上下文写入 DAO，并重置缓存。
 
-    调用后所有 data_manager 接口自动作用在该用户自己的题库上。
+    单库多租户下不再「切库文件」，而是把 user_id 交给 DataAccess —— 所有读写
+    自动带上该用户的条件，用户之间互不可见。
 
-    ⚠️ 幂等设计（2026-09-14）：若当前**已经**路由到同一用户库，则直接返回，
+    ⚠️ 幂等设计（2026-09-14）：若当前**已经**是同一用户，则直接返回，
     不重建 DAO、不清缓存。这样 app.py 可以在**每一帧**安全地调用它，用于
-    校正跨 session 的模块级全局变量（_current_db_path 会被其他 session 覆盖），
+    校正跨 session 的模块级全局变量（_current_user_id 会被其他 session 覆盖），
     同时不带来任何额外开销。
 
-    为什么必须每帧校正：_current_db_path 是模块级全局变量，Streamlit 多个
+    为什么必须每帧校正：_current_user_id 是模块级全局变量，Streamlit 多个
     session（多标签页/多浏览器）共享同一进程，会互相覆盖；且代码热重载会
-    把它重置为 None。任一情况都会让后续读库落到默认空库，表现为"题库为空"。
+    把它重置为 None。任一情况都会让后续读库落到「无用户」上下文，表现为"题库为空"。
     """
-    global _current_db_path, _dao
-    new_path = str(USERS_DIR / f"{user_id}.db")
-    if _current_db_path == new_path and _dao is not None:
+    global _current_user_id, _dao
+    if _current_user_id == user_id and _dao is not None:
         return  # 已就位，保持缓存与 DAO 复用（避免每帧读盘/重建）
-    _current_db_path = new_path
-    _dao = None  # 强制按新库重建 DAO
+    _current_user_id = user_id
+    _dao = get_data_access(user_id=user_id)  # 单例；此处顺带同步用户上下文
     invalidate_rerun_cache()
     _invalidate_version_cache()
 
 
+def get_current_user_id():
+    """当前用户 ID（未设置时返回 None）"""
+    return _current_user_id
+
+
 def get_current_db_path():
-    """当前用户私有库路径（未设置时返回 None，回退默认库）"""
-    return _current_db_path
+    """当前数据库路径（单库模式下恒定；保留供备份/调试使用）"""
+    return str(SQLITE_DB)
 
 
 def _get_dao():
-    """获取 SQLiteDataAccess 单例（路由到当前用户库）"""
+    """获取数据访问单例（已绑定当前用户上下文）"""
     global _dao
     if _dao is None:
-        _dao = get_data_access(db_path=_current_db_path)
+        _dao = get_data_access(user_id=_current_user_id)
     return _dao
 
 
-# ---- 题库版本号缓存（按 db_path 隔离）----
-# 版本号仅在 save_questions（导入/替换题库）时递增，答题/统计过程不变。
-# 之前每次 rerun 都实时读盘（每次新建连接 + 4 条 PRAGMA + SELECT），
-# 实测约 259ms/次，是勾选答案卡顿的头号元凶。这里改为模块级缓存，
-# 仅在 save_questions / set_current_user 时失效，跨 rerun 复用。
-_version_cache = {}  # {db_path: version}
+# ---- 题库版本号（全局，per-rerun 缓存）----
+# 版本号只在题库写操作（导入/替换/清空）时递增，答题/统计过程不变。
+# 改造前是「每次 rerun 都实时读盘」（每次新建连接 + 4 条 PRAGMA + SELECT，
+# 实测约 259ms/次，是勾选答案卡顿的头号元凶）。
+# 现在缓存到本次 rerun 结束 —— 由 invalidate_rerun_cache() 在每个渲染帧开始时清空。
+# 这样做的关键收益：**任何人对题库的改动，别人下一次刷新（rerun）就能看到**。
+_version_cache_value = None
 
 
 def get_questions_version() -> int:
-    """获取当前题库数据版本号（供 app.py 检测题库是否变更）。
-
-    带 per-db 缓存：版本号只在导入/替换题库时递增，答题过程不变，
-    无需每次 rerun 实时读盘。
-    """
-    db_path = _current_db_path
-    if db_path is not None and db_path in _version_cache:
-        return _version_cache[db_path]
-    version = _get_dao().get_questions_version()
-    if db_path is not None:
-        _version_cache[db_path] = version
-    return version
+    """获取当前题库数据版本号（供 app.py 检测题库是否变更）"""
+    global _version_cache_value
+    if _version_cache_value is None:
+        _version_cache_value = _get_dao().get_questions_version()
+    return _version_cache_value
 
 
 def _invalidate_version_cache():
-    """题库版本号缓存失效（save_questions / set_current_user 时调用）"""
-    global _version_cache
-    _version_cache = {}
+    """题库版本号缓存失效（题库写操作 / set_current_user 时调用）"""
+    global _version_cache_value
+    _version_cache_value = None
 
 
 # ---- per-rerun 缓存（同一 rerun 内复用全量数据，避免重复 I/O）----
 # 注意：这些是**模块级全局变量**，Streamlit 多 session（多标签页/多浏览器）在同一
-# 进程内共享，彼此会互相覆盖。因此每个缓存都记录其归属的库路径（*_db），
-# 读取时校验路径一致才复用，避免串库（读到别人的题库/空库）。
+# 进程内共享，彼此会互相覆盖。因此每个缓存都记录其归属的 user_id（*_user），
+# 读取时校验用户一致才复用，避免串号（读到别人的题库/统计）。
 _rerun_cache_questions = None
-_rerun_cache_questions_db = None
+_rerun_cache_questions_user = None
 _rerun_cache_stats = {}  # 按 exam_type 分别缓存
-_rerun_cache_stats_db = None
+_rerun_cache_stats_user = None
 _rerun_cache_version = 0
 
 
 def invalidate_rerun_cache():
     """每次 Streamlit rerun 开始时调用，清除数据缓存"""
-    global _rerun_cache_questions, _rerun_cache_questions_db
-    global _rerun_cache_stats, _rerun_cache_stats_db, _rerun_cache_version
+    global _rerun_cache_questions, _rerun_cache_questions_user
+    global _rerun_cache_stats, _rerun_cache_stats_user, _rerun_cache_version
+    global _version_cache_value
     _rerun_cache_questions = None
-    _rerun_cache_questions_db = None
+    _rerun_cache_questions_user = None
     _rerun_cache_stats = {}
-    _rerun_cache_stats_db = None
+    _rerun_cache_stats_user = None
     _rerun_cache_version += 1
+    _version_cache_value = None  # 每帧重新读一次题库版本号（跨用户改动可见）
 
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+# 数据目录（可用 EXMSYS_DATA_DIR 覆盖，与 data_access 保持一致：
+# 云端部署挂载卷、自动化测试用副本时靠它改道）
+DATA_DIR = Path(os.environ.get("EXMSYS_DATA_DIR") or
+                (Path(__file__).resolve().parent.parent / "data"))
 BACKUP_DIR = DATA_DIR / "backup"
 DRAFTS_DIR = DATA_DIR / "drafts"
 
@@ -202,23 +209,53 @@ def ensure_dirs():
 # ============================
 
 def load_questions():
-    """加载题库（通过 DataAccess 抽象层，per-rerun 缓存）
+    """加载用户可见题库（公共题库 ∪ 自己的私人题库），per-rerun 缓存
 
-    缓存按库路径（_current_db_path）校验：若缓存的题库来自别的用户库
-    （模块级全局变量被其他 session 覆盖），则强制重读，避免串库或读到空库。
+    缓存按 user_id 校验：若缓存来自别的用户（模块级全局变量被其他 session
+    覆盖），则强制重读，避免串号或读到空题库。
     """
-    global _rerun_cache_questions, _rerun_cache_questions_db
-    if _rerun_cache_questions is not None and _rerun_cache_questions_db == _current_db_path:
+    global _rerun_cache_questions, _rerun_cache_questions_user
+    if _rerun_cache_questions is not None and _rerun_cache_questions_user == _current_user_id:
         return _rerun_cache_questions
     _rerun_cache_questions = _get_dao().load_questions()
-    _rerun_cache_questions_db = _current_db_path
+    _rerun_cache_questions_user = _current_user_id
     return _rerun_cache_questions
 
 
-def save_questions(questions):
-    """保存题库（通过 DataAccess 抽象层）"""
-    _get_dao().save_questions(questions)
-    _invalidate_version_cache()  # 版本号已递增，清除缓存
+def import_questions(questions, owner_id=None, mode="append", exam_type=None):
+    """导入题目（按 owner 作用域 upsert，不再全量重建题库）
+
+    Args:
+        questions: 解析出的题目列表（含 md5）
+        owner_id: 目标 owner。None = 当前用户的私人题库；
+                  PUBLIC_OWNER（'__public__'）= 公共题库，仅管理员使用。
+        mode: 'append' 只新增与更新（默认，安全）；'replace' 额外删除未匹配到的旧题。
+        exam_type: 题目未自带 exam_type 时的兜底题库类型。
+
+    Returns:
+        {"added": n, "updated": n, "unchanged": n, "removed": n, "skipped": n, "log": [...]}
+    """
+    report = _get_dao().import_questions(questions, owner_id=owner_id, mode=mode, exam_type=exam_type)
+    invalidate_rerun_cache()
+    _invalidate_version_cache()
+    return report
+
+
+def clear_questions(owner_id=None, exam_type=None):
+    """清空指定 owner 的题库，返回删除行数
+
+    owner_id=None → 只清空当前用户自己的题（公共题库不受影响）；
+    owner_id=PUBLIC_OWNER → 清空公共题库（管理员专用，影响所有用户）。
+    """
+    n = _get_dao().clear_questions(owner_id=owner_id, exam_type=exam_type)
+    invalidate_rerun_cache()
+    _invalidate_version_cache()
+    return n
+
+
+def count_questions(owner_id=None, exam_type=None):
+    """统计指定 owner 的题目数（owner_id=PUBLIC_OWNER 可查公共题库）"""
+    return _get_dao().count_questions(owner_id=owner_id, exam_type=exam_type)
 
 
 def get_question_count(exam_type=None):
@@ -269,9 +306,9 @@ def load_case_studies(exam_type=None):
     return _get_dao().load_case_studies(exam_type=exam_type)
 
 
-def save_case_studies(case_studies):
-    """批量保存案例背景"""
-    return _get_dao().save_case_studies(case_studies)
+def save_case_studies(case_studies, owner_id=None):
+    """批量保存案例背景（owner_id=None 表示当前用户自己的题库）"""
+    return _get_dao().save_case_studies(case_studies, owner_id=owner_id)
 
 
 def get_case_sub_questions(case_id):
@@ -772,13 +809,12 @@ def save_mock_exam_record(record, exam_type=None):
 # ============================
 
 def backup_data():
-    """备份当前用户的数据库文件"""
+    """备份数据库文件（单库模式：备份整个 exmsys.db）"""
     ensure_dirs()
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    src = Path(_current_db_path) if _current_db_path else DATA_DIR / "exmsys.db"
+    src = Path(SQLITE_DB)
     if src.exists():
-        suffix = f"_{Path(_current_db_path).stem}" if _current_db_path else ""
-        dst = BACKUP_DIR / f"{timestamp}{suffix}_exmsys.db"
+        dst = BACKUP_DIR / f"{timestamp}_exmsys.db"
         shutil.copy2(src, dst)
     return timestamp
 
@@ -956,17 +992,17 @@ def extract_questions(questions, dan_count=40, duo_count=30, pan_count=30,
 def load_question_stats(exam_type=None):
     """加载题目答题统计（通过 DataAccess 抽象层，per-rerun 缓存按 exam_type 隔离）
 
-    缓存同时按库路径（_current_db_path）校验，防止模块级全局缓存被其他
-    session 覆盖后读到别的用户的统计（串库）。
+    缓存同时按 user_id 校验，防止模块级全局缓存被其他 session 覆盖后
+    读到别的用户的统计（串号）。
     """
-    global _rerun_cache_stats, _rerun_cache_stats_db
+    global _rerun_cache_stats, _rerun_cache_stats_user
     # 防御性初始化：如果缓存被意外设为 None，自动恢复为空字典
     if _rerun_cache_stats is None:
         _rerun_cache_stats = {}
-    # 库切换（含跨 session 覆盖）时，丢弃旧库的统计缓存
-    if _rerun_cache_stats_db != _current_db_path:
+    # 用户切换（含跨 session 覆盖）时，丢弃旧用户的统计缓存
+    if _rerun_cache_stats_user != _current_user_id:
         _rerun_cache_stats = {}
-        _rerun_cache_stats_db = _current_db_path
+        _rerun_cache_stats_user = _current_user_id
     cache_key = exam_type or "__all__"
     if cache_key in _rerun_cache_stats:
         return _rerun_cache_stats[cache_key]

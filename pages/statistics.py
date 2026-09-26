@@ -137,9 +137,12 @@ def _show_wrong_stats(questions, wrong_list, wrong_stats, question_stats):
 
     # 错题列表（按答错次数排序，从 stats 读取）
     st.markdown("### 🔝 高频错题 TOP 20")
+    st.caption("口径：当前题库**所有答过的题**（含已移出错题本的），按历史累计答错次数降序")
 
-    # 按 wrong_count 降序排列
-    sorted_qids = sorted(wrong_qids, key=lambda qid: question_stats.get(qid, {}).get("wrong_count", 0), reverse=True)
+    # 全量口径（2026-09-26）：不再限定当前错题本，而是所有答过的题中
+    # 答错次数 > 0 的题目，按 wrong_count 降序 —— 与「最高答错次数」口径一致
+    answered_qids = [qid for qid, ws in question_stats.items() if ws.get("wrong_count", 0) > 0]
+    sorted_qids = sorted(answered_qids, key=lambda qid: question_stats.get(qid, {}).get("wrong_count", 0), reverse=True)
     top_data = []
     for i, qid in enumerate(sorted_qids[:20]):
         q = q_map.get(qid)

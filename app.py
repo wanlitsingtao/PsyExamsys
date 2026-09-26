@@ -545,7 +545,10 @@ st.markdown(f"""
 
 # 初始化 session_state
 from utils.data_manager import load_config, load_questions, get_available_exam_types, DEFAULT_EXAM_TYPE, invalidate_rerun_cache, get_questions_version, set_current_user
-from utils.account_manager import generate_device_fingerprint, get_or_create_user, ensure_user_db_initialized
+from utils.account_manager import (
+    generate_device_fingerprint, get_or_create_user, ensure_admin, is_admin,
+    is_admin_password_default, ROLE_ADMIN,
+)
 from utils.answer_card import CARD_CSS
 
 # 答题卡右栏样式（模拟考试/专项训练/巩固练习/错题本 共用一套，收在一处避免各页重复注入）
@@ -555,22 +558,22 @@ st.markdown(CARD_CSS, unsafe_allow_html=True)
 invalidate_rerun_cache()
 
 # ============================
-# 多用户身份识别（设备指纹 → 用户私有题库）
-# 首次访问：自动生成指纹 → 创建用户 → 克隆初始化题库模板
+# 多用户身份识别（设备指纹 → 用户；单库内按 user_id 隔离）
+# 首次访问：自动生成指纹 → 创建用户 → 直接看到公共题库（不再复制题库文件）
 # 再次访问：同一浏览器指纹不变 → 自动识别同一用户（稳定绑定）
 # ============================
 
 def _resolve_current_user():
-    """解析设备指纹并绑定/创建当前用户。每个用户拥有独立题库库文件。
+    """解析设备指纹并绑定/创建当前用户。全系统共用一个库，隔离靠 user_id。
 
     ⚠️ 2026-09-14 关键修复：本函数**每一帧都会执行路由同步**，不再因为
     session 里已有 _user_id 就整体跳过。
 
-    原因：data_manager 的 _current_db_path 是**模块级全局变量**，
+    原因：data_manager 的 _current_user_id 是**模块级全局变量**，
       (a) 会被其他 session（多标签页/多浏览器，同进程共享）覆盖；
       (b) 代码热重载时会被重置为 None；
     而旧逻辑 "_user_id 已存在 → 直接 return" 会跳过 set_current_user，
-    于是后续所有读库都落到默认空库 data/exmsys.db → 页面报"题库为空"。
+    于是后续所有读库都落到「无用户」上下文 → 页面报"题库为空"。
 
     现在拆成两段：
       1) 身份解析（生成/查找 user_id）—— 仅首次执行；
@@ -589,7 +592,8 @@ def _resolve_current_user():
         user = get_or_create_user(fingerprint, raw_ua)
         st.session_state._user_id = user["user_id"]
         st.session_state._device_fp = fingerprint
-        # 首次进入/切换用户：强制重载该用户自己的题库与配置
+        st.session_state._role = user.get("role") or "user"
+        # 首次进入/切换用户：强制重载可见题库与配置
         for key in ["questions", "config", "_cache_available_exams",
                     "_db_questions_version", "_data_version", "_mnemonic_data"]:
             st.session_state.pop(key, None)
@@ -600,14 +604,21 @@ def _resolve_current_user():
 
 _resolve_current_user()
 
-# 兜底：若当前用户私有库是「残留空库」（从未真正使用过），自动从 master 模板克隆题库。
-# 区分主动清空题库（config 有大量已用 key）的关键：这里不会破坏用户主动清空的意图。
-# 初始化完成时清掉 session 里的题库与配置缓存，让后续 load_questions 读到新克隆的数据。
-_init_res = ensure_user_db_initialized(st.session_state._user_id)
-if _init_res.get("initialized"):
-    for key in ["questions", "config", "_cache_available_exams",
-                "_db_questions_version", "_data_version", "_mnemonic_data"]:
-        st.session_state.pop(key, None)
+# 启动引导：确保存在初始管理员账号（username=admin / 初始密码 admin）
+# 幂等且廉价（一条 SELECT），每个 session 只做一次。
+if not st.session_state.get("_admin_checked"):
+    try:
+        ensure_admin()
+    except Exception:
+        pass
+    st.session_state._admin_checked = True
+
+# 身份可能被「登录/绑定/解绑」改动过，每帧按 user_id 校正一次角色
+_cur_role = st.session_state.get("_role")
+if _cur_role is None:
+    _cur_role = ROLE_ADMIN if is_admin(st.session_state._user_id) else "user"
+    st.session_state._role = _cur_role
+IS_ADMIN = (_cur_role == ROLE_ADMIN)
 
 # 检测题库数据版本号是否变更（仅在 save_questions 导入/替换题库时递增），
 # 答题过程中的自动保存、统计更新等不会触发，避免页面答题中途被刷出
@@ -708,9 +719,10 @@ def _perform_exam_switch(new_code):
 
 
 def _switch_user(new_user_id):
-    """账号登录/切换用户：重置当前用户库与全部会话缓存"""
+    """账号登录/切换用户：重置当前用户上下文与全部会话缓存"""
     set_current_user(new_user_id)
     st.session_state._user_id = new_user_id
+    st.session_state._role = ROLE_ADMIN if is_admin(new_user_id) else "user"
     for key in ["questions", "config", "_cache_available_exams",
                 "_db_questions_version", "_data_version", "_mnemonic_data",
                 "_cache_wrong_stats"]:
@@ -894,18 +906,22 @@ with st.sidebar.container():
             st.session_state._current_user_bound_fp = _current_user_bound_fp
 
     _user_short = st.session_state._user_id or "未分配"
+    _is_adm_now = is_admin(st.session_state._user_id)
 
     # ============ 用户卡片（借鉴 bid-buddy-dev 渐变头像）============
     if _current_username:
         # 已登录：显示 "用户 wanli"，副标题用 ID 而非指纹
         _disp_name = _current_username
-        _avatar_letter = "U"   # 固定 U = user（已登录）
-        _sub_text = f"ID {_user_short}"
+        _avatar_letter = "A" if _is_adm_now else "U"   # A = admin / U = user
+        _sub_text = (f"管理员 · ID {_user_short}" if _is_adm_now else f"ID {_user_short}")
     else:
         # 未登录（仅访客）
         _disp_name = f"访客 {_user_short[:8]}"
         _avatar_letter = "V"   # 固定 V = visitor（未登录）
         _sub_text = f"ID {_user_short}"
+
+    if _is_adm_now and is_admin_password_default():
+        _sub_text += " · 初始密码未改"
 
     st.markdown(
         f"<div class='sx-user-card'>"
@@ -961,18 +977,34 @@ with st.sidebar.container():
                 cu1, cu2 = st.columns(2)
                 with cu1:
                     if st.button("确认解绑", key="btn_confirm_unbind", type="primary", use_container_width=True):
-                        # 解绑账号：清掉当前设备的 by_device 记录，并清 session_state 用户身份
-                        _acct_mgr.unbind_account(st.session_state._device_fp)
+                        # 解绑账号：清掉账号信息与 session 身份，学习数据保留
+                        _ok_un, _msg_un = _acct_mgr.unbind_account(st.session_state._device_fp)
                         st.session_state._current_username = None
                         st.session_state._current_user_bound_fp = ""
+                        st.session_state._role = "user"
                         st.session_state.sx_show_unbind_confirm = False
-                        st.success("已解绑")
+                        st.success(_msg_un if _ok_un else "已解绑")
                         st.rerun()
                 with cu2:
                     if st.button("取消", key="btn_cancel_unbind", use_container_width=True):
                         st.session_state.sx_show_unbind_confirm = False
                         st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
+
+        # ---- 修改密码（已登录用户可见）----
+        with st.expander("修改密码"):
+            with st.form("sx_pwd_form", clear_on_submit=True):
+                _p_old = st.text_input("原密码", type="password", key="pwd_old")
+                _p_new = st.text_input("新密码", type="password", key="pwd_new")
+                _p_sub = st.form_submit_button("更新密码", use_container_width=True)
+            if _p_sub:
+                _ok_pw, _msg_pw = _acct_mgr.change_password(
+                    st.session_state._user_id or "", _p_old, _p_new
+                )
+                if _ok_pw:
+                    st.success(_msg_pw)
+                else:
+                    st.error(_msg_pw)
     else:
         # 未绑定：两列 [绑定账号] [账号登录]
         with st.container():
