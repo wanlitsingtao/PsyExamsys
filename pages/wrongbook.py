@@ -1,7 +1,8 @@
 """
-错题本 v2.3 - 双入口模式 + 统一答题界面
-  1. 错题解析：按易错程度排序，左侧列表 + 右侧逐条解析
-  2. 做错题：统一提交答题模式，操作元素与其他答题页面一致
+错题本 v2.6 - 三入口模式 + 统一答题界面
+  1. 高频错题 TOP 20：按历史累计答错次数排序（含已移出错题本的题），完整题目+解析
+  2. 错题解析：按易错程度排序，左侧列表 + 右侧逐条解析
+  3. 做错题：统一提交答题模式，操作元素与其他答题页面一致
 """
 import streamlit as st
 import uuid
@@ -14,7 +15,7 @@ from utils.data_manager import (
     remove_wrong_question, clear_all_wrong, get_wrong_stats,
     load_questions, load_question_stats, infer_category,
     get_all_wrong_with_stats, save_exam_record, save_draft,
-    get_question_stats,
+    get_question_stats, get_top_wrong_by_history,
 )
 from utils.answer_card import render_answer_card
 
@@ -33,6 +34,8 @@ def show_wrongbook():
 
     if mode is None:
         _show_wrongbook_home()
+    elif mode == "top20":
+        _show_top20_wrong()
     elif mode == "analysis":
         _show_wrong_analysis()
     elif mode == "practice":
@@ -55,6 +58,8 @@ def _show_wrongbook_home():
         for key in ["wb_questions", "wb_wrong_counts", "wb_answers", "wb_submitted", "wb_results", "wb_marked", "wb_uncertain"]:
             st.session_state.pop(key, None)
         st.success("🎉 太棒了！错题本为空，继续加油！")
+        # 错题本为空时仍提供高频错题入口（历史口径含已移出错题本的题）
+        _render_top20_home_entry(_load_top20_cached())
         return
 
     # ---- 错题解析 ----
@@ -83,6 +88,9 @@ def _show_wrongbook_home():
         st.session_state.wb_regenerate = True
         st.rerun()
 
+    # ---- 高频错题 TOP 20（历史口径）----
+    _render_top20_home_entry(_load_top20_cached())
+
     # 清空错题（仅首页可见，避免与结果页混在一起）
     st.markdown("---")
     st.markdown("### 🗑️ 清空错题")
@@ -102,6 +110,131 @@ def _show_wrongbook_home():
 
 
 # ============================
+#  高频错题 TOP 20 模式（历史口径）
+# ============================
+
+def _load_top20_cached():
+    """高频错题 TOP 20 缓存：按 _data_version + exam_type 双键失效，避免每次交互重查"""
+    _cur = st.session_state.get("_data_version", 0)
+    _exam = st.session_state.get("exam_type")
+    vkey = "wt_top20_v"
+    ekey = "wt_top20_exam"
+    if (_cur != st.session_state.get(vkey, -1)
+            or st.session_state.get(ekey) != _exam
+            or "wt_top20" not in st.session_state):
+        st.session_state.wt_top20 = get_top_wrong_by_history(20, _exam)
+        st.session_state[vkey] = _cur
+        st.session_state[ekey] = _exam
+    return st.session_state.wt_top20
+
+
+def _render_top20_home_entry(top20):
+    """错题本首页的 TOP 20 入口卡片（无历史错题数据时不显示）"""
+    if not top20:
+        return
+    st.markdown("---")
+    st.markdown("### 🔥 高频错题 TOP 20")
+    st.markdown(
+        f"按历史累计答错次数排序的最常错 {len(top20)} 题（含已移出错题本的题），"
+        "逐条查看完整题目、选项、正确答案和解析。"
+    )
+    if st.button("🔥 查看高频错题 TOP 20", key="btn_top20", use_container_width=True, type="primary"):
+        st.session_state.wb_mode = "top20"
+        st.rerun()
+
+
+def _show_top20_wrong():
+    """高频错题 TOP 20 浏览页：完整题目 + 解析
+
+    展开控制：顶部一个「全部展开」复选框 —— 勾选=全部展开，取消勾选=全部收起。
+    """
+    st.markdown("# 🔥 高频错题 TOP 20")
+
+    items = _load_top20_cached()
+
+    if not items:
+        st.info("暂无历史错题数据，答题后这里将展示高频错题。")
+        if st.button("返回", key="wt_back_empty", use_container_width=True):
+            st.session_state.pop("wt_expand_all", None)
+            st.session_state.pop("wb_mode", None)
+            st.rerun()
+        return
+
+    # 顶部导航栏
+    top_cols = st.columns([3, 1])
+    with top_cols[0]:
+        st.caption("口径：当前题库所有答过的题按历史累计答错次数降序（含已移出错题本的题），与首页统计一致")
+    with top_cols[1]:
+        if st.button("返回", key="wt_back", use_container_width=True):
+            st.session_state.pop("wt_expand_all", None)
+            st.session_state.pop("wb_mode", None)
+            st.rerun()
+
+    st.markdown(f"共 **{len(items)}** 题 · 按答错次数由高到低排列")
+
+    # 全部展开开关：勾选=全部展开，取消=全部收起
+    expand_all = st.checkbox("📖 全部展开", key="wt_expand_all",
+                             help="勾选：全部展开；取消勾选：全部收起")
+
+    st.markdown("---")
+
+    for i, item in enumerate(items):
+        _render_top20_item(item, i + 1, expanded=expand_all)
+
+
+def _render_top20_item(item, rank, expanded=False):
+    """渲染单条高频错题：完整题目 + 全部选项 + 正确答案 + 解析"""
+    wc = item["wrong_count"]
+    cc = item["correct_count"]
+    medal = "🥇" if rank == 1 else ("🥈" if rank == 2 else ("🥉" if rank == 3 else f"#{rank}"))
+    q_short = item["question"][:40] + "..." if len(item["question"]) > 40 else item["question"]
+    with st.expander(f"{medal} TOP{rank} · 错{wc}次/对{cc}次 [{item['type_label']}] {q_short}",
+                     expanded=expanded):
+        # 题型 + 板块 + 统计
+        st.markdown(
+            f"**{item['type_label']}** · 📂 {item.get('category', '未知')}  "
+            f"|  ⚠️ 答错 {wc} 次  |  ✅ 答对 {cc} 次  |  易错指数：{item['diff']}"
+        )
+
+        # 案例题：在题目上方显示案例背景
+        case_bg = item.get("case_background", "")
+        if case_bg:
+            st.markdown(f"**📋 案例背景：** {case_bg}")
+
+        # 完整题目
+        st.markdown(f"**📝 题目：** {item['question']}")
+
+        # 全部选项（正确答案用深绿色标注）
+        st.markdown("**选项：**")
+        options = item["options"]
+        opt_keys = sorted(options.keys())
+        correct_ans = item["answer"].strip().upper()
+        for k in opt_keys:
+            if k in correct_ans:
+                st.markdown(f'<p style="color:#1b5e20;font-weight:bold;">✅ {k}: {options[k]}</p>',
+                            unsafe_allow_html=True)
+            else:
+                st.markdown(f'{k}: {options[k]}')
+
+        # 正确答案
+        correct_display = get_answer_display(item["type"], correct_ans, options)
+        st.markdown(
+            f'<div style="background:#e8f5e9;border-left:4px solid #1b5e20;padding:8px 12px;'
+            f'border-radius:4px;margin:4px 0;">'
+            f'<span style="color:#1b5e20;font-weight:bold;">✅ 正确答案：{correct_display}</span></div>',
+            unsafe_allow_html=True,
+        )
+
+        # 解析
+        explanation = item.get("explanation", "")
+        if explanation:
+            st.markdown("**📖 解析：**")
+            st.markdown(explanation)
+        else:
+            st.info("暂无解析")
+
+
+# ============================
 #  错题解析模式
 # ============================
 
@@ -109,17 +242,26 @@ def _show_wrong_analysis():
     st.markdown("# 📖 错题解析")
 
     _cur = st.session_state.get("_data_version", 0)
+    _exam = st.session_state.get("exam_type")
 
-    # 1. 缓存错题列表（带 _data_version 版本号）
+    # 1. 缓存错题列表（_data_version + exam_type 双键失效）
+    #    只认 _data_version 不够：切题库不会递增版本号，会残留上一题库的列表
     _wa_all_vkey = "wa_all_wrong_v"
-    if _cur != st.session_state.get(_wa_all_vkey, -1) or "wa_all_wrong" not in st.session_state:
-        st.session_state.wa_all_wrong = get_all_wrong_with_stats(st.session_state.get("exam_type"))
+    _wa_all_ekey = "wa_all_wrong_exam"
+    if (_cur != st.session_state.get(_wa_all_vkey, -1)
+            or st.session_state.get(_wa_all_ekey) != _exam
+            or "wa_all_wrong" not in st.session_state):
+        st.session_state.wa_all_wrong = get_all_wrong_with_stats(_exam)
         st.session_state[_wa_all_vkey] = _cur
+        st.session_state[_wa_all_ekey] = _exam
     all_wrong = st.session_state.wa_all_wrong
 
     # 2. 从 wa_all_wrong 构建 stats 缓存（避免全表加载）
     _wa_stats_vkey = "wa_stats_cache_v"
-    if _cur != st.session_state.get(_wa_stats_vkey, -1) or "wb_stats_cache" not in st.session_state:
+    _wa_stats_ekey = "wa_stats_cache_exam"
+    if (_cur != st.session_state.get(_wa_stats_vkey, -1)
+            or st.session_state.get(_wa_stats_ekey) != _exam
+            or "wb_stats_cache" not in st.session_state):
         cache = {}
         for item in all_wrong:
             qid = item["question_id"]
@@ -132,7 +274,9 @@ def _show_wrong_analysis():
                 "confidence": item.get("confidence", 0),
             }
         st.session_state.wb_stats_cache = cache
+        st.session_state.wb_stats_cache_exam_type = _exam
         st.session_state[_wa_stats_vkey] = _cur
+        st.session_state[_wa_stats_ekey] = _exam
 
     if not all_wrong:
         st.success("🎉 没有错题！")
@@ -149,7 +293,9 @@ def _show_wrong_analysis():
             st.session_state.pop("wa_all_wrong", None)
             st.session_state.pop("wb_stats_cache", None)
             st.session_state.pop("wa_stats_cache_v", None)
+            st.session_state.pop("wa_stats_cache_exam", None)
             st.session_state.pop("wa_all_wrong_v", None)
+            st.session_state.pop("wa_all_wrong_exam", None)
             st.session_state.pop("wb_mode", None)
             st.rerun()
 

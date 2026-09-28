@@ -294,15 +294,18 @@ def _show_mastery_analysis(questions, exam_type=None):
     """
     st.markdown("### 🧠 知识掌握情况分析")
 
-    # 缓存掌握度分布（457ms 重计算，仅在 _data_version/exam_type 变化时重算）
+    # 缓存掌握度分布（457ms 重计算，仅在 _data_version 或题库变化时重算）
+    # _data_version + exam_type 双键：_data_version 不会因切题库递增，
+    # 必须显式比对 exam_type，否则会残留上一题库的掌握度（曾显示为全 0 / 错库数据）
     version = st.session_state.get("_data_version", 0)
     cache_key = f"_mastery_cache_{exam_type}"
     cache = st.session_state.get(cache_key, {})
-    if cache.get("_version") == version:
+    if cache.get("_version") == version and cache.get("_exam_type") == exam_type:
         mastery_data = cache["data"]
     else:
         mastery_data = get_mastery_distribution(questions, exam_type)
-        st.session_state[cache_key] = {"_version": version, "data": mastery_data}
+        st.session_state[cache_key] = {"_version": version, "_exam_type": exam_type,
+                                       "data": mastery_data}
     by_cat = mastery_data["by_category"]
     retention_list = mastery_data["retention_list"]
     unstable_list = mastery_data.get("unstable_list", [])

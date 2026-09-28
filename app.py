@@ -544,7 +544,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # 初始化 session_state
-from utils.data_manager import load_config, load_questions, get_available_exam_types, DEFAULT_EXAM_TYPE, invalidate_rerun_cache, get_questions_version, set_current_user
+from utils.data_manager import load_config, save_config, load_questions, get_available_exam_types, DEFAULT_EXAM_TYPE, invalidate_rerun_cache, get_questions_version, set_current_user
 from utils.account_manager import (
     generate_device_fingerprint, get_or_create_user, ensure_admin, is_admin,
     is_admin_password_default, ROLE_ADMIN,
@@ -632,9 +632,15 @@ if "_db_questions_version" not in st.session_state or st.session_state._db_quest
 if "config" not in st.session_state:
     st.session_state.config = load_config()
 if "exam_type" not in st.session_state:
-    # 检测可用题库，默认选第一个
+    # 检测可用题库：优先沿用用户上次使用的题库（记住跨会话），
+    # 否则回退到第一个可用题库。避免每次进入都跳回名字排序第一个（曾导致
+    # 用户以为"考试记录全没了"——其实记录都在他上次用的题库里）。
     available = get_available_exam_types()
-    if available:
+    _codes = [c for c, _ in available]
+    _last = (st.session_state.get("config") or {}).get("last_exam_type")
+    if _last and _last in _codes:
+        st.session_state.exam_type = _last
+    elif available:
         st.session_state.exam_type = available[0][0]  # 使用短码
     else:
         st.session_state.exam_type = DEFAULT_EXAM_TYPE
@@ -694,6 +700,30 @@ def _reset_exam_states_for_switch():
     st.session_state.spec_state = "idle"
 
 
+def _reset_stats_caches_for_switch():
+    """清除所有「按题库统计」的会话缓存。
+
+    为什么必须清：这些缓存的失效只认 `_data_version`（答题后才递增），
+    而**切题库不会递增 _data_version**。若残留，切题库后首页/错题本会显示
+    上一个题库的统计（曾观测到「三级题库页显示四级的已学 2080/掌握 1674」，
+    或因为 key 不同而显示全 0）。切题库 = 换了一整套题，统计必须整体作废。
+    """
+    stale = []
+    for k in list(st.session_state):
+        if k in ("_stats_cache", "wb_stats_cache", "wa_all_wrong",
+                 "wt_top20", "_cache_wrong_stats") \
+                or k.startswith("_mastery_cache_") \
+                or k.startswith("_cache_wrong_stats_") \
+                or k.startswith("_cache_wrong_stats_v_") \
+                or k.startswith("wa_all_wrong_v") \
+                or k.startswith("wa_stats_cache_v") \
+                or k.startswith("wt_top20_v") \
+                or k.startswith("wt_top20_exam"):
+            stale.append(k)
+    for k in stale:
+        st.session_state.pop(k, None)
+
+
 def _perform_exam_switch(new_code):
     """执行题库切换：保留当前模块不变，仅切换题库。
 
@@ -707,11 +737,19 @@ def _perform_exam_switch(new_code):
     _preserved_nav = st.session_state.get("nav", "首页")
     # 2) 切换题库
     st.session_state.exam_type = new_code
+    # 记住用户最后使用的题库（首页默认值用它，避免每次登录都跳回名字排序第一个）
+    if "_user_id" in st.session_state:
+        try:
+            save_config({"last_exam_type": new_code})
+        except Exception:
+            pass
     # 清除旧数据缓存，强制重新加载（含助记助学缓存，保证按新题库生成）
     for key in ["questions", "wb_questions", "wb_wrong_counts", "wb_answers",
                 "wb_submitted", "wb_results", "wb_mode", "wa_selected_idx",
                 "_cache_available_exams", "_mnemonic_data"]:
         st.session_state.pop(key, None)
+    # 统计类缓存整体作废（否则切题库后显示上一题库的统计）
+    _reset_stats_caches_for_switch()
     _reset_exam_states_for_switch()
     # 3) 显式恢复 nav，确保切题库后导航按钮和右侧页面都不变
     st.session_state.nav = _preserved_nav

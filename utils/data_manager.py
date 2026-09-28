@@ -582,6 +582,60 @@ def get_all_wrong_with_stats(exam_type=None):
     return result
 
 
+def get_top_wrong_by_history(top_n=20, exam_type=None):
+    """
+    高频错题 TOP N（历史口径）：当前题库所有答过的题中，
+    按历史累计答错次数降序取前 N 题（含已移出错题本的题）——
+    与首页统计「高频错题 TOP 20」口径一致，供错题本模块展示完整题目+解析。
+    排序：wrong_count 降序 → (wrong_count - correct_count) 降序 → 题号升序（保证稳定）。
+    返回: list[dict]，每项包含完整题目信息 + wrong_count / correct_count / diff
+    """
+    stats = load_question_stats(exam_type=exam_type)
+    # 所有答错次数 > 0 的题（不限当前错题本，含已移出的题）
+    candidates = [qid for qid, s in stats.items() if s.get("wrong_count", 0) > 0]
+    if not candidates:
+        return []
+
+    def _rank_key(qid):
+        s = stats.get(qid, {})
+        wc = s.get("wrong_count", 0)
+        cc = s.get("correct_count", 0)
+        return (-wc, -(wc - cc), qid)
+
+    candidates.sort(key=_rank_key)
+
+    questions = load_questions()
+    q_map = {q["id"]: q for q in questions}
+    type_labels = {"single": "单选", "multi": "多选", "judge": "判断", "案例题": "案例题", "indefinite": "不定项"}
+
+    result = []
+    for qid in candidates:
+        if len(result) >= top_n:
+            break
+        q = q_map.get(qid)
+        if q is None:
+            continue  # 题目已被删除（如私人题库被移除），跳过防断链（不占名额）
+        s = stats.get(qid, {})
+        wc = s.get("wrong_count", 0)
+        cc = s.get("correct_count", 0)
+        result.append({
+            "question_id": qid,
+            "question": q["question"],
+            "type": q["type"],
+            "type_label": type_labels.get(q["type"], q["type"]),
+            "options": q.get("options", {}),
+            "answer": q["answer"],
+            "explanation": q.get("explanation", ""),
+            "category": q.get("category", infer_category(q.get("source_file", ""))),
+            "case_study_id": q.get("case_study_id"),
+            "case_background": q.get("case_background") or "",
+            "wrong_count": wc,
+            "correct_count": cc,
+            "diff": wc - cc,
+        })
+    return result
+
+
 # ============================
 # 配置管理
 # ============================
