@@ -203,21 +203,27 @@ def _start_subject(subject_key):
         filtered = [q for q in st.session_state.questions if q.get("category", "") in sub_categories]
 
     indefinite_count = cfg.get("indefinite_count", 0)
-    # 案例题按案例单位抽取：
-    # 每个案例包含背景文本 + 多道子题，子题按 index_num 排序
+    # 案例题：模拟考试保持**内置真实试卷规则** —— 按"子题数量"凑够
+    # cfg["indefinite_count"]（如咨询实务 10 道案例小题），
+    # 按案例为单位随机选取、子题按 index_num 排序。
+    # （注意：综合训练的"案例个数"口径与此不同，见 extract_case_questions）
     case_backgrounds = {}  # {case_id: background_text} 用于 UI 展示
     case_subs_selected = []  # 被选中的案例子题列表
-    if indefinite_count > 0 and subject_key == "counseling":
-        cases = load_case_studies(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
+    if indefinite_count > 0:
+        _et = st.session_state.get("exam_type", "心理学会咨询师四级")
+        # 过滤掉没有子题的脏案例背景记录
+        cases = [
+            cs for cs in load_case_studies(exam_type=_et)
+            if get_case_sub_questions(cs["id"])
+        ]
         if cases:
-            # 按案例为单位随机选取，直到子题总数 >= indefinite_count
             import random
             random.shuffle(cases)
             selected_cases = []
             total_subs = 0
             for cs in cases:
                 selected_cases.append(cs)
-                total_subs += cs.get("question_count", 0)
+                total_subs += len(get_case_sub_questions(cs["id"]))
                 if total_subs >= indefinite_count:
                     break
             # 收集被选案例的全部子题（按 index_num 排序）

@@ -16,6 +16,7 @@ from utils.data_manager import (
     get_all_categories, infer_category, get_question_stats,
     load_config, get_category_training_stats, load_question_stats,
     save_draft, load_drafts, delete_draft, save_exam_record,
+    extract_case_questions, get_case_group_count,
 )
 from utils.answer_card import render_answer_card
 
@@ -100,13 +101,19 @@ def _show_spec_start(questions):
     comp_single = config.get("comp_single_count", 30)
     comp_multi = config.get("comp_multi_count", 20)
     comp_judge = config.get("comp_judge_count", 10)
+    # 综合训练案例题开关与案例个数（v2.8：布尔开关 + 案例个数配置）
+    comp_case_on = bool(config.get("comp_case_enabled", False))
+    comp_case_n = int(config.get("comp_case_count", 1) or 1)
 
-    # 综合训练统计数据
+    # 综合训练统计数据（案例题计入，保证 total 与四个分项之和一致）
+    # 案例题按"案例个数"计（一个案例可含多道子题）
+    case_group_count = get_case_group_count(questions)
     comp_total_all = sum(info["total"] for info in cats.values())
     comp_actual_single = min(comp_single, sum(info["single"] for info in cats.values()))
     comp_actual_multi = min(comp_multi, sum(info["multi"] for info in cats.values()))
-    comp_actual_judge = min(comp_judge, sum(info["judge"] for info in cats.values()))
-    comp_actual_total = comp_actual_single + comp_actual_multi + comp_actual_judge
+    comp_actual_judge = min(comp_judge, sum(info.get("judge", 0) for info in cats.values()))
+    comp_actual_case = min(comp_case_n, case_group_count) if comp_case_on else 0
+    comp_actual_total = comp_actual_single + comp_actual_multi + comp_actual_judge + comp_actual_case
 
     # 综合训练答题统计（汇总所有板块）
     comp_answered = sum(cs.get("answered", 0) for cs in cat_stats.values())
@@ -180,7 +187,7 @@ def _show_spec_start(questions):
         col = col1 if idx % 2 == 0 else col2
         idx += 1
 
-        # 计算实际可抽取的各题型数量（最多不超过配置数）
+        # 计算实际可抽取的各题型数量（最多不超过配置数；板块不含案例题）
         actual_single = min(info["single"], spec_single)
         actual_multi = min(info["multi"], spec_multi)
         actual_judge = min(info["judge"], spec_judge)
@@ -243,7 +250,12 @@ def _show_spec_start(questions):
 
 
 def _start_comprehensive(questions):
-    """开始综合训练（从全部模块随机抽题）"""
+    """开始综合训练（从全部模块随机抽题）
+
+    案例题：由配置项 `comp_case_enabled`（复选框）控制是否出。勾选时按
+    `comp_case_count` 抽 **N 个案例**（每个案例带出背景及其全部子题，
+    子题数不设限制）追加到卷末。
+    """
     _clear_spec_show_ans()
     config = load_config()
 
@@ -257,8 +269,17 @@ def _start_comprehensive(questions):
         dan_count=comp_single,
         duo_count=comp_multi,
         pan_count=comp_judge,
+        indefinite_count=0,  # 案例题单独按"案例个数"抽取，见下
         shuffle_types=False,
     )
+
+    # 案例题：开关打开时按配置的案例个数抽取（每个案例的全部子题一起带出）
+    if config.get("comp_case_enabled", False):
+        _exam_type_c = st.session_state.get("exam_type", "心理学会咨询师四级")
+        case_n = int(config.get("comp_case_count", 1) or 1)
+        case_subs = extract_case_questions(case_n, exam_type=_exam_type_c, questions=questions)
+        if case_subs:
+            selected.extend(case_subs)
 
     if not selected:
         st.error("❌ 没有可用的题目")
@@ -269,6 +290,7 @@ def _start_comprehensive(questions):
 
     single_end = sum(1 for q in selected if q["type"] == "single")
     multi_end = single_end + sum(1 for q in selected if q["type"] == "multi")
+    judge_end = multi_end + sum(1 for q in selected if q["type"] == "judge")
 
     # 预填不确定开关：历史标记为不确定的题目默认打开
     _stats_c = load_question_stats(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
@@ -287,6 +309,7 @@ def _start_comprehensive(questions):
     st.session_state.spec_type_boundaries = {
         "single_end": single_end,
         "multi_end": multi_end,
+        "judge_end": judge_end,
     }
     st.session_state.spec_mode = "comprehensive"
     st.session_state.pop("spec_draft_id", None)  # 新训练清除旧草稿ID
@@ -294,7 +317,11 @@ def _start_comprehensive(questions):
 
 
 def _start_specialized(questions, category):
-    """开始专项训练（按指定板块抽题）"""
+    """开始专项训练（按指定板块抽题）
+
+    注意：**知识板块专项训练不出案例题**（2026-09-28 用户明确）——
+    案例题只在「综合训练」里出现，故此处不传 case_count（保持默认 0）。
+    """
     _clear_spec_show_ans()
     config = load_config()
     # 使用配置中的题数（默认 30单选 + 20多选 + 10判断 = 60题）
@@ -308,6 +335,7 @@ def _start_specialized(questions, category):
         dan_count=spec_single,
         duo_count=spec_multi,
         pan_count=spec_judge,
+        case_count=0,   # 板块专项训练不含案例题
     )
 
     if not selected:
@@ -319,6 +347,7 @@ def _start_specialized(questions, category):
 
     single_end = sum(1 for q in selected if q["type"] == "single")
     multi_end = single_end + sum(1 for q in selected if q["type"] == "multi")
+    judge_end = multi_end + sum(1 for q in selected if q["type"] == "judge")
 
     # 预填不确定开关：历史标记为不确定的题目默认打开
     _stats_s = load_question_stats(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
@@ -337,6 +366,7 @@ def _start_specialized(questions, category):
     st.session_state.spec_type_boundaries = {
         "single_end": single_end,
         "multi_end": multi_end,
+        "judge_end": judge_end,
     }
     st.session_state.spec_mode = "specialized"
     st.session_state.pop("spec_draft_id", None)  # 新训练清除旧草稿ID
@@ -426,12 +456,20 @@ def _show_spec_running():
         st.success("✅ 进度已保存，下次可在首页继续作答。", icon="💾")
     st.markdown("---")
 
-    # 题型段标签
+    # 题型段标签（动态：只列出本轮实际抽取到的题型，避免案例题被并入其它段）
     se = boundaries["single_end"]
     me = boundaries["multi_end"]
-    st.markdown(
-        f"🔵 单选 {se}题 / 🟢 多选 {me-se}题 / 🟠 判断 {total_q-me}题"
-    )
+    je = boundaries.get("judge_end", total_q)
+    seg_parts = []
+    if se > 0:
+        seg_parts.append(f"🔵 单选 {se}题")
+    if me - se > 0:
+        seg_parts.append(f"🟢 多选 {me-se}题")
+    if je - me > 0:
+        seg_parts.append(f"🟠 判断 {je-me}题")
+    if total_q - je > 0:
+        seg_parts.append(f"🟣 案例题 {total_q-je}题")
+    st.markdown(" / ".join(seg_parts) if seg_parts else f"共 {total_q} 题")
 
     st.markdown("---")
 

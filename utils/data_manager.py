@@ -140,10 +140,11 @@ DEFAULT_CONFIG = {
     "comp_single_count": 30,
     "comp_multi_count": 20,
     "comp_judge_count": 10,
-    "exam_time_minutes": 90,
-    "exam_single_count": 20,
-    "exam_multi_count": 20,
-    "exam_judge_count": 20,
+    # 综合训练是否出案例题（复选框开关，v2.8）。
+    # comp_case_enabled=True 时，按 comp_case_count 抽取**案例个数**，
+    # 每个案例带出其全部子题（子题数不设限制，依题库实际情况）。
+    "comp_case_enabled": False,
+    "comp_case_count": 1,
     "wrongbook_extract_count": 50,
     "retention_days_threshold": 5,
     "last_import_files": [],
@@ -202,6 +203,13 @@ def ensure_dirs():
     """确保数据和备份目录存在"""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+
+
+# 模拟考出题规则（v2.8）：**完全走内置 `MOCK_EXAM_CONFIG`**，系统配置里不再暴露
+# 模拟考题数与时长。原因：模拟考试模拟的是真实试卷（心理学综合 150/50/50、
+# 咨询实务 140/60/0+10 案例、初级 200/100/0，时长 120 分钟/科），
+# 让用户改会造成"配置与实际不符"的困惑。如需调整请直接改本文件的固定模型。
+# 历史实现 `get_mock_exam_config()` 已于 v2.8 移除。
 
 
 # ============================
@@ -314,6 +322,76 @@ def save_case_studies(case_studies, owner_id=None):
 def get_case_sub_questions(case_id):
     """获取某个案例的全部子题"""
     return _get_dao().get_case_sub_questions(case_id)
+
+
+def _group_case_questions(questions):
+    """把题池内的案例题按 case_study_id 归组（组内按 index_num 排序）
+
+    返回: dict {case_study_id: [子题, ...]}，只含真正有子题的案例
+    """
+    pool = {}
+    for q in questions:
+        if q.get("type") != "案例题":
+            continue
+        cid = q.get("case_study_id")
+        if cid:
+            pool.setdefault(cid, []).append(q)
+    for cid in pool:
+        pool[cid].sort(key=lambda x: x.get("index_num", 0) or 0)
+    return pool
+
+
+def get_case_group_count(exam_type=None, questions=None):
+    """统计题池内的**案例个数**（一个案例 = 一组子题）"""
+    if questions is None:
+        questions = [
+            q for q in load_questions()
+            if not exam_type or q.get("exam_type") == exam_type
+        ]
+    return len(_group_case_questions(questions))
+
+
+def extract_case_questions(case_count, exam_type=None, questions=None):
+    """按「案例个数」抽取案例题（综合训练 / 模拟考试共用）
+
+    - case_count: 目标**案例个数**（不是一个案例题，而是"几个案例"）。
+      例：case_count=1 → 抽 1 个案例，该案例下有多少子题就带出多少子题，
+      **不对子题数量做限制**（2026-09-28 用户明确）。
+      <=0 时返回空列表。
+    - 抽取规则：把候选题池中的案例随机打乱，取前 case_count 个案例的**全部**子题。
+    - 只取**本次题池内**的案例，避免抽到当前题库/板块之外的案例题。
+    - 返回: list[dict] 案例子题，按案例内 index_num 排序；每项带 case_background。
+    """
+    if not case_count or case_count <= 0:
+        return []
+
+    # 题池：显式传入的优先（-- 综合/专项按 exam_type 过滤后的题集）
+    if questions is None:
+        questions = [
+            q for q in load_questions()
+            if not exam_type or q.get("exam_type") == exam_type
+        ]
+
+    pool_cases = _group_case_questions(questions)
+    if not pool_cases:
+        return []
+
+    # 案例元信息（背景文本）从 case_studies 取，用于回填缺失的 case_background
+    meta = {cs["id"]: cs for cs in load_case_studies(exam_type=exam_type)}
+    case_ids = list(pool_cases.keys())
+    random.shuffle(case_ids)
+
+    # 按"案例个数"取：取够 case_count 个案例即停，子题数不限
+    selected_subs = []
+    for cid in case_ids[:case_count]:
+        selected_subs.extend(pool_cases[cid])
+
+    # 回填案例背景（子题记录本身已带 case_background，缺失时从 case_studies 补）
+    for sub in selected_subs:
+        if not sub.get("case_background"):
+            cs = meta.get(sub.get("case_study_id"), {})
+            sub["case_background"] = cs.get("title", "")
+    return selected_subs
 
 
 # ============================
@@ -1106,14 +1184,16 @@ def clear_uncertain_mark(question_id):
 # 专项训练 - 按知识板块抽取题目
 # ============================
 
-def extract_questions_by_category(questions, category, dan_count=30, duo_count=20, pan_count=10):
+def extract_questions_by_category(questions, category, dan_count=30, duo_count=20, pan_count=10,
+                                  case_count=0):
     """
     从指定知识板块中按题型抽取题目（含优先级排序：错题 > 新题 > 旧题）
     - category: 知识板块名称（如"心理学导论"）
     - dan_count: 单选题数
     - duo_count: 多选题数
     - pan_count: 判断题数
-    返回: list[dict] 按 单选→多选→判断 顺序排列
+    - case_count: 案例题数（>0 且该板块有案例题时追加到卷末）
+    返回: list[dict] 按 单选→多选→判断→案例题 顺序排列
     """
     # 筛选指定板块的题目
     cat_questions = [
@@ -1135,19 +1215,27 @@ def extract_questions_by_category(questions, category, dan_count=30, duo_count=2
     selected_m = _priority_sample(multis, min(duo_count, len(multis)), None, stats)
     selected_j = _priority_sample(judges, min(pan_count, len(judges)), None, stats)
 
-    return selected_s + selected_m + selected_j
+    # 案例题：按案例单位抽取（只在本板块题池内找案例）
+    selected_c = extract_case_questions(
+        case_count,
+        exam_type=(cat_questions[0].get("exam_type") if cat_questions else None),
+        questions=cat_questions,
+    ) if case_count and case_count > 0 else []
+
+    return selected_s + selected_m + selected_j + selected_c
 
 
 def get_all_categories(questions):
     """
     获取所有知识板块及其题数统计
-    返回: dict {板块名: {total, single, multi, judge}}
+    返回: dict {板块名: {total, single, multi, judge, case}}
+    - total 含案例题；single/multi/judge/case 四类之和 == total
     """
     cats = {}
     for q in questions:
         cat = q.get("category", "其他")
         if cat not in cats:
-            cats[cat] = {"total": 0, "single": 0, "multi": 0, "judge": 0}
+            cats[cat] = {"total": 0, "single": 0, "multi": 0, "judge": 0, "case": 0}
         cats[cat]["total"] += 1
         if q["type"] == "single":
             cats[cat]["single"] += 1
@@ -1155,6 +1243,8 @@ def get_all_categories(questions):
             cats[cat]["multi"] += 1
         elif q["type"] == "judge":
             cats[cat]["judge"] += 1
+        elif q["type"] == "案例题":
+            cats[cat]["case"] += 1
     return cats
 
 

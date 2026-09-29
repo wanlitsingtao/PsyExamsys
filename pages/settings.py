@@ -367,7 +367,8 @@ def _show_tab_config():
 
     st.markdown("---")
     st.markdown("**专项训练设置**")
-    st.markdown("专项训练固定每轮出 **60 题**（30 单选 + 20 多选 + 10 判断），可在此调整题数配置。")
+    st.markdown("专项训练按题型分别出题，可在此调整各题型题数配置。"
+                "（知识板块专项训练不出案例题，案例题只在综合训练中出现）")
 
     spec_per_round = st.number_input(
         "每轮专项训练总数", min_value=10, max_value=200, value=config.get("spec_per_round", 60),
@@ -383,16 +384,35 @@ def _show_tab_config():
         key="cfg_spec_judge")
 
     st.markdown("---")
-    st.markdown("**模拟考试设置**")
-    exam_time = st.number_input(
-        "考试时间（分钟）", min_value=30, max_value=180, value=config["exam_time_minutes"],
-        key="cfg_exam_time")
-    exam_single = st.number_input(
-        "单选题数", min_value=0, max_value=100, value=config["exam_single_count"], key="cfg_exam_single")
-    exam_multi = st.number_input(
-        "多选题数", min_value=0, max_value=100, value=config["exam_multi_count"], key="cfg_exam_multi")
-    exam_judge = st.number_input(
-        "判断题数", min_value=0, max_value=100, value=config["exam_judge_count"], key="cfg_exam_judge")
+    st.markdown("**综合训练设置**")
+    st.markdown("综合训练从全部知识板块混合抽题，可在此调整各题型题数配置。")
+
+    comp_per_round = st.number_input(
+        "每轮综合训练总数", min_value=10, max_value=300, value=config.get("comp_per_round", 60),
+        help="综合训练每轮抽取的总题数", key="cfg_comp_total")
+    comp_single = st.number_input(
+        "其中单选题数", min_value=0, max_value=200, value=config.get("comp_single_count", 30),
+        key="cfg_comp_single")
+    comp_multi = st.number_input(
+        "其中多选题数", min_value=0, max_value=200, value=config.get("comp_multi_count", 20),
+        key="cfg_comp_multi")
+    comp_judge = st.number_input(
+        "其中判断题数", min_value=0, max_value=200, value=config.get("comp_judge_count", 10),
+        key="cfg_comp_judge")
+    comp_case_enabled = st.checkbox(
+        "综合训练中出案例题",
+        value=bool(config.get("comp_case_enabled", False)),
+        help="勾选后，综合训练会额外抽案例题追加到卷末；该题库无案例题时不会报错，自动不出",
+        key="cfg_comp_case")
+    # 勾选后才出现"案例题数量"（数量 = 案例**个数**，不是子题数）
+    comp_case_count = config.get("comp_case_count", 1)
+    if comp_case_enabled:
+        comp_case_count = st.number_input(
+            "案例题数量",
+            min_value=1, max_value=20, value=max(1, int(comp_case_count)),
+            help="按**案例个数**配置：填 1 表示抽 1 个案例，该案例下有多少道子题就出多少道"
+                 "（子题数不设限制，依题库中案例题的实际情况）；填 2 表示抽 2 个案例，以此类推",
+            key="cfg_comp_case_count")
 
     st.markdown("---")
     st.markdown("**错题本设置**")
@@ -416,10 +436,12 @@ def _show_tab_config():
             "spec_single_count": spec_single,
             "spec_multi_count": spec_multi,
             "spec_judge_count": spec_judge,
-            "exam_time_minutes": exam_time,
-            "exam_single_count": exam_single,
-            "exam_multi_count": exam_multi,
-            "exam_judge_count": exam_judge,
+            "comp_per_round": comp_per_round,
+            "comp_single_count": comp_single,
+            "comp_multi_count": comp_multi,
+            "comp_judge_count": comp_judge,
+            "comp_case_enabled": comp_case_enabled,
+            "comp_case_count": int(comp_case_count),
             "wrongbook_extract_count": wrong_count,
             "retention_days_threshold": retention_threshold,
         })

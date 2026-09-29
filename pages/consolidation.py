@@ -16,6 +16,9 @@ from utils.data_manager import (
 )
 from utils.answer_card import render_answer_card
 
+# 题型固定顺序：单选 → 多选 → 判断 → 案例题（巩固练习不采用随机题型顺序）
+_TYPE_ORDER = {"single": 0, "multi": 1, "judge": 2, "案例题": 3, "indefinite": 4}
+
 
 def _get_cached_qstats(qid):
     """从 session_state 缓存获取题目统计；缓存缺失时回查数据库，避免切换考试类型后显示 0/0"""
@@ -50,8 +53,22 @@ def show_consolidation():
 #  题目生成 + Start 页面
 # ============================
 
+def _clear_consol_show_ans():
+    """清除所有题目的答案展开状态（新练习开始时调用）
+
+    2026-09-29 修复：巩固练习的题池（消退型/遗忘预警/波动型/不确定题目）
+    两轮之间高度重叠（实测 60/60 完全相同），原先未清理
+    `consol_show_ans_{qid}` → 第二轮抽到上一轮做过的题时，答案会**自动处于展开状态**。
+    与专项训练 `_clear_spec_show_ans()` 的行为、命名、时机保持一致。
+    """
+    keys_to_clear = [k for k in st.session_state if k.startswith("consol_show_ans_")]
+    for k in keys_to_clear:
+        del st.session_state[k]
+
+
 def _generate_consol_questions():
     """加载并筛选需要巩固的题目，写入 session_state"""
+    _clear_consol_show_ans()  # 新一轮：清空上一轮残留的答案展开状态
     questions = load_questions()
     q_map = {q["id"]: q for q in questions}
     mastery = get_mastery_distribution(questions, st.session_state.get("exam_type"))
@@ -108,6 +125,11 @@ def _generate_consol_questions():
             q_copy["_tag"] = tag
             selected.append(q_copy)
             tags[item["question_id"]] = tag
+
+    # 题型顺序固定为 单选 → 多选 → 判断 → 案例题（2026-09-29 用户要求：不要随机顺序）；
+    # 同类题内部保持既有优先级顺序（消退型 > 遗忘预警 > 波动型 > 不确定题目）——
+    # Python 的 sort 是**稳定**排序，故组内次序不变。
+    selected.sort(key=lambda _q: _TYPE_ORDER.get(_q.get("type"), 99))
 
     if not selected:
         # 无可巩固题目：保持 idle，不进入答题态（防止 cq[idx] IndexError）
@@ -172,6 +194,7 @@ def _show_consol_start():
 
 def _resume_consol_draft(draft: dict):
     """从草稿恢复巩固练习状态"""
+    _clear_consol_show_ans()  # 恢复草稿：清空残留的答案展开状态（与专项训练一致）
     q_map = {q["id"]: q for q in load_questions()}
     restored_questions = [q_map[qid] for qid in draft.get("question_ids", []) if qid in q_map]
     if not restored_questions:
