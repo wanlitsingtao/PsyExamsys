@@ -415,6 +415,16 @@ def _show_tab_config():
             key="cfg_comp_case_count")
 
     st.markdown("---")
+    st.markdown("**巩固练习设置**")
+    st.markdown("巩固练习从「不稳固题目」（消退型 / 波动型 / 遗忘预警 / 不确定题目）中"
+                "按优先级抽题，**各题型数量由题库实况决定**，故此处只配总题数。")
+    consol_per_round = st.number_input(
+        "每轮巩固练习总数", min_value=10, max_value=200,
+        value=config.get("consol_per_round", 60),
+        help="巩固练习每轮抽取的最大题数；不稳固题目不足时按实际数量出题，不报错",
+        key="cfg_consol_total")
+
+    st.markdown("---")
     st.markdown("**错题本设置**")
     wrong_count = st.number_input(
         "每次提取错题数", min_value=10, max_value=200, value=config["wrongbook_extract_count"],
@@ -442,6 +452,7 @@ def _show_tab_config():
             "comp_judge_count": comp_judge,
             "comp_case_enabled": comp_case_enabled,
             "comp_case_count": int(comp_case_count),
+            "consol_per_round": consol_per_round,
             "wrongbook_extract_count": wrong_count,
             "retention_days_threshold": retention_threshold,
         })

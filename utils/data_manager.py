@@ -145,6 +145,11 @@ DEFAULT_CONFIG = {
     # 每个案例带出其全部子题（子题数不设限制，依题库实际情况）。
     "comp_case_enabled": False,
     "comp_case_count": 1,
+    # 巩固练习每轮题数（v2.8.4）。
+    # 巩固练习的题源是「不稳固题目」（消退型 / 遗忘预警 / 波动型 / 不确定题目），
+    # 先按 4 级优先级选、再按题型排序显示，**各题型数量由题库实况决定**，
+    # 因此只配总题数（上限截断），不配各题型配额。
+    "consol_per_round": 60,
     "wrongbook_extract_count": 50,
     "retention_days_threshold": 5,
     "last_import_files": [],

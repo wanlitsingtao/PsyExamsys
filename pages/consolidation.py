@@ -13,6 +13,7 @@ from utils.data_manager import (
     load_questions, load_question_stats, infer_category,
     get_mastery_distribution, load_uncertain_questions,
     save_draft, load_drafts, delete_draft, get_question_stats,
+    load_config,
 )
 from utils.answer_card import render_answer_card
 
@@ -113,8 +114,10 @@ def _generate_consol_questions():
                 "uncertainty_score": uq.get("uncertainty_score", 0),
             })
 
-    # 取最多 60 题
-    count = min(len(combined), 60)
+    # 取最多 N 题（N 由系统设置「每轮巩固练习总数」决定，默认 60）
+    _consol_cfg = load_config()
+    max_count = int(_consol_cfg.get("consol_per_round", 60) or 60)
+    count = min(len(combined), max_count)
     selected = []
     tags = {}
     for item in combined[:count]:

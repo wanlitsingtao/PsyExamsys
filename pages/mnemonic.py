@@ -10,6 +10,45 @@ from utils.data_manager import (
 )
 
 
+# 中文「数量结构」：中文数词必须带数量单位才算数字
+# （由此排除「一致 / 一方 / 统一 / 一般 / 同一性 / 逐次 / 多项」等合成词的误判）
+_CN_QUANTITY_RE = re.compile(
+    r'(?:第[一二三四五六七八九十百千]+'
+    r'|[一二三四五六七八九十百千]+'
+    r'(?:个|次|种|类|项|条|级|年|月|周|天|分|秒|岁|步|点|名|位|件|方面|阶段|等级|题|篇|倍|成|半)'
+    r'|[一二三四五六七八九十百千]+分之[一二三四五六七八九十百千]+)'
+)
+
+# 案例背景题的题干特征：开头是「求助者 / 来访者 / N岁男女性」的人物介绍
+_CASE_PERSON_RE = re.compile(r'(求助者|来访者|咨客|某[男女]性?|男性|女性|男|女)')
+_AGE_IN_HEAD_RE = re.compile(r'\d+\s*岁')
+
+
+def _has_number(text):
+    """文本是否含「数字」。
+
+    2026-09-29 收窄：只认**阿拉伯数字**，或中文的**数量结构**
+    （数词+量词 如"一次/三种"、序号 如"第五"、分数 如"三分之一"）。
+    不再把孤立的中文数词当数字 —— 否则"一致、一方、统一、一般、同一性、
+    逐次、多项、初步"这类词里的"一/三/多"会被误判成数字知识点。
+    """
+    t = str(text)
+    if re.search(r'\d', t):
+        return True
+    return bool(_CN_QUANTITY_RE.search(t))
+
+
+def _is_case_background(qtext):
+    """题干是否为「案例背景叙述」（人物介绍 + 年龄）。
+
+    例：『求助者，男，30岁，销售，近半年因业绩压力大…』
+        『24岁女性因和恋人相处矛盾前来咨询…』
+    这类题干里的年龄只是背景介绍，不构成数字知识点。
+    """
+    head = qtext[:30]
+    return bool(_CASE_PERSON_RE.search(head)) and bool(_AGE_IN_HEAD_RE.search(head))
+
+
 def _filter_number_questions(questions):
     """
     从题库中筛选涉及数字答案的题目。
@@ -18,6 +57,10 @@ def _filter_number_questions(questions):
     1. 题目文本包含数量/数字关键词
     2. 至少2个选项含有数字
     3. 答案中含数字
+
+    2026-09-29 修正（两处误判）：
+    - 数字判定收窄为 `_has_number()`：不再把"一致/一方/统一/一般"里的中文数词当数字；
+    - 题干是「求助者/N岁男女性」人物背景叙述的案例题直接排除（年龄只是背景，非知识点）。
     """
     quantity_keywords = [
         '条目数', '条目', '几岁', '年龄', '岁', '几分', '几级', '几类',
@@ -61,6 +104,11 @@ def _filter_number_questions(questions):
         if not opts or not ans_key:
             continue
 
+        # 0. 排除「案例背景题」：题干是人物背景叙述（求助者/N岁男女性…），
+        #    其中的年龄只是背景介绍，不是数字知识点
+        if _is_case_background(qtext):
+            continue
+
         # 处理多选题答案（answer="AB" → 拼接 A/B 选项值）
         if q_type == "multi" and len(ans_key) > 1:
             ans_texts = [str(opts.get(k, "")) for k in ans_key if k in opts]
@@ -84,7 +132,7 @@ def _filter_number_questions(questions):
         # 2. 至少2个选项含数字
         digit_count = sum(
             1 for v in opts.values()
-            if re.search(r'\d+|[一二三四五六七八九十百]+', str(v))
+            if _has_number(v)
         )
         if digit_count < 2:
             # 判断题特例：选项"正确/错误"无数字，但题干含岁/月龄则放行
@@ -94,7 +142,7 @@ def _filter_number_questions(questions):
         # 3. 答案中含数字（排除书籍/标准名称等伪数字答案）
         if "《" in ans_text:
             continue
-        if not re.search(r'\d+|[一二三四五六七八九十百]+', ans_text):
+        if not _has_number(ans_text):
             # 判断题特例：答案"正确/错误"不含数字，若题干含岁/月龄则放行
             if not (q_type == "judge" and (re.search(r'\d+\s*岁', qtext) or re.search(r'\d+\s*月龄', qtext))):
                 continue
