@@ -31,6 +31,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+# ---- 隔离：库文件与库模式**都**要钉到临时目录，且必须在 import utils.* 之前 ----
+# 只改 da.SQLITE_DB / dm.DATA_DIR 是不够的 —— 那只改「库文件路径」，不改「库模式」。
+# 本机或 CI 上只要存在 .streamlit/secrets.toml（或 SUPABASE_DB_URL 之类的环境变量），
+# get_db_mode() 就会解析成 supabase，测试构造的题库/用户直接写进**云端生产库**。
+# 2026-10-09 实际发生过：psych_exm 里多出 3 条 `题库A.docx`、2 个用户 alice/bob。
+#   · EXMSYS_DATA_DIR 是 get_db_mode() 里的安全阀（设了就强制 sqlite）
+#   · EXMSYS_DB_MODE 再显式钉一层
+# 两者都设才稳；缺一不可。
+_tmp = Path(tempfile.mkdtemp(prefix="exmsys_single_db_test_"))
+_test_db = _tmp / "exmsys.db"
+os.environ["EXMSYS_DB_MODE"] = "sqlite"
+os.environ["EXMSYS_DATA_DIR"] = str(_tmp)
+
 import utils.data_access as da
 import utils.data_manager as dm
 import utils.account_manager as acct
@@ -40,9 +53,6 @@ from _testenv import snapshot_real_db  # noqa: E402  （防呆用，见 guard()�
 
 REAL_DATA = ROOT / "data"
 
-# ---- 隔离：把单库路径指到临时目录，并断言没碰真实目录 ----
-_tmp = Path(tempfile.mkdtemp(prefix="exmsys_single_db_test_"))
-_test_db = _tmp / "exmsys.db"
 da.SQLITE_DB = _test_db
 dm.SQLITE_DB = _test_db
 dm.DATA_DIR = _tmp
@@ -51,6 +61,11 @@ dm.DRAFTS_DIR = _tmp / "drafts"
 da.reset_data_access()
 dm._dao = None
 dm._current_user_id = None
+
+# ---- 模式哨兵：必须真的是 sqlite，绝不连云端 ----
+assert da.get_db_mode() == "sqlite", (
+    f"库模式被解析成 {da.get_db_mode()!r} —— 测试数据会写进云端生产库，已中止。"
+)
 
 _passed = []
 

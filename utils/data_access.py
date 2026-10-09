@@ -23,6 +23,7 @@ import json
 import os
 import re
 import sqlite3
+from collections.abc import Mapping
 from pathlib import Path
 from datetime import datetime
 
@@ -149,7 +150,10 @@ def _dsn_from_mapping(mapping) -> str:
         if _looks_like_dsn(v):
             return str(v).strip()
     sub = mapping.get("supabase")
-    if isinstance(sub, dict):
+    # 判据必须是 Mapping 而不是 dict：Streamlit 的 st.secrets 把嵌套表包成
+    # AttrDict（collections.abc.Mapping 的子类，**不是 dict**），用 dict 判断
+    # 会让 st.secrets 这条路径恒为空 —— 云端正是靠它拿连接串的。
+    if isinstance(sub, Mapping):
         for k in ("url", "dsn", "connection_string", "database_url"):
             v = sub.get(k)
             if _looks_like_dsn(v):
@@ -164,7 +168,8 @@ def _schema_from_mapping(mapping) -> str:
         if isinstance(v, str) and v.strip() and v.strip() not in _SCHEMA_UNSET:
             return v.strip()
     sub = mapping.get("supabase")
-    if isinstance(sub, dict):
+    # 同 _dsn_from_mapping：st.secrets 的嵌套表是 AttrDict（Mapping，非 dict）
+    if isinstance(sub, Mapping):
         for k in ("schema", "db_schema"):
             v = sub.get(k)
             if isinstance(v, str) and v.strip() and v.strip() not in _SCHEMA_UNSET:
