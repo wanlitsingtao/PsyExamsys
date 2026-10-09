@@ -1,0 +1,18 @@
+# exmsys 运行依赖
+#
+# 用途：
+#   · 本机安装：python -m pip install -r requirements.txt
+#   · Streamlit Community Cloud 部署：仓库根目录必须有此文件，平台按它装依赖
+#
+# 依赖清单是按「全项目实际 import 扫描」得出的，不是凭印象列的：
+#   streamlit / pandas / docx(python-docx) / psycopg2
+# 本机是 Python 3.14.4，Streamlit Cloud 支持 3.10 ~ 3.14。
+
+streamlit==1.57.0
+pandas
+python-docx
+
+# Postgres / Supabase 驱动
+#   用 -binary 版：带预编译 wheel，Linux（Streamlit Cloud）上不用现场编译 libpq。
+#   与本机已装的 psycopg2 2.9.12 源码版 API 完全一致，本地/云端行为一致。
+psycopg2-binary>=2.9,<3

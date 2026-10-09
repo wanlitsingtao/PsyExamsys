@@ -36,6 +36,271 @@ DATA_DIR = Path(os.environ.get("EXMSYS_DATA_DIR") or
 # SQLite 数据库路径（单库：全系统唯一）
 SQLITE_DB = DATA_DIR / "exmsys.db"
 
+
+# ========================================
+# 数据库模式：sqlite（本机单库） / supabase（Postgres）
+# ========================================
+#
+# 选择顺序（先命中者生效）：
+#   1. 环境变量 EXMSYS_DB_MODE = sqlite | supabase  → 强制指定
+#   2. 设了 EXMSYS_DATA_DIR（测试隔离 / 挂载卷）      → 强制 sqlite
+#   3. 能拿到 Postgres 连接串                        → supabase
+#   4. 兜底                                          → sqlite
+#
+# 第 2 条是**安全阀**，不能删：
+#   自动化测试会把 EXMSYS_DATA_DIR 指向「真实库的临时副本」，
+#   万一开发机环境里恰好存在 SUPABASE_DB_URL / st.secrets，
+#   没有这条就会把测试数据写进云上生产库。
+#   测试必须永远打在本机副本上 —— 见 scripts/_testenv.py。
+#
+# 连接串来源：环境变量（本地开发 / 批处理） 或 st.secrets（Streamlit 云端）。
+
+_PG_DSN_ENV_KEYS = ("EXMSYS_DB_URL", "SUPABASE_DB_URL", "DATABASE_URL")
+
+# ---- 目标 schema（同一实例多应用隔离）----
+# 一个 Supabase 项目 = 一个 PostgreSQL 实例。实例里可以建多个 schema，
+# 各应用各占一个，互不干扰（新 schema 默认不在 Exposed schemas 里，
+# 因此 Data API / anon key 根本触不到 —— 比 RLS 兜底更硬）。
+# 兜底值 'public' 保证「没配 schema 的场合行为与改造前完全一致」。
+DEFAULT_PG_SCHEMA = "public"
+
+# 合法标识符白名单：schema 名会被拼进 SET search_path / information_schema 参数，
+# 必须只允许 [A-Za-z_][A-Za-z0-9_]*（长度上限 63 是 PG 的标识符上限）。
+# 用白名单而不是转义：任何不符合的值一律报错，绝不"尽力猜"。
+_SCHEMA_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,62}$")
+
+_SCHEMA_ENV_KEYS = ("EXMSYS_DB_SCHEMA", "DB_SCHEMA")
+
+# 值被当成「未配置」的哨兵（空串 / 常见默认值都视为没配）
+_SCHEMA_UNSET = ("", "public")
+
+
+def _looks_like_dsn(value) -> bool:
+    """是不是一个 Postgres 连接串"""
+    return isinstance(value, str) and value.strip().startswith(("postgres://", "postgresql://"))
+
+
+def mask_dsn(dsn: str) -> str:
+    """连接串打码（抹掉密码），供日志与界面显示 —— 密码绝不进日志"""
+    if not _looks_like_dsn(dsn):
+        return str(dsn)
+    try:
+        head, tail = dsn.split("://", 1)
+        cred, rest = tail.split("@", 1)
+        user = cred.split(":", 1)[0]
+        return f"{head}://{user}:***@{rest.split('?')[0]}"
+    except Exception:
+        return "postgresql://***@***"
+
+
+def _read_project_secrets_toml() -> dict:
+    """直接解析 .streamlit/secrets.toml（不依赖 Streamlit 运行时）
+
+    为什么需要：Streamlit 之外的场合（导入脚本、迁移脚本、批处理自检）
+    读不到 st.secrets，但用户不该为此维护第二份配置。
+    用标准库 tomllib（Python 3.11+）读，零额外依赖。
+    """
+    try:
+        import tomllib
+    except Exception:  # pragma: no cover - Python < 3.11
+        return {}
+    candidates = [
+        Path(__file__).resolve().parent.parent / ".streamlit" / "secrets.toml",
+        Path.cwd() / ".streamlit" / "secrets.toml",
+    ]
+    for p in candidates:
+        try:
+            if p.is_file():
+                with open(p, "rb") as fh:
+                    return tomllib.load(fh)
+        except Exception:
+            continue
+    return {}
+
+
+def _read_project_dotenv() -> dict:
+    """读项目根目录的 .env（极简 KEY=VALUE 解析，不引入 python-dotenv 依赖）"""
+    out = {}
+    candidates = [
+        Path(__file__).resolve().parent.parent / ".env",
+        Path.cwd() / ".env",
+    ]
+    for p in candidates:
+        try:
+            if not p.is_file():
+                continue
+            for line in p.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                out[k.strip()] = v.strip().strip('"').strip("'")
+            if out:
+                return out
+        except Exception:
+            continue
+    return out
+
+
+def _dsn_from_mapping(mapping) -> str:
+    """从 dict（toml 解析结果 / .env 解析结果）里找连接串"""
+    for k in _PG_DSN_ENV_KEYS:
+        v = mapping.get(k)
+        if _looks_like_dsn(v):
+            return str(v).strip()
+    sub = mapping.get("supabase")
+    if isinstance(sub, dict):
+        for k in ("url", "dsn", "connection_string", "database_url"):
+            v = sub.get(k)
+            if _looks_like_dsn(v):
+                return str(v).strip()
+    return ""
+
+
+def _schema_from_mapping(mapping) -> str:
+    """从 dict（toml 解析结果 / .env 解析结果）里找目标 schema 名"""
+    for k in _SCHEMA_ENV_KEYS:
+        v = mapping.get(k)
+        if isinstance(v, str) and v.strip() and v.strip() not in _SCHEMA_UNSET:
+            return v.strip()
+    sub = mapping.get("supabase")
+    if isinstance(sub, dict):
+        for k in ("schema", "db_schema"):
+            v = sub.get(k)
+            if isinstance(v, str) and v.strip() and v.strip() not in _SCHEMA_UNSET:
+                return v.strip()
+    return ""
+
+
+def normalize_pg_schema(value) -> str:
+    """校验并规范化 schema 名；非法值直接抛错，绝不静默降级
+
+    schema 名会被拼进 `SET search_path` 与 information_schema 的查询参数。
+    与其费劲转义，不如用白名单卡死：只接受 [A-Za-z_][A-Za-z0-9_]*。
+    """
+    name = ("" if value is None else str(value)).strip().strip('"')
+    if not name:
+        return DEFAULT_PG_SCHEMA
+    if not _SCHEMA_RE.match(name):
+        raise RuntimeError(
+            f"schema 名不合法：{name!r}\n"
+            "  只允许字母 / 数字 / 下划线，且不能以数字开头（PostgreSQL 标识符规则）。\n"
+            "  请检查 EXMSYS_DB_SCHEMA 环境变量，或 .streamlit/secrets.toml 里的 schema 配置。"
+        )
+    return name
+
+
+def detect_pg_schema() -> str:
+    """按优先级寻找目标 schema；找不到返回 'public'（与改造前行为完全一致）
+
+    查找顺序与连接串对齐，一份配置全场景通用：
+      1. 环境变量 EXMSYS_DB_SCHEMA / DB_SCHEMA
+      2. Streamlit secrets（云端 Secrets 面板 / 本地 .streamlit/secrets.toml）
+      3. 直接解析 .streamlit/secrets.toml（脚本 / 批处理等非 Streamlit 场合）
+      4. 项目根目录 .env
+    """
+    for k in _SCHEMA_ENV_KEYS:
+        v = os.environ.get(k)
+        if isinstance(v, str) and v.strip() and v.strip() not in _SCHEMA_UNSET:
+            return normalize_pg_schema(v)
+
+    try:
+        import streamlit as st
+        name = _schema_from_mapping(st.secrets)
+        if name:
+            return normalize_pg_schema(name)
+    except Exception:
+        pass
+
+    for mapping in (_read_project_secrets_toml(), _read_project_dotenv()):
+        name = _schema_from_mapping(mapping)
+        if name:
+            return normalize_pg_schema(name)
+
+    return DEFAULT_PG_SCHEMA
+
+
+def detect_pg_dsn() -> str:
+    """按优先级寻找 Postgres 连接串。找不到返回 ''。
+
+    查找顺序（先命中者生效）：
+      1. 环境变量 EXMSYS_DB_URL / SUPABASE_DB_URL / DATABASE_URL
+      2. Streamlit secrets（云端 Secrets 面板 / 本地 .streamlit/secrets.toml）
+      3. 直接解析 .streamlit/secrets.toml（脚本、批处理等非 Streamlit 场合）
+      4. 项目根目录 .env
+    这样**一份配置全场景通用**，不需要为「应用」和「脚本」各维护一份。
+    """
+    for k in _PG_DSN_ENV_KEYS:
+        v = os.environ.get(k)
+        if _looks_like_dsn(v):
+            return v.strip()
+
+    # Streamlit 云端把密钥放在 secrets 面板；非 Streamlit 环境访问会抛异常
+    try:
+        import streamlit as st
+        dsn = _dsn_from_mapping(st.secrets)
+        if dsn:
+            return dsn
+    except Exception:
+        pass
+
+    dsn = _dsn_from_mapping(_read_project_secrets_toml())
+    if dsn:
+        return dsn
+
+    return _dsn_from_mapping(_read_project_dotenv())
+
+
+def get_db_mode() -> str:
+    """当前数据库模式：'sqlite' 或 'supabase'"""
+    explicit = (os.environ.get("EXMSYS_DB_MODE") or "").strip().lower()
+    if explicit in ("sqlite", "supabase"):
+        return explicit
+    if os.environ.get("EXMSYS_DATA_DIR"):
+        return "sqlite"
+    return "supabase" if detect_pg_dsn() else "sqlite"
+
+
+# 托管商显示名（从连接串主机名推断，仅用于界面文案与提示，不参与连接）
+_DB_PROVIDER_LABEL = {
+    "supabase": "Supabase",
+    "neon": "Neon",
+    "aiven": "Aiven",
+    "unknown": "云端 PostgreSQL",
+}
+
+
+def get_db_provider() -> str:
+    """从连接串主机名推断托管商：'supabase' / 'neon' / 'aiven' / 'unknown' / ''（非云端）
+
+    只用于「界面文案与运维提示」——例如备份说明各家的免费版策略不同
+    （Supabase 有每日自动备份，Neon / Aiven 免费版没有），不能一刀切。
+    连接行为本身与托管商无关，任何标准 PostgreSQL 都走同一条路径。
+    """
+    dsn = detect_pg_dsn()
+    if not dsn:
+        return ""
+    host = dsn.split("://", 1)[-1]
+    if "@" in host:
+        host = host.split("@", 1)[-1]
+    host = host.split("/", 1)[0]
+    if "pooler.supabase.com" in host or ".supabase.co" in host:
+        return "supabase"
+    if ".neon.tech" in host:
+        return "neon"
+    if "aivencloud.com" in host:
+        return "aiven"
+    return "unknown"
+
+
+def get_db_label() -> str:
+    """给界面用的模式说明（含打码后的地址与目标 schema）"""
+    if get_db_mode() == "supabase":
+        name = _DB_PROVIDER_LABEL.get(get_db_provider(), "云端 PostgreSQL")
+        return (f"☁️ {name}（云端） {mask_dsn(detect_pg_dsn())}"
+                f" · schema {detect_pg_schema()}")
+    return f"💾 本地 SQLite {SQLITE_DB}"
+
 # 公共题库 owner 哨兵值
 PUBLIC_OWNER = "__public__"
 
@@ -54,6 +319,8 @@ def get_retention_threshold(db_path=None, user_id=None):
 
     Args:
         db_path: 库路径；None 时使用单库默认路径。
+                 **传 Postgres 连接串时自动走 Supabase 分支**
+                 （PostgresDataAccess 会把 self.db_path 设成 DSN）。
         user_id: 用户 ID（配置按用户隔离）。
     """
     path = str(db_path) if db_path else str(SQLITE_DB)
@@ -61,19 +328,29 @@ def get_retention_threshold(db_path=None, user_id=None):
     if key in _retention_threshold_cache:
         return _retention_threshold_cache[key]
     try:
-        conn = sqlite3.connect(path, timeout=5)
-        try:
-            cur = conn.cursor()
-            cur.execute(
-                "SELECT value FROM user_config WHERE user_id = ? AND key = 'retention_days_threshold'",
+        if _looks_like_dsn(path):
+            from utils.data_access_pg import fetch_one
+            row = fetch_one(
+                path,
+                "SELECT value FROM user_config "
+                "WHERE user_id = %s AND key = 'retention_days_threshold'",
                 (user_id or "",),
             )
-            row = cur.fetchone()
             value = json.loads(row[0]) if (row and row[0]) else 5
-            _retention_threshold_cache[key] = int(value)
-            return _retention_threshold_cache[key]
-        finally:
-            conn.close()
+        else:
+            conn = sqlite3.connect(path, timeout=5)
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT value FROM user_config WHERE user_id = ? AND key = 'retention_days_threshold'",
+                    (user_id or "",),
+                )
+                row = cur.fetchone()
+                value = json.loads(row[0]) if (row and row[0]) else 5
+            finally:
+                conn.close()
+        _retention_threshold_cache[key] = int(value)
+        return _retention_threshold_cache[key]
     except Exception:
         return 5  # 默认值
 
@@ -330,6 +607,8 @@ class SQLiteDataAccess(DataAccess):
     由 data_manager.set_current_user() 每帧校正（与改造前同样的幂等策略，
     解决 Streamlit 模块级全局被其他 session 覆盖的问题）。
     """
+
+    db_kind = "sqlite"
 
     def __init__(self, db_path=None, user_id=None):
         self.db_path = str(db_path) if db_path else str(SQLITE_DB)
@@ -2491,15 +2770,21 @@ _DAO_SINGLETON = None
 
 
 def get_data_access(db_path=None, user_id=None) -> DataAccess:
-    """返回数据访问对象（单库，进程内单例）
+    """返回数据访问对象（进程内单例）
 
-    单库多租户：全系统只有一个 data/exmsys.db，用户隔离靠 SQL 里的 user_id/owner_id。
-    DAO 持有「当前用户」上下文，由 data_manager.set_current_user() 每帧校正
-    （解决 Streamlit 多 session 共享模块级全局变量导致的串号问题）。
+    模式由 get_db_mode() 决定，见文件头「数据库模式」一节：
+      · 'supabase' → PostgresDataAccess（连 Supabase / 任意 Postgres）
+      · 'sqlite'   → SQLiteDataAccess（本机单库 data/exmsys.db）
+
+    显式传入 db_path 时强制走 SQLite —— 测试与迁移脚本依赖这个行为。
     """
     global _DAO_SINGLETON
     if _DAO_SINGLETON is None:
-        _DAO_SINGLETON = SQLiteDataAccess(db_path=db_path, user_id=user_id)
+        if db_path is not None or get_db_mode() == "sqlite":
+            _DAO_SINGLETON = SQLiteDataAccess(db_path=db_path, user_id=user_id)
+        else:
+            from utils.data_access_pg import PostgresDataAccess
+            _DAO_SINGLETON = PostgresDataAccess(dsn=detect_pg_dsn(), user_id=user_id)
     elif user_id is not None:
         _DAO_SINGLETON.set_user_id(user_id)
     return _DAO_SINGLETON
@@ -2508,4 +2793,11 @@ def get_data_access(db_path=None, user_id=None) -> DataAccess:
 def reset_data_access():
     """丢弃单例（测试或库切换时使用）"""
     global _DAO_SINGLETON
+    if _DAO_SINGLETON is not None:
+        # Postgres 模式还持有连接池，一并释放，否则切库后旧连接会一直被引用
+        try:
+            from utils.data_access_pg import reset_pools
+            reset_pools()
+        except Exception:
+            pass
     _DAO_SINGLETON = None

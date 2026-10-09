@@ -1,0 +1,18 @@
+[server]
+# 关闭文件变更自动重载 —— 考试中修改代码不会导致连接断开
+runOnSave = false
+
+# 健康检查保持开启（默认），防止反向代理判定服务不可用
+scriptHealthCheckEnabled = true
+
+# 增大消息大小上限，避免大数据传输截断
+maxMessageSize = 500
+
+[browser]
+# 关闭使用统计上报
+gatherUsageStats = false
+
+[client]
+# 关闭 Streamlit 内置的多页面侧边栏导航（本应用在 st.sidebar 内自绘导航菜单）
+# 官方配置，彻底不渲染 stSidebarNav，避免首屏闪烁与多余页签
+showSidebarNavigation = false

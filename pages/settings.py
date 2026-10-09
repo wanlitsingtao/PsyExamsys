@@ -464,4 +464,33 @@ def _show_tab_config():
     st.markdown("**数据备份**")
     if st.button("📦 立即备份所有数据", use_container_width=True):
         ts = backup_data()
-        st.success(f"✅ 数据已备份到 data/backup/ 目录 (时间戳: {ts})")
+        from utils.data_access import get_db_mode, get_db_provider, get_db_label
+        if get_db_mode() == "supabase":
+            # 各托管商免费版的备份策略不同，不能一刀切说「每日自动备份」
+            provider = get_db_provider()
+            if provider == "neon":
+                advice = (
+                    "**Neon 免费版没有自动定时备份**，只有 1 个可手动创建的快照"
+                    "（外加 6 小时内的即时恢复）。重要节点请到 Neon 控制台手动建快照。"
+                )
+            elif provider == "aiven":
+                advice = (
+                    "**Aiven 免费版不含自动备份**（Developer 档起才有）。"
+                    "重要节点请在 Aiven 控制台自行导出。"
+                )
+            elif provider == "supabase":
+                advice = (
+                    "Supabase 免费版提供**每日自动备份**（保留 7 天），无需手动操作。"
+                )
+            else:
+                advice = (
+                    "当前连接的托管商未识别，请自行确认其备份策略。"
+                )
+            st.info(
+                f"☁️ 当前使用的是云端数据库（{get_db_label()}），本地没有库文件可备份。\n\n"
+                f"{advice}\n\n"
+                f"**建议同时在本地留一份 data/exmsys.db 作为兜底。**\n"
+                f"（本次操作时间戳：{ts}）"
+            )
+        else:
+            st.success(f"✅ 数据已备份到 data/backup/ 目录 (时间戳: {ts})")

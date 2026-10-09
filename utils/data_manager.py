@@ -52,7 +52,14 @@ def get_current_user_id():
 
 
 def get_current_db_path():
-    """当前数据库路径（单库模式下恒定；保留供备份/调试使用）"""
+    """当前数据库位置
+
+    · SQLite 模式：data/exmsys.db 的文件路径
+    · Supabase 模式：打码后的连接串（**绝不会把密码打到界面或日志上**）
+    """
+    from utils.data_access import get_db_mode, detect_pg_dsn, mask_dsn
+    if get_db_mode() == "supabase":
+        return mask_dsn(detect_pg_dsn())
     return str(SQLITE_DB)
 
 
@@ -946,9 +953,18 @@ def save_mock_exam_record(record, exam_type=None):
 # ============================
 
 def backup_data():
-    """备份数据库文件（单库模式：备份整个 exmsys.db）"""
+    """备份数据
+
+    · SQLite 模式：把整个 exmsys.db 复制到 data/backup/
+    · 云端 PostgreSQL 模式（Supabase / Neon / Aiven 等）：**不做本地文件备份**
+      （数据在云上，本地根本没有库文件）。这里只返回时间戳，
+      界面按托管商给不同提示（各家免费版的备份策略不同，见 pages/settings.py）。
+    """
     ensure_dirs()
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    from utils.data_access import get_db_mode
+    if get_db_mode() == "supabase":
+        return timestamp
     src = Path(SQLITE_DB)
     if src.exists():
         dst = BACKUP_DIR / f"{timestamp}_exmsys.db"

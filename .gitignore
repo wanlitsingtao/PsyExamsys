@@ -22,4 +22,12 @@ __pycache__/
 temp/
 tmp/
 logs/
-.streamlit/
+
+# Streamlit 配置
+#   config.toml 是纯配置（云端部署需要它，所以要进仓库）
+#   secrets.toml 含 Supabase 数据库密码 —— 绝不进仓库
+.streamlit/*
+!.streamlit/config.toml
+
+# 本地环境变量文件（含 Supabase 连接串）—— 绝不进仓库
+.env
