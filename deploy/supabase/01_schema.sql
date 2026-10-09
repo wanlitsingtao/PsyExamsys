@@ -400,3 +400,38 @@ select current_schema()                                       as schema_name,
                      'answer_records','exam_records','mock_exam_records',
                      'study_records','drafts')
  order by c.relname;
+
+
+-- ============================================================================
+--  类型约定守卫：本 schema 里不得存在 boolean 列
+--
+--  SQLite 用 INTEGER 存布尔（True / False 落库就是 1 / 0），PG 侧的表结构
+--  逐字照搬 SQLite，所以整库靠 integer 模拟布尔、一个 boolean 列都没有。
+--  方言层 utils/data_access_pg.py 的 _normalize_params() 会把 Python bool
+--  统一归一成 0/1 再交给驱动 —— 依据正是「这一侧没有 boolean 列」。
+--  一旦这里混进 boolean 列，归一化反而会让它写不进去（0/1 不是 boolean）。
+--
+--  背景（2026-10-09 真实事故）：question_stats.unstable / last_correct 收到
+--  Python bool 时报 DatatypeMismatch: column "unstable" is of type integer
+--  but expression is of type boolean —— PG 不做 boolean → integer 隐式转换。
+--
+--  注：DO 块里的 plpgsql 局部变量（如第 6 节的 needs_revoke boolean）
+--      是过程变量、不属于任何表，不会出现在 information_schema.columns 里。
+-- ============================================================================
+
+do $$
+declare
+    bad text;
+begin
+    select string_agg(table_name || '.' || column_name, ', ')
+      into bad
+      from information_schema.columns
+     where table_schema = current_schema()
+       and data_type = 'boolean';
+
+    if bad is not null then
+        raise exception
+            '目标 schema 里出现了 boolean 列：%。SQLite 用 INTEGER 存布尔，'
+            'PG 侧必须逐字一致，否则方言层的 bool 归一化会失效。', bad;
+    end if;
+end $$;

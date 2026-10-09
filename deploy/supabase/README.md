@@ -50,6 +50,7 @@
 | `02_import_sqlite_to_supabase.py` | 数据搬运 + **逐行校验**（自动按配置的 schema 操作） | 第 5 步 |
 | `preflight.py` | 连接与结构自检（配错、schema 没建、表没建、序列没对齐都会在这里被挡住） | 第 6 步 / 随时 |
 | `03_verify.sql` | 纯 SQL 巡检（行数/分布/断链/NULL/序列/RLS/体积） | 第 5 步复核、线上排查 |
+| `04_smoke_real_pg.py` | **真实库写入冒烟**：把各条写入路径各跑一遍，每例独立 `SAVEPOINT` 后立刻回滚，不落任何数据 | 第 6 步 / **每次改过 SQL 或方言层之后** |
 | `secrets.toml.example` | 配置文件模板（实际位置在 `.streamlit/secrets.toml`），**含 Supabase / Neon / Aiven 三家样例 + schema 项** | 第 3 步 |
 
 > 本包与平台无关：**Supabase / Neon / Aiven 全部通用**，命令一字不差，只有连接串不同
@@ -65,7 +66,7 @@
 | `utils/data_access_pg.py` | PostgreSQL 实现（方言翻译层 + 连接池） |
 | `启动Supabase模式.bat` | 双击即启动云端模式（端口 8512） |
 | `start.bat` | 启动本机 SQLite 模式（端口 8511），两种模式可同时开 |
-| `scripts/test_pg_dialect.py` | 方言翻译 + schema 隔离回归测试（44 项） |
+| `scripts/test_pg_dialect.py` | 方言翻译 + schema 隔离 + 参数类型归一化回归测试（51 项） |
 | `scripts/test_cloud_schema_platform.py` | 建库脚本跨平台 + schema 隔离回归测试（24 项） |
 
 ---
@@ -534,6 +535,37 @@ python deploy/supabase/preflight.py
 ```
 
 全 `[ OK ]` 才继续。
+
+### 6.1b 写入路径冒烟（真库，强烈建议先跑一遍）
+
+```bash
+python deploy/supabase/04_smoke_real_pg.py
+```
+
+`preflight.py` 只**读**结构；这个脚本**把每条写入路径都真跑一遍** —— 统计 upsert
+（含 `bool` / `None` / 混合各变体）、答题记录、错题本增删、草稿覆盖、配置 upsert、
+题库整行回写，以及 `PRAGMA` / `sqlite_master` 翻译和 `PgRow` 取值。
+**每个用例各自开一个 `SAVEPOINT`、跑完立刻 `ROLLBACK TO SAVEPOINT`**，
+不会往库里落任何数据、也不会改动任何现有行。
+
+```
+✅ 统计 upsert：unstable=False（bool）★ 事故点
+✅ 统计 upsert：last_correct=True（bool）★ 第二处事故点
+✅ 草稿：同 id 覆盖（走 ON CONFLICT DO UPDATE 分支）
+✅ 题库：按原值整行写回（PRAGMA + PgRow 取列 + 13 列 upsert）
+...
+通过 25 项 / 失败 0 项
+✅ 冒烟全部通过
+```
+
+**为什么需要它**：本机没有 PostgreSQL，`scripts/` 下的回归测试全跑在 SQLite 模式，
+而 `test_pg_dialect.py` 又只用「假游标」验证翻译出来的 SQL 文本、并不真正执行 ——
+于是「类型 / 方言」这类只有真库才会暴露的问题，本地测试一律测不出来。
+2026-10-09 的 `DatatypeMismatch`（Python `bool` 写进 PG 的 `integer` 列）
+就是这么漏到云端的。
+
+**凡改动过 `utils/data_access.py` 里的 SQL、或改过 `utils/data_access_pg.py`，
+推代码前都跑一遍**，几十秒的事。退出码：`0` 全过 / `3` 有失败 / `4` 连不上。
 
 ### 6.2 启动
 

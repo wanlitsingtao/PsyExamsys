@@ -448,6 +448,28 @@ def reset_pools():
 # 游标 / 连接代理
 # ==========================================================
 
+def _normalize_params(params):
+    """把 Python `bool` 参数归一成 `0` / `1` 整数，其它类型原样透传。
+
+    SQLite 用 `INTEGER` 列存布尔（True/False 落库就是 1/0），PG 侧的表结构是
+    **逐字照搬 SQLite** 的 —— `psych_exm` 里同样一个 `boolean` 列都没有，
+    整库靠 `integer` 模拟布尔。
+
+    但 psycopg2 会把 Python `bool` 适配成 PG 的 `boolean` 类型，而
+    **PostgreSQL 不做 boolean → integer 的隐式转换**，写进去就报
+    `DatatypeMismatch: column "x" is of type integer but expression is of type boolean`
+    （2026-10-09 真实事故：`question_stats.unstable` 与 `last_correct`，
+    因为 `_recalc_mastery_fields()` 赋 bool、读库时又 `bool(row[...])`）。
+
+    在方言层统一收口，好处是**一处覆盖 13 张表的所有写入路径**（含将来新增的），
+    且与 SQLite 的存储语义逐位一致。注意 `bool` 是 `int` 的子类，
+    所以判断要精确到 `isinstance(v, bool)`，不能写成 `isinstance(v, int)`。
+    """
+    if not params:
+        return params
+    return tuple(int(v) if isinstance(v, bool) else v for v in params)
+
+
 class PgCursor:
     """把 SQLite 方言 SQL 翻译后交给 psycopg2 执行，并把行包成 PgRow"""
 
@@ -460,10 +482,11 @@ class PgCursor:
 
     def execute(self, sql, params=()):
         t = translate_sql(sql, self._schema)
+        p = _normalize_params(params)
         if t.extra_params:
-            self._cur.execute(str(t), tuple(params or ()) + tuple(t.extra_params))
+            self._cur.execute(str(t), tuple(p or ()) + tuple(t.extra_params))
         else:
-            self._cur.execute(str(t), tuple(params) if params else None)
+            self._cur.execute(str(t), p or None)
         self._cols = None
         return self
 
@@ -471,7 +494,7 @@ class PgCursor:
         t = translate_sql(sql, self._schema)
         if t.extra_params:
             raise NotImplementedError("带额外参数的语句不支持 executemany")
-        self._cur.executemany(str(t), [tuple(p) for p in seq_of_params])
+        self._cur.executemany(str(t), [_normalize_params(p) for p in seq_of_params])
         self._cols = None
         return self
 
