@@ -542,12 +542,12 @@ st.markdown(f"""
     }}
     /* ============ 手机竖屏（≤640px）：触控优化，PC/平板完全不受影响 ============ */
     @media (max-width: 640px) {{
-        /* 手机抽屉：仅展开态占满全宽；折叠态保持原生窄轨（1.57 中 stSidebar 为 <section>） */
-        section[data-testid="stSidebar"][aria-expanded="true"] {{
-            width: 100% !important;
-            min-width: 100% !important;
-            max-width: 100% !important;
-        }}
+        /* 手机抽屉：**故意不设宽度**，保留 Streamlit 原生 300px
+           （原生 min-width:200px / max-width: min(600px, 90vw)）。
+           展开后是「窄覆盖层」——右侧露出主内容，与 WordStyle/bid-buddy-pub 的
+           移动端侧边栏形态一致（实测 360/390/430px 下均为 300px）。
+           🩸 不要在这里写 width/min-width/max-width: 100% —— 那会把它撑成全宽，
+           主内容被完全遮住（v2.9.4 曾如此，2026-10-10 按用户意见移除）。 */
         /* 底部导航条：390px 宽下"上一题/状态chip/下一题"挤压时自动折行 */
         .question-nav-bar {{
             flex-wrap: wrap !important;
