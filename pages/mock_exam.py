@@ -617,13 +617,14 @@ def _show_exam_subject(subject_key):
         def _go_next():
             st.session_state.mock_current = idx + 1
 
-        nav_cols[0].button("◀ 上一题", use_container_width=True,
+        # key 前缀 nav_* 供手机端 CSS 定位这一行（≤640px 折成 2×2），四个答题页统一命名
+        nav_cols[0].button("◀ 上一题", key="nav_prev", use_container_width=True,
                            disabled=(idx == 0), on_click=_go_prev)
-        nav_cols[1].button("下一题 ▶", use_container_width=True,
+        nav_cols[1].button("下一题 ▶", key="nav_next", use_container_width=True,
                            disabled=(idx >= total_q - 1), on_click=_go_next)
-        nav_cols[2].button("💾 保存", use_container_width=True,
+        nav_cols[2].button("💾 保存", key="nav_save", use_container_width=True,
                            on_click=lambda: _save_mock_draft(subject_key))
-        nav_cols[3].button("📤 提交试卷", use_container_width=True, type="primary",
+        nav_cols[3].button("📤 提交试卷", key="nav_submit", use_container_width=True, type="primary",
                            on_click=lambda: st.session_state.update(mock_confirm_submit=True))
 
         if st.session_state.get("mock_confirm_submit"):

@@ -15,7 +15,11 @@ if "_app_initialized" not in st.session_state:
         page_title="心理咨询师考试背题系统",
         page_icon="📚",
         layout="centered",
-        initial_sidebar_state="expanded",
+        # auto：≤768px 自动收起（手机 / iPad 标准竖屏打开直接看到主页面），
+        # ≥820px 保持展开（PC 与 iPad 横屏行为不变）。
+        # 阈值 768px 为 2026-10-10 实测结论（1440/1280/1100/1024/992/960/900/860/820 → 展开；
+        # 768/700/640/560/480 → 收起），且与 UA 无关（iPad 桌面级 UA 在 768px 同样收起）。
+        initial_sidebar_state="auto",
     )
     st.session_state._app_initialized = True
 
@@ -558,6 +562,41 @@ st.markdown(f"""
         }}
         .question-nav-button {{
             min-height: 44px !important;
+        }}
+        /* ---- 答题导航行（上一题 / 下一题 / 保存 / 提交）折成 2×2 ----
+           该行是 st.columns([1,1,1,1])，390px 下每列仅 89px，
+           会把按钮文字折成 3~4 行、"📤 提交所有答案"行高撑到 103px。
+           用 :has 命中这一行（含 nav_prev），并用 :not(:has(答题卡)) 排除外层
+           "题目区 + 答题卡"那一行，避免误改答题区布局。 */
+        [data-testid="stHorizontalBlock"]:has([class*="st-key-nav_prev"]):not(:has([class*="st-key-answer_card_side"])) {{
+            flex-wrap: wrap !important;
+            gap: 0.5rem !important;
+        }}
+        [data-testid="stHorizontalBlock"]:has([class*="st-key-nav_prev"]):not(:has([class*="st-key-answer_card_side"])) > [data-testid="stColumn"] {{
+            flex: 0 0 calc(50% - 0.25rem) !important;
+            width: calc(50% - 0.25rem) !important;
+            min-width: 0 !important;
+            max-width: calc(50% - 0.25rem) !important;
+        }}
+        /* ---- 题型行（题型·板块 / 不确定 / 标记）折两行 ----
+           该行是 st.columns([5, 2.5, 2.5])，第 2 列在 390px 下仅约 93px，
+           装不下「不确定」开关（复选框 + 3 字）→ 文字被挤成竖排。
+           改为：第 1 列（题型+板块）独占一行，后两列各占一半。
+           四个答题页（专项训练/巩固练习/模拟考试/错题本）的题型行结构完全一致，
+           故用 _mark_ 通配一次覆盖。 */
+        [data-testid="stHorizontalBlock"]:has([class*="_mark_"]):not(:has([class*="st-key-answer_card_side"])) {{
+            flex-wrap: wrap !important;
+            gap: 0.4rem !important;
+        }}
+        [data-testid="stHorizontalBlock"]:has([class*="_mark_"]):not(:has([class*="st-key-answer_card_side"])) > [data-testid="stColumn"]:first-child {{
+            flex: 0 0 100% !important;
+            width: 100% !important;
+            max-width: 100% !important;
+        }}
+        [data-testid="stHorizontalBlock"]:has([class*="_mark_"]):not(:has([class*="st-key-answer_card_side"])) > [data-testid="stColumn"]:not(:first-child) {{
+            flex: 1 1 0 !important;
+            min-width: 0 !important;
+            max-width: calc(50% - 0.2rem) !important;
         }}
     }}
     /* 隐藏 Streamlit 默认多页面导航（放首块 CSS 尽早生效，配合 config.toml 双重保险） */
