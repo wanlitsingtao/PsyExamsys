@@ -221,6 +221,19 @@ div[class*="st-key-answer_card_grid"] button p {
         position: static !important; max-height: none !important; min-height: 0 !important;
     }
 }
+
+/* ============ 手机竖屏（≤640px）：格子加大到触控友好 ============ */
+/* 桌面 26px 太小（低于触控规范），手机上放宽到 32px 高 / 12.5px 字号。
+   宽度仍由 minmax(46px, 1fr) 网格自适应，列数随屏宽自动减少，不会溢出。
+   本块特异性高于 app.py 的通用按钮 min-height:44px（且注入更晚），
+   确保答题卡格子不会被误放大到 44px 而占满竖屏。 */
+@media (max-width: 640px) {
+    div[class*="st-key-answer_card_grid"] button {
+        min-height: 32px !important;
+        height: 32px !important;
+        font-size: 12.5px !important;
+    }
+}
 </style>
 """
 

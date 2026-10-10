@@ -529,11 +529,35 @@ st.markdown(f"""
             padding-left: 0.5rem;
             padding-right: 0.5rem;
         }}
-        /* 窄屏抽屉：仅展开态占满全宽；折叠态保持原生窄轨（1.57 中 stSidebar 为 <section>） */
+        /* 注：侧边栏的「展开态占满全宽」规则**不在这里**，已下移到 ≤640px 块。
+           阈值若用 900px 会把 iPad 竖屏（CSS 视口 768 / 810 / 820 / 834px）一起卷进来；
+           而 iPad Safari 从 iOS 13 起上报桌面级 UA（Macintosh; Intel Mac OS X），
+           Streamlit 因此判它非移动端、不自动收起侧边栏，配合 initial_sidebar_state="expanded"
+           → 侧边栏展开态占满 100% 宽、主内容区被挤成 0 宽，打开就是满屏左侧栏。
+           （2026-10-10 实测复现：768×1024 下 sidebarWidth=768 / mainWidth=0） */
+    }}
+    /* ============ 手机竖屏（≤640px）：触控优化，PC/平板完全不受影响 ============ */
+    @media (max-width: 640px) {{
+        /* 手机抽屉：仅展开态占满全宽；折叠态保持原生窄轨（1.57 中 stSidebar 为 <section>） */
         section[data-testid="stSidebar"][aria-expanded="true"] {{
             width: 100% !important;
             min-width: 100% !important;
             max-width: 100% !important;
+        }}
+        /* 底部导航条：390px 宽下"上一题/状态chip/下一题"挤压时自动折行 */
+        .question-nav-bar {{
+            flex-wrap: wrap !important;
+            gap: 0.5rem !important;
+        }}
+        /* 触控目标 ≥44px（Apple HIG / Material 规范）。两种选择器兼顾 1.57 的
+           button 容器写法；答题卡网格内的格子不在此列 —— answer_card.py 在
+           ≤640px 单独放宽到 32px，且其选择器特异性更高、注入更晚，稳赢。 */
+        div.stButton > button,
+        div[data-testid="stButton"] > button {{
+            min-height: 44px !important;
+        }}
+        .question-nav-button {{
+            min-height: 44px !important;
         }}
     }}
     /* 隐藏 Streamlit 默认多页面导航（放首块 CSS 尽早生效，配合 config.toml 双重保险） */
@@ -1131,6 +1155,10 @@ st.markdown("""
 <style>
 /* 全局：基础字号从16px提升为18px */
 html { font-size: 18px; }
+/* 手机竖屏（≤640px）：根字号回落 16px —— 18px 正文在 390~430px 窄屏偏大，
+   一屏可见的题干/选项行数太少；16px 恰是 Streamlit 原生比例，全套 rem 排版等比缩小。
+   必须写在本条 18px 规则之后（同特异性下后者胜出），PC/平板 >640px 不命中、完全不受影响。 */
+@media (max-width: 640px) { html { font-size: 16px; } }
 /* Streamlit 内置14px字号元素 → 16px（tab标签、caption等） */
 button[data-baseweb="tab"], .stTabs [data-baseweb="tab"] p,
 div[data-testid="stTabs"] button[role="tab"],
