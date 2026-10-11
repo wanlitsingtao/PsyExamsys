@@ -22,6 +22,9 @@
 """
 
 import hashlib
+import hmac
+import os
+import re
 from typing import Optional, Tuple
 
 from utils.data_access import get_data_access
@@ -58,6 +61,140 @@ def user_id_for(fingerprint: str) -> str:
 
 def _dao():
     return get_data_access()
+
+
+# ============================
+# 身份持久化令牌（Cookie 承载，2026-10-11）
+# ============================
+# 要解决的问题（2026-10-10 用户报障，两个症状同源）：
+#   ① 设备指纹 = md5(User-Agent|Sec-CH-UA-Platform)[:32]。浏览器升级、客户端提示
+#      (Client Hints) 策略变化、隐私模式等都会让指纹漂移 → 自动识别落到**新的匿名用户**，
+#      表现为"昨天做过的题今天显示没做过""上次明明答错了却说答对"。
+#   ② Streamlit 会话被回收（长时间不操作/网络断开重连）后，新会话的 session_state 是空的，
+#      只能重新按指纹识别 → 回到"重新登录后的初始页"。
+#
+# 方案：把当前身份签成短令牌（`<user_id>.<hmac16>`）存进**浏览器 Cookie**，
+# 会话重置/重连时用它恢复身份，不再依赖指纹稳定性。
+#   · HMAC 签名 + 校验"该 user_id 在 users 表中真实存在"，防手工改 cookie 冒充
+#     （尤其防冒充管理员 ADMIN_USER_ID）。
+#   · 签名密钥首次生成后存 app_config（全局、跨设备/跨重启稳定），
+#     同一份部署内签发的令牌可互认。
+#
+# 🩸 为什么是 Cookie 而不是 URL（v2.9.6 的教训，用户 2026-10-11 报障）：
+#    令牌里含**明文 user_id**，且**签名本身就是凭证** —— 放 URL query param 等于
+#    地址栏长期挂着身份凭证，转发/截图/收藏夹/浏览器历史都会把它带出去，
+#    拿到该链接的人可直接以该身份进入系统。Cookie 不出现在地址栏与分享链接里，
+#    也不随 User-Agent 变化（比设备指纹更稳）。
+#    ⚠️ 仍要求：当前设备指纹「未登记」或「登记的正是该身份」——已绑定其他账号的
+#    设备不会因为 cookie 而被换号。
+# 兼容：历史上签发过的 `?u=` 令牌仍会被**读取一次**（老链接/老书签不失效），
+#      恢复身份后立即把该参数从地址栏清除。
+
+IDENTITY_TOKEN_PARAM = "u"            # 历史遗留的 URL query param（只读兼容，不再写入）
+IDENTITY_COOKIE_NAME = "exmsys_uid"   # 身份令牌的 Cookie 名
+_IDENTITY_COOKIE_MAX_AGE = 31536000   # Cookie 有效期 1 年
+_IDENTITY_KEY_NAME = "identity_signing_key"
+_identity_key_cache = None
+# 令牌字符白名单：`<user_id>.<sig>`，两侧都是十六进制。用于把令牌安全拼进 JS。
+_IDENTITY_TOKEN_RE = re.compile(r"^[0-9a-f]{6,64}\.[0-9a-f]{8,64}$")
+
+
+def _identity_signing_key() -> Optional[str]:
+    """取（或首次生成）身份签名密钥。失败返回 None → 上层降级为「不持久化身份」。"""
+    global _identity_key_cache
+    if _identity_key_cache:
+        return _identity_key_cache
+    try:
+        dao = _dao()
+        key = dao.get_app_config(_IDENTITY_KEY_NAME)
+        if not key:
+            key = hashlib.sha256(os.urandom(32)).hexdigest()
+            dao.set_app_config(_IDENTITY_KEY_NAME, key)
+        _identity_key_cache = key
+    except Exception:
+        return None
+    return _identity_key_cache
+
+
+def _identity_sig(user_id: str) -> Optional[str]:
+    key = _identity_signing_key()
+    if not key or not user_id:
+        return None
+    return hmac.new(key.encode("utf-8"), user_id.encode("utf-8"),
+                    hashlib.sha256).hexdigest()[:16]
+
+
+def sign_user_id(user_id: str) -> Optional[str]:
+    """签发身份令牌 "<user_id>.<sig>"；密钥不可用时返回 None（调用方跳过持久化）"""
+    sig = _identity_sig(user_id)
+    return f"{user_id}.{sig}" if sig else None
+
+
+def verify_user_token(token: str) -> Optional[str]:
+    """校验身份令牌，通过则返回 user_id，否则 None。
+
+    只接受「签名正确 **且** user_id 在 users 表中真实存在」的令牌。
+    """
+    if not token or "." not in token:
+        return None
+    user_id, _, sig = token.partition(".")
+    if not user_id or not sig:
+        return None
+    expect = _identity_sig(user_id)
+    if not expect or not hmac.compare_digest(sig, expect):
+        return None
+    try:
+        if not _dao().get_user(user_id):
+            return None
+    except Exception:
+        return None
+    return user_id
+
+
+def identity_cookie_script(token: str) -> Optional[str]:
+    """生成「把身份令牌写进浏览器 Cookie」的 HTML/JS 片段；令牌不合法则返回 None。
+
+    ⚠️ 只做**白名单字符校验**后再拼接 —— 绝不把未校验内容注入脚本。
+    不设 `Secure` 标志：本机 `http://localhost:8511` 与云端 `https` 都必须能写。
+    """
+    if not token or not _IDENTITY_TOKEN_RE.match(token):
+        return None
+    value = (f"{IDENTITY_COOKIE_NAME}={token};path=/;"
+             f"max-age={_IDENTITY_COOKIE_MAX_AGE};SameSite=Lax")
+    return f"<script>try{{document.cookie={value!r};}}catch(e){{}}</script>"
+
+
+def device_bound_user_id(device_fingerprint: str) -> Optional[str]:
+    """当前设备指纹已登记的 user_id（未登记返回 None）。**只读，不建号不绑定。**
+
+    ⚠️ 必须把空值归一为 None：DAO 的 get_device_user 未命中时返回的是**空字符串**，
+    直接拿去判断 `is None` 会恒为 False（2026-10-11 踩坑：导致凭令牌恢复身份的分支永不进入）。
+    """
+    if not device_fingerprint:
+        return None
+    try:
+        return _dao().get_device_user(device_fingerprint) or None
+    except Exception:
+        return None
+
+
+def bind_device_if_absent(device_fingerprint: str, user_id: str) -> bool:
+    """把设备指纹登记到指定身份，**仅在未登记时**。
+
+    用于「凭令牌恢复身份」后顺手补登记：新设备 / 浏览器升级导致指纹漂移时，
+    下次即使没有令牌（从收藏夹打开、手动输入域名）也能落到同一身份。
+    已登记到别的账号时**保持不动** —— 避免点击别人的链接就把自己的设备改绑。
+    """
+    if not device_fingerprint or not user_id:
+        return False
+    try:
+        dao = _dao()
+        if dao.get_device_user(device_fingerprint):
+            return False
+        dao.bind_device(device_fingerprint, user_id)
+        return True
+    except Exception:
+        return False
 
 
 # ============================

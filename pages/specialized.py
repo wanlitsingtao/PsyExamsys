@@ -12,11 +12,12 @@ import time
 from datetime import datetime
 from utils.data_manager import (
     extract_questions_by_category, extract_questions, check_answer, get_answer_display,
-    batch_update_wrong_and_stats, batch_add_answer_records,
+    batch_update_wrong_and_stats,
     get_all_categories, infer_category, get_question_stats,
     load_config, get_category_training_stats, load_question_stats,
-    save_draft, load_drafts, delete_draft, save_exam_record,
+    save_draft, load_drafts, delete_draft,
     extract_case_questions, get_case_group_count,
+    sync_session_identity,
 )
 from utils.answer_card import render_answer_card
 
@@ -409,6 +410,9 @@ def _show_spec_running():
     返回/提交等状态切换内部 st.rerun() 仍为整页，行为不变。
     """
     _exam_type = st.session_state.get("exam_type", "心理学会咨询师四级")
+    # 🩸 片段入口必须重新校正用户身份：fragment 重跑不执行 app.py，
+    # 而 _current_user_id 是模块级全局，可能被同进程其他 session 覆盖（串号）。
+    sync_session_identity()
     # ---- 自动保存：每 5 分钟静默保存 ----
     _now = time.time()
     if _now - st.session_state.get("spec_last_auto_save", _now) >= 300:
@@ -436,7 +440,8 @@ def _show_spec_running():
     # 缓存答题统计（避免每次渲染读文件），同时按 exam_type 隔离并在切换后刷新
     if ("spec_stats_cache" not in st.session_state or
             st.session_state.get("spec_stats_cache_exam_type") != _exam_type):
-        st.session_state.spec_stats_cache = load_question_stats(exam_type=_exam_type)
+        st.session_state.spec_stats_cache = load_question_stats(
+            exam_type=_exam_type, user_id=st.session_state.get("_user_id"))
         st.session_state.spec_stats_cache_exam_type = _exam_type
 
     # 标题行 + 返回按钮（同行居右；保存按钮已移至导航行）
@@ -706,6 +711,9 @@ def _save_spec_draft(auto_save: bool = False):
     auto_save=True: 后台静默保存，不rerun，不显示提示
     """
     session_id = st.session_state.get("spec_session_id", "")
+    # 🩸 手动保存由 on_click 回调触发，而**回调先于片段体执行**（2026-10-11 实证）
+    #    → 此处必须自己先校正身份，否则草稿会写到别人的 user_id 下。
+    _uid = sync_session_identity()
     draft_data = {
         "exam_type": st.session_state.get("exam_type", ""),
         "category": st.session_state.get("spec_category", ""),
@@ -718,7 +726,7 @@ def _save_spec_draft(auto_save: bool = False):
         "session_id": session_id,
         "type_boundaries": dict(st.session_state.get("spec_type_boundaries", {})),
     }
-    save_draft("spec", session_id, draft_data)
+    save_draft("spec", session_id, draft_data, user_id=_uid)
     st.session_state.spec_draft_id = session_id
     if auto_save:
         return  # 静默保存
@@ -777,17 +785,36 @@ def _finish_specialized():
             "case_background": q.get("case_background", ""),
         })
 
-    # 批量更新错题库和答题统计（单次读取+单次写入）
-    stats_updates = [(qid, True) for qid in correct_qids] + [(qid, False) for qid, _ in wrong_qids]
-    batch_update_wrong_and_stats(wrong_qids, correct_qids, stats_updates, uncertain_map)
-
-    # 刷新统计缓存，确保结果页读到最新数据
+    # ---- 归属用户：显式取会话身份，绝不用进程级全局（防串号）----
+    _uid = sync_session_identity()
     _exam_type = st.session_state.get("exam_type", "心理学会咨询师四级")
-    st.session_state.spec_stats_cache = load_question_stats(exam_type=_exam_type)
-    st.session_state.spec_stats_cache_exam_type = _exam_type
 
-    # 批量追加答题记录
-    batch_add_answer_records(answer_records, exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
+    # ★ 统计 + 错题本 + 答题记录 + 考试记录 + 删草稿 —— **单个事务**
+    #   上云后每次连接都要经 Session pooler 建会话，合并事务是提交提速的主要来源。
+    _draft_id = st.session_state.get("spec_draft_id")
+    exam_record = {
+        "type": mode,  # "specialized" 或 "comprehensive"
+        "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "total": total_q,
+        "correct": correct_count,
+        "accuracy": f"{correct_count/total_q*100:.1f}%",
+        "category": category,
+    }
+    stats_updates = [(qid, True) for qid in correct_qids] + [(qid, False) for qid, _ in wrong_qids]
+    batch_update_wrong_and_stats(
+        wrong_qids, correct_qids, stats_updates, uncertain_map,
+        user_id=_uid,
+        exam_type=_exam_type,
+        answer_records=answer_records,
+        exam_record=exam_record,
+        delete_draft_key=("spec", _draft_id) if _draft_id else None,
+    )
+    st.session_state.pop("spec_draft_id", None)
+
+    # 刷新统计缓存（显式带 user_id：per-rerun 缓存按全局 user 校验，可能已被污染）
+    st.session_state.spec_stats_cache = load_question_stats(
+        exam_type=_exam_type, user_id=_uid)
+    st.session_state.spec_stats_cache_exam_type = _exam_type
 
     # 标记数据已变更，触发首页统计缓存刷新
     st.session_state._data_version = st.session_state.get("_data_version", 0) + 1
@@ -825,20 +852,7 @@ def _finish_specialized():
     }
     st.session_state.spec_state = "finished"
 
-    # 保存考试记录到数据库
-    save_exam_record({
-        "type": mode,  # "specialized" 或 "comprehensive"
-        "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-        "total": total_q,
-        "correct": correct_count,
-        "accuracy": f"{correct_count/total_q*100:.1f}%",
-        "category": category,
-    }, exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
-
-    # 提交成功后删除对应草稿（如果本次是从草稿恢复的，或曾保存过进度）
-    draft_id = st.session_state.pop("spec_draft_id", None)
-    if draft_id:
-        delete_draft("spec", draft_id)
+    # 考试记录与草稿删除已在上面的单事务里一并完成（见 batch_update_wrong_and_stats 调用）
     st.rerun()
 
 

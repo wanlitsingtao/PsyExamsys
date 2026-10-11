@@ -6,7 +6,7 @@ import re
 import streamlit as st
 from utils.data_manager import (
     load_questions, load_config, load_uncertain_questions, clear_uncertain_mark,
-    get_answer_display,
+    get_answer_display, sync_session_identity,
 )
 
 
@@ -632,8 +632,15 @@ def _compute_mnemonic_data():
 @st.fragment()
 def _render_uncertain_tab():
     """不确定题目列表 — 使用 fragment 隔离，toggle 变化只重跑此片段，不刷新整页。
-    每次渲染直接从数据库加载最新数据，不缓存。"""
-    uncertain_questions = load_uncertain_questions(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
+    每次渲染直接从数据库加载最新数据，不缓存。
+
+    🩸 片段入口必须校正身份：片段重跑**不执行 app.py**，而 user_id 是进程级全局变量，
+    会被同进程其他 session 覆盖 → 不校正就会读到/清掉**别人**的不确定标记
+    （2026-10-11 实测复现；与四个答题页同一缺陷类别）。
+    """
+    _uid = sync_session_identity()
+    _exam_type = st.session_state.get("exam_type", "心理学会咨询师四级")
+    uncertain_questions = load_uncertain_questions(exam_type=_exam_type, user_id=_uid)
 
     if len(uncertain_questions) == 0:
         st.info("暂无标记为不确定的题目。在专项练习或模拟考试中，可通过题目旁的「不确定」开关标记题目。")
@@ -736,18 +743,20 @@ def _render_uncertain_tab():
                 with op_c1:
                     st.caption(f"标记强度：{mark_count_display} 次")
                 with op_c3:
-                    def _make_uncertain_callback(_qid):
+                    def _make_uncertain_callback(_qid, _owner_uid):
                         def _cb():
                             # toggle 关闭时立即写库，不触发整页刷新
+                            # 显式传 user_id：on_change 回调先于片段体执行，
+                            # 不能依赖片段入口的 sync_session_identity()（2026-10-11 实证）
                             if not st.session_state.get(f"mnemonic_uncertain_toggle_{_qid}", True):
-                                clear_uncertain_mark(_qid)
+                                clear_uncertain_mark(_qid, user_id=_owner_uid or sync_session_identity())
                         return _cb
                     st.toggle(
                         "移除标记",
                         key=toggle_key,
                         value=True,
                         help="关闭后该题不再作为不确定题目，已记录到数据库",
-                        on_change=_make_uncertain_callback(qid),
+                        on_change=_make_uncertain_callback(qid, _uid),
                     )
 
 
@@ -771,7 +780,11 @@ def show_mnemonic():
     show_answer = True
 
     # ---- 加载不确定题目（从数据库实时加载，用于 Tab 标签计数）----
-    uncertain_questions = load_uncertain_questions(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
+    # 显式传 user_id：模块级全局可能被同进程其他 session 覆盖（串号），不走全局。
+    uncertain_questions = load_uncertain_questions(
+        exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"),
+        user_id=st.session_state.get("_user_id"),
+    )
 
     # ---- 四 Tab ----
     scale_total = len(scale_dimension_items) + len(scale_score_items) + len(entry_count_items)

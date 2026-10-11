@@ -3,6 +3,7 @@
 本地 C/S 版 (Streamlit 单机应用)
 """
 import streamlit as st
+import streamlit.components.v1 as components
 import sys
 from pathlib import Path
 
@@ -603,6 +604,10 @@ st.markdown(f"""
     [data-testid="stSidebarNav"] {{ display: none !important; }}
     [data-testid="stSidebarNavItems"] {{ display: none !important; }}
     [data-testid="stSidebarNavSeparator"] {{ display: none !important; }}
+    /* 隐藏「身份 Cookie 写入」用的 0 高度组件容器：iframe 高度为 0，但作为 flex 子项
+       仍会占用一个 gap（约 6px）→ 用 display:none 彻底消除，不占布局也不留空隙。
+       ⚠️ display:none 的 iframe 仍会加载并执行内部脚本（已端到端复验 cookie 照常写入）。 */
+    [data-testid="stElementContainer"]:has(> iframe[title="st.iframe"]) {{ display: none !important; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -611,6 +616,9 @@ from utils.data_manager import load_config, save_config, load_questions, get_ava
 from utils.account_manager import (
     generate_device_fingerprint, get_or_create_user, ensure_admin, is_admin,
     is_admin_password_default, ROLE_ADMIN,
+    # 身份持久化令牌（Cookie 承载）：修复指纹漂移 / 会话回收导致的身份丢失
+    sign_user_id, verify_user_token, device_bound_user_id, bind_device_if_absent,
+    identity_cookie_script, IDENTITY_COOKIE_NAME, IDENTITY_TOKEN_PARAM,
 )
 from utils.answer_card import CARD_CSS
 
@@ -626,6 +634,61 @@ invalidate_rerun_cache()
 # 再次访问：同一浏览器指纹不变 → 自动识别同一用户（稳定绑定）
 # ============================
 
+def _identity_token_from_cookie():
+    """读浏览器 Cookie 里的身份令牌；读不到 / 环境不支持则返回 None。"""
+    try:
+        return (st.context.cookies or {}).get(IDENTITY_COOKIE_NAME)
+    except Exception:
+        return None
+
+
+def _clear_url_identity_param():
+    """把历史遗留的 `?u=` 身份令牌从地址栏清掉（身份已改由 Cookie 承载）。
+
+    老链接 / 老书签仍会被**读取一次**（见 _resolve_current_user），恢复身份后立即清除，
+    避免身份凭证继续留在地址栏、浏览器历史与分享链接里。
+    """
+    try:
+        if IDENTITY_TOKEN_PARAM in st.query_params:
+            del st.query_params[IDENTITY_TOKEN_PARAM]
+    except Exception:
+        pass
+
+
+def _sync_identity_cookie():
+    """把当前身份写进浏览器 Cookie（**不再往地址栏写任何东西**）。
+
+    与 _resolve_current_user 配合：解析身份 → 回写 Cookie，这样「刷新 / 断线重连 /
+    浏览器会话被回收」都能恢复到同一身份，且**不依赖指纹稳定性**（Cookie 不随
+    User-Agent 变化，比设备指纹更稳）。
+
+    只在该写的时候渲染一次写入组件，避免每帧多一个元素：
+      · 本会话已经写过同一令牌 → 跳过；
+      · 上一次页面刷新已把 Cookie 带回来（服务端已能读到）→ 记下并跳过。
+    """
+    try:
+        token = sign_user_id(st.session_state.get("_user_id"))
+    except Exception:
+        return
+    if not token:
+        return
+    if st.session_state.get("_cookie_synced_token") == token:
+        return
+    if _identity_token_from_cookie() == token:
+        st.session_state._cookie_synced_token = token
+        return
+    script = identity_cookie_script(token)
+    if not script:
+        return
+    try:
+        # height=0 的隐藏组件：其 iframe 与主页面**同源**，document.cookie 才写得到本站点
+        # （2026-10-11 实测：写入后刷新页面，服务端 st.context.cookies 能读到该值）
+        components.html(script, height=0)
+        st.session_state._cookie_synced_token = token
+    except Exception:
+        pass
+
+
 def _resolve_current_user():
     """解析设备指纹并绑定/创建当前用户。全系统共用一个库，隔离靠 user_id。
 
@@ -638,9 +701,17 @@ def _resolve_current_user():
     而旧逻辑 "_user_id 已存在 → 直接 return" 会跳过 set_current_user，
     于是后续所有读库都落到「无用户」上下文 → 页面报"题库为空"。
 
-    现在拆成两段：
-      1) 身份解析（生成/查找 user_id）—— 仅首次执行；
-      2) 数据路由同步 —— 每帧无条件执行（set_current_user 已幂等，无额外开销）。
+    现在拆成三段：
+      1) 身份解析 —— 仅首次执行。**身份令牌优先（Cookie 为主，URL `?u=` 仅兼容历史
+         链接），设备指纹兜底**（2026-10-11；v2.9.6 曾把令牌写进 URL，因地址栏泄漏
+         身份凭证 → 已改为 Cookie 承载）；
+      2) 数据路由同步 —— 每帧无条件执行（set_current_user 已幂等，无额外开销）；
+      3) 回写 Cookie + 清除地址栏遗留令牌 —— 每帧无条件执行（均幂等）。
+
+    为什么令牌优先：设备指纹是 md5(User-Agent|Sec-CH-UA-Platform)，浏览器升级 /
+    Client Hints 策略变化就会漂移，同一人先后会算出多个指纹 → 落到不同匿名用户，
+    表现为「昨天做的题今天显示没做过」。令牌由服务端签名，不受 UA 变化影响；
+    存 Cookie 而非 URL：不出现在地址栏 / 分享链接 / 浏览器历史里（分享链接≠分享身份）。
     """
     if "_user_id" not in st.session_state:
         try:
@@ -652,10 +723,39 @@ def _resolve_current_user():
             ua, platform = "", ""
         raw_ua = f"{ua}|{platform}".strip("|")
         fingerprint = generate_device_fingerprint(raw_ua)
-        user = get_or_create_user(fingerprint, raw_ua)
-        st.session_state._user_id = user["user_id"]
+        # 设备指纹始终记录：绑定/解绑设备、账号面板都要用（与身份决定解耦）
         st.session_state._device_fp = fingerprint
-        st.session_state._role = user.get("role") or "user"
+
+        # ---- ① 身份令牌优先：Cookie 为主；URL `?u=` 仅作历史链接兼容（用后即清）----
+        # 条件：签名有效 + 用户存在 + 未占用「已绑定其他账号」的设备
+        _token_uid = verify_user_token(_identity_token_from_cookie())
+        if not _token_uid:
+            _url_token = None
+            try:
+                _url_token = st.query_params.get(IDENTITY_TOKEN_PARAM)
+            except Exception:
+                _url_token = None
+            _token_uid = verify_user_token(_url_token)
+        _bound_uid = device_bound_user_id(fingerprint)
+        # 注意用 `not _bound_uid`：device_bound_user_id 已把「未登记」归一为 None，
+        # 但不能写成 `is None` —— DAO 层未命中返回空串，历史上因此漏判过。
+        if _token_uid and (not _bound_uid or _bound_uid == _token_uid):
+            st.session_state._user_id = _token_uid
+            st.session_state._role = ROLE_ADMIN if is_admin(_token_uid) else "user"
+            # 设备指纹未登记（全新设备 / 浏览器升级导致指纹漂移）→ 顺手登记到该身份，
+            # 这样下次即使没有令牌（从收藏夹打开、手动输入域名）也能命中同一身份，
+            # 彻底止血"指纹一变就换号 → 昨天的答题记录不见了"。
+            # 已登记到别的账号时保持不动 —— 避免点击别人的链接就把自己的设备改绑。
+            if not _bound_uid:
+                try:
+                    bind_device_if_absent(fingerprint, _token_uid)
+                except Exception:
+                    pass
+        else:
+            # ---- ② 无令牌 / 令牌不可用 → 老路径：设备指纹自动建号 ----
+            user = get_or_create_user(fingerprint, raw_ua)
+            st.session_state._user_id = user["user_id"]
+            st.session_state._role = user.get("role") or "user"
         # 首次进入/切换用户：强制重载可见题库与配置
         for key in ["questions", "config", "_cache_available_exams",
                     "_db_questions_version", "_data_version", "_mnemonic_data"]:
@@ -663,6 +763,10 @@ def _resolve_current_user():
 
     # 每帧同步数据路由（幂等）：修复跨 session 全局变量污染 / 热重载丢路由
     set_current_user(st.session_state._user_id)
+    # 每帧回写身份 Cookie（幂等，且只在需要时渲染一次写入组件）
+    _sync_identity_cookie()
+    # 每帧清掉地址栏里历史遗留的 ?u= 令牌（幂等）
+    _clear_url_identity_param()
 
 
 _resolve_current_user()
@@ -834,6 +938,10 @@ def _switch_user(new_user_id):
     # 清掉旧登录身份缓存（下一个渲染帧会按新 user_id 重新反查）
     st.session_state.pop("_current_username", None)
     st.session_state.pop("_current_user_bound_fp", None)
+    # 身份变了 → 清掉本会话的「已写 Cookie」标记，让**下一个渲染帧**把新身份写进 Cookie。
+    # ⚠️ 此处不能直接渲染写入组件：紧随其后的 st.rerun() 会在组件 JS 执行前把它丢弃，
+    #    于是 Cookie 仍是旧身份 → 下次刷新被带回旧账号。
+    st.session_state.pop("_cookie_synced_token", None)
     _reset_exam_states_for_switch()
     # 切账号后导航回首页。⚠️ sidebar.radio(key="nav") 在本帧已实例化，
     # 不能直接 st.session_state.nav = ...（会触发 StreamlitAPIException）。

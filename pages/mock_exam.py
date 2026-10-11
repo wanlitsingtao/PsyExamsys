@@ -10,10 +10,10 @@ import uuid
 from datetime import datetime
 from utils.data_manager import (
     MOCK_EXAM_CONFIG, SUPER_CATEGORY_MAP, extract_questions, check_answer, get_answer_display,
-    batch_update_wrong_and_stats, batch_add_answer_records,
-    save_mock_exam_record, infer_category, load_question_stats,
+    batch_update_wrong_and_stats, infer_category, load_question_stats,
     save_draft, load_drafts, delete_draft,
     load_case_studies, get_case_sub_questions, get_question_stats,
+    sync_session_identity,
 )
 from utils.answer_card import render_answer_card
 
@@ -239,7 +239,9 @@ def _start_subject(subject_key):
                     case_backgrounds[cs["id"]] = bg_text
 
     # 预加载统计，避免 extract_questions 内重复全量加载
-    _stats = load_question_stats(exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
+    _stats = load_question_stats(
+        exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"),
+        user_id=st.session_state.get("_user_id"))
     selected = extract_questions(
         filtered,
         dan_count=cfg["single_count"],
@@ -343,6 +345,9 @@ def _show_exam_subject(subject_key):
     返回/提交等状态切换内部 st.rerun() 仍为整页，行为不变。
     """
     _exam_type = st.session_state.get("exam_type", "心理学会咨询师四级")
+    # 🩸 片段入口必须重新校正用户身份：fragment 重跑不执行 app.py，
+    # 而 _current_user_id 是模块级全局，可能被同进程其他 session 覆盖（串号）。
+    sync_session_identity()
     # ---- 自动保存：每 5 分钟静默保存 ----
     _now = time.time()
     if _now - st.session_state.get("mock_last_auto_save", _now) >= 300:
@@ -368,7 +373,8 @@ def _show_exam_subject(subject_key):
     # 缓存答题统计（避免每次渲染读文件，与专项训练一致），同时按 exam_type 隔离并在切换后刷新
     if ("mock_stats_cache" not in st.session_state or
             st.session_state.get("mock_stats_cache_exam_type") != _exam_type):
-        st.session_state.mock_stats_cache = load_question_stats(exam_type=_exam_type)
+        st.session_state.mock_stats_cache = load_question_stats(
+            exam_type=_exam_type, user_id=st.session_state.get("_user_id"))
         st.session_state.mock_stats_cache_exam_type = _exam_type
 
     # 标题行 + 返回按钮（同行居右；保存按钮已移至导航行）
@@ -667,6 +673,10 @@ def _save_mock_draft(subject_key: str, auto_save: bool = False):
     """
     session_id = st.session_state.get("mock_session_id", "")
     now = time.time()
+    # 🩸 手动保存由 on_click 回调触发，而**回调先于片段体执行**（2026-10-11 实证）
+    #    → 片段入口的 sync_session_identity() 还没跑到，此处必须自己先校正身份，
+    #    否则草稿会写到被其他 session 覆盖过的全局身份下（别人的 user_id）。
+    _uid = sync_session_identity()
     # 暂停期间倒计时冻结：优先使用暂停时刻的剩余时间
     if "mock_paused_at" in st.session_state:
         remaining_seconds = st.session_state.get("mock_remaining_at_pause",
@@ -685,7 +695,7 @@ def _save_mock_draft(subject_key: str, auto_save: bool = False):
         "type_boundaries": dict(st.session_state.get("mock_type_boundaries", {})),
         "remaining_seconds": remaining_seconds,
     }
-    save_draft("mock", session_id, draft_data)
+    save_draft("mock", session_id, draft_data, user_id=_uid)
     st.session_state.mock_draft_id = session_id
     if auto_save:
         return  # 静默保存，不暂停，不显示提示
@@ -777,20 +787,9 @@ def _finish_subject(subject_key):
             "category": q.get("category", infer_category(q.get("source_file", ""))),
         })
 
-    # 批量更新错题库和答题统计（单次读取+单次写入）
-    stats_updates = [(qid, True) for qid in correct_qids] + [(qid, False) for qid, _ in wrong_qids]
-    batch_update_wrong_and_stats(wrong_qids, correct_qids, stats_updates, uncertain_map)
-
-    # 批量追加答题记录
-    batch_add_answer_records(answer_records, exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
-
-    # 标记数据已变更，触发首页统计缓存刷新
-    st.session_state._data_version = st.session_state.get("_data_version", 0) + 1
-
-    # 刷新统计缓存，确保后续页面读到最新数据
+    # ---- 归属用户：显式取会话身份，绝不用进程级全局（防串号）----
+    _uid = sync_session_identity()
     _exam_type = st.session_state.get("exam_type", "心理学会咨询师四级")
-    st.session_state.mock_stats_cache = load_question_stats(exam_type=_exam_type)
-    st.session_state.mock_stats_cache_exam_type = _exam_type
 
     duration_str = f"{int(duration // 60)}分{int(duration % 60)}秒"
 
@@ -823,9 +822,7 @@ def _finish_subject(subject_key):
         "category_stats": cat_stats,
     }
 
-    st.session_state.mock_result = result
-
-    # 保存记录
+    # 模拟考记录（与统计/答题记录放在同一事务内写入）
     record = {
         "subject": subject_key,
         "subject_name": cfg["name"],
@@ -840,13 +837,31 @@ def _finish_subject(subject_key):
         "session_id": st.session_state.get("mock_session_id", ""),
         "category_stats": cat_stats,
     }
-    save_mock_exam_record(record, exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
 
-    # 提交成功后删除对应草稿
-    draft_id = st.session_state.pop("mock_draft_id", None)
-    if draft_id:
-        delete_draft("mock", draft_id)
+    # ★ 提交落库：统计 + 错题本 + 答题记录 + 模拟考记录 + 删草稿 —— **单个事务**
+    #   上云后每次连接都要经 Session pooler 建会话，把原来的 4 次连接/事务
+    #   压成 1 次，是「提交试卷慢」的主要提速来源。
+    _draft_id = st.session_state.get("mock_draft_id")
+    stats_updates = [(qid, True) for qid in correct_qids] + [(qid, False) for qid, _ in wrong_qids]
+    batch_update_wrong_and_stats(
+        wrong_qids, correct_qids, stats_updates, uncertain_map,
+        user_id=_uid,
+        exam_type=_exam_type,
+        answer_records=answer_records,
+        mock_exam_record=record,
+        delete_draft_key=("mock", _draft_id) if _draft_id else None,
+    )
+    st.session_state.pop("mock_draft_id", None)
 
+    # 标记数据已变更，触发首页统计缓存刷新
+    st.session_state._data_version = st.session_state.get("_data_version", 0) + 1
+
+    # 刷新统计缓存（显式带 user_id：per-rerun 缓存按全局 user 校验，可能已被污染）
+    st.session_state.mock_stats_cache = load_question_stats(
+        exam_type=_exam_type, user_id=_uid)
+    st.session_state.mock_stats_cache_exam_type = _exam_type
+
+    st.session_state.mock_result = result
     st.session_state.mock_state = f"{subject_key}_finished"
     st.rerun()
 
@@ -861,7 +876,8 @@ def _show_subject_result(subject_key):
         st.session_state.mock_uncertain = set()
     if ("mock_stats_cache" not in st.session_state or
             st.session_state.get("mock_stats_cache_exam_type") != _exam_type):
-        st.session_state.mock_stats_cache = load_question_stats(exam_type=_exam_type)
+        st.session_state.mock_stats_cache = load_question_stats(
+            exam_type=_exam_type, user_id=st.session_state.get("_user_id"))
         st.session_state.mock_stats_cache_exam_type = _exam_type
 
     cfg = MOCK_EXAM_CONFIG[subject_key]

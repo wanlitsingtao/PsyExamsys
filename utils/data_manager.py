@@ -38,12 +38,39 @@ def set_current_user(user_id: str):
     把它重置为 None。任一情况都会让后续读库落到「无用户」上下文，表现为"题库为空"。
     """
     global _current_user_id, _dao
-    if _current_user_id == user_id and _dao is not None:
+    # ⚠️ 2026-10-11：短路条件必须同时校验**单例实际持有的 user_id**。
+    # 只比 _current_user_id 会漏掉一类问题：别的 session 直接调
+    # get_data_access(user_id=X) 会改掉共享单例的 user_id，而 _current_user_id
+    # 没变 → 短路直接 return → 单例永远停在别人的用户上（10-10 串号事故的成因之一）。
+    if (_current_user_id == user_id and _dao is not None
+            and getattr(_dao, "user_id", None) == (user_id or "")):
         return  # 已就位，保持缓存与 DAO 复用（避免每帧读盘/重建）
     _current_user_id = user_id
     _dao = get_data_access(user_id=user_id)  # 单例；此处顺带同步用户上下文
     invalidate_rerun_cache()
     _invalidate_version_cache()
+
+
+def sync_session_identity(default=None):
+    """按 st.session_state._user_id 重新校正当前用户上下文，返回生效的 user_id。
+
+    🩸 必须在每个 `@st.fragment` 片段入口、以及每个「提交写库」函数开头调用。
+
+    原因：片段（fragment）重跑**不会重新执行 app.py**，因此 app.py 里的
+    「每帧 set_current_user」在这类帧里不生效；而 `_current_user_id` 是**模块级全局**，
+    同一进程内多个 Streamlit session（多标签页/多浏览器/手机+PC 同时开着）会互相覆盖
+    → 片段内的读写会落到**别的用户**身上（2026-10-10：模拟考 210 题写进匿名用户
+    91fa45a11dbf，而侧边栏显示的是已登录的 wanli）。
+    """
+    uid = default
+    try:
+        import streamlit as st
+        uid = st.session_state.get("_user_id") or default
+    except Exception:
+        pass
+    if uid:
+        set_current_user(uid)
+    return _current_user_id
 
 
 def get_current_user_id():
@@ -501,7 +528,10 @@ def _extract_qids_from_wrong_list(wrong_list):
 
 
 def batch_update_wrong_and_stats(wrong_qids, correct_qids, stats_updates,
-                                      uncertain_map=None, exam_record=None):
+                                      uncertain_map=None, exam_record=None,
+                                      user_id=None, exam_type=None,
+                                      answer_records=None,
+                                      mock_exam_record=None, delete_draft_key=None):
     """
     批量更新错题库和题目答题统计（委托 DAO 单事务完成）。
     新规则：答错次数 >= 答对次数 → 记入错题本
@@ -510,14 +540,26 @@ def batch_update_wrong_and_stats(wrong_qids, correct_qids, stats_updates,
     - stats_updates: list of (question_id, is_correct) 需要更新统计的
     - uncertain_map: dict {qid: bool} 答题者自评不确定性标记
     - exam_record: 可选，考试记录 dict，在同一事务内写入
+    - user_id: 可选，**显式指定归属用户**（提交页必传 st.session_state._user_id）。
+      不传则用当前上下文 —— 那是模块级全局，可能被同进程其他 session 覆盖（串号）。
+    - exam_type: 可选，exam_records / mock_exam_records / answer_records 的题库归属
+      （缺省时由 DAO 回退 DEFAULT_EXAM_TYPE 或按题目自身的 exam_type 推断）
+    - answer_records / mock_exam_record / delete_draft_key: 可选，同事务内一并写入，
+      把「提交试卷」的 4 次连接/事务压成 1 次（上云后每次连接都要经 pooler，收益明显）。
     """
     global _rerun_cache_stats
     _get_dao().batch_update_wrong_and_stats(
         wrong_qids, correct_qids, stats_updates,
         uncertain_map=uncertain_map,
         exam_record=exam_record,
+        exam_type=exam_type,
+        user_id=user_id,
+        answer_records=answer_records,
+        mock_exam_record=mock_exam_record,
+        delete_draft_key=delete_draft_key,
     )
-    # 写入后立即清除 rerun 缓存，确保下次 load_question_stats() 读到最新数据
+    # 🩸 必须清空统计缓存：片段重跑不会执行 app.py 里的 invalidate_rerun_cache()，
+    # 缓存会跨片段帧存活 → 不清的话提交后的「刷新统计缓存」读到的还是旧值。
     _rerun_cache_stats = {}
 
 
@@ -573,20 +615,25 @@ def _recalc_mastery_fields(stats_entry):
     stats_entry["unstable"] = unstable
 
 
-def batch_add_answer_records(records, exam_type=None):
+def batch_add_answer_records(records, exam_type=None, user_id=None):
     """
     批量追加答题过程记录（通过 DataAccess 抽象层）
+
+    user_id: 可选，显式指定归属用户（提交页必传），避免进程级全局被其他 session 覆盖。
     """
-    _get_dao().batch_add_answer_records(records, exam_type=exam_type)
+    _get_dao().batch_add_answer_records(records, exam_type=exam_type, user_id=user_id)
 
 
-def get_top_wrong_questions(count=50, exam_type=None):
+def get_top_wrong_questions(count=50, exam_type=None, user_id=None):
     """
     获取答错次数最多的N道题（含完整题目信息）
     改为直接调用 DAO 的 SQL 层排序+Limit，避免三重全量加载
     返回: list[tuple(question_dict, wrong_count)]
+
+    user_id: 可选，显式指定归属用户（片段/fragment 内调用必传 —— 片段帧不执行 app.py，
+    全局身份可能被同进程其他 session 覆盖）。
     """
-    items = _get_dao().get_all_wrong_with_stats(exam_type, limit=count)
+    items = _get_dao().get_all_wrong_with_stats(exam_type, limit=count, user_id=user_id)
     result = []
     for item in items:
         q = {
@@ -618,10 +665,12 @@ def clear_all_wrong():
     save_wrong_questions([])
 
 
-def get_wrong_stats(exam_type=None):
+def get_wrong_stats(exam_type=None, user_id=None):
     """获取错题统计，可按 exam_type 过滤
-    委托 DAO 层单连接 SQL JOIN 版本，避免三重全量加载"""
-    return _get_dao().get_wrong_stats(exam_type)
+    委托 DAO 层单连接 SQL JOIN 版本，避免三重全量加载
+
+    user_id: 可选，显式指定归属用户（片段内调用必传）。"""
+    return _get_dao().get_wrong_stats(exam_type, user_id=user_id)
 
 
 def get_all_wrong_with_stats(exam_type=None):
@@ -943,9 +992,9 @@ def load_mock_exam_records(exam_type=None):
     return _get_dao().load_mock_exam_records(exam_type=exam_type)
 
 
-def save_mock_exam_record(record, exam_type=None):
+def save_mock_exam_record(record, exam_type=None, user_id=None):
     """保存一条模拟考试记录（通过 DataAccess 抽象层）"""
-    _get_dao().append_mock_exam_record(record, exam_type=exam_type)
+    _get_dao().append_mock_exam_record(record, exam_type=exam_type, user_id=user_id)
 
 
 # ============================
@@ -1142,13 +1191,18 @@ def extract_questions(questions, dan_count=40, duo_count=30, pan_count=30,
 # ============================
 
 
-def load_question_stats(exam_type=None):
+def load_question_stats(exam_type=None, user_id=None):
     """加载题目答题统计（通过 DataAccess 抽象层，per-rerun 缓存按 exam_type 隔离）
 
     缓存同时按 user_id 校验，防止模块级全局缓存被其他 session 覆盖后
     读到别的用户的统计（串号）。
+
+    user_id: 显式指定归属用户时**绕过进程级全局缓存**直接查库（提交页刷新缓存用），
+    避免读到被其他 session 污染的缓存。
     """
     global _rerun_cache_stats, _rerun_cache_stats_user
+    if user_id is not None and user_id != _current_user_id:
+        return _get_dao().load_question_stats(exam_type=exam_type, user_id=user_id)
     # 防御性初始化：如果缓存被意外设为 None，自动恢复为空字典
     if _rerun_cache_stats is None:
         _rerun_cache_stats = {}
@@ -1191,14 +1245,23 @@ def clear_question_stats(question_id=None):
         save_question_stats({})
 
 
-def load_uncertain_questions(exam_type=None):
-    """加载所有标记为不确定的题目，按 self_uncertainty 降序"""
-    return _get_dao().load_uncertain_questions(exam_type=exam_type)
+def load_uncertain_questions(exam_type=None, user_id=None):
+    """加载所有标记为不确定的题目，按 self_uncertainty 降序
+
+    user_id: 可选，显式指定归属用户。
+      🩸 助记助学的「不确定题目」是 **fragment**（`_render_uncertain_tab`）渲染的，
+      片段帧不执行 app.py → 必须显式传 user_id，否则会读到被其他 session 覆盖后的
+      全局身份（= 别人的不确定题目列表）。2026-10-11 已实测复现。
+    """
+    return _get_dao().load_uncertain_questions(exam_type=exam_type, user_id=user_id)
 
 
-def clear_uncertain_mark(question_id):
-    """清除某道题的不确定标记（设置 self_uncertainty = 0）"""
-    _get_dao().clear_uncertain_mark(question_id)
+def clear_uncertain_mark(question_id, user_id=None):
+    """清除某道题的不确定标记（设置 self_uncertainty = 0）
+
+    user_id: 可选，显式指定归属用户（同上：该操作由 fragment 内的回调触发）。
+    """
+    _get_dao().clear_uncertain_mark(question_id, user_id=user_id)
 
 
 # ============================
@@ -1400,19 +1463,26 @@ def _ensure_drafts_dir():
     DRAFTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def save_draft(prefix, draft_id, data, exam_type=None):
-    """保存/覆盖答题草稿（通过 DataAccess 抽象层）"""
-    _get_dao().save_draft(prefix, draft_id, data, exam_type=exam_type)
+def save_draft(prefix, draft_id, data, exam_type=None, user_id=None):
+    """保存/覆盖答题草稿（通过 DataAccess 抽象层）
+
+    user_id: 可选，显式指定归属用户。
+      🩸 手动「💾 保存」按钮走的是 `on_click=` 回调，而 Streamlit 的**回调先于
+      片段体执行**（2026-10-11 实证：CALLBACK → FRAGMENT_BODY）→ 片段入口的
+      sync_session_identity() 还没跑到。因此保存函数内必须**自己先 sync** 并显式传入，
+      否则会把草稿写到被其他 session 覆盖过的全局身份下（别人的 user_id）。
+    """
+    _get_dao().save_draft(prefix, draft_id, data, exam_type=exam_type, user_id=user_id)
 
 
-def load_drafts(prefix, exam_type=None):
+def load_drafts(prefix, exam_type=None, user_id=None):
     """加载指定前缀的所有草稿（通过 DataAccess 抽象层）"""
-    return _get_dao().load_drafts(prefix, exam_type=exam_type)
+    return _get_dao().load_drafts(prefix, exam_type=exam_type, user_id=user_id)
 
 
-def delete_draft(prefix, draft_id):
+def delete_draft(prefix, draft_id, user_id=None):
     """删除指定草稿（通过 DataAccess 抽象层）"""
-    _get_dao().delete_draft(prefix, draft_id)
+    _get_dao().delete_draft(prefix, draft_id, user_id=user_id)
 
 
 # ============================

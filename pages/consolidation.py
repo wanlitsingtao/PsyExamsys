@@ -9,11 +9,12 @@ from datetime import datetime
 
 from utils.data_manager import (
     check_answer, get_answer_display,
-    batch_update_wrong_and_stats, batch_add_answer_records,
+    batch_update_wrong_and_stats,
     load_questions, load_question_stats, infer_category,
     get_mastery_distribution, load_uncertain_questions,
     save_draft, load_drafts, delete_draft, get_question_stats,
     load_config,
+    sync_session_identity,
 )
 from utils.answer_card import render_answer_card
 
@@ -230,6 +231,9 @@ def _show_consolidation_running():
     st.rerun() 默认 app 范围，行为与改版前一致。
     """
     _exam_type = st.session_state.get("exam_type", "心理学会咨询师四级")
+    # 🩸 片段入口必须重新校正用户身份：fragment 重跑不执行 app.py，
+    # 而 _current_user_id 是模块级全局，可能被同进程其他 session 覆盖（串号）。
+    sync_session_identity()
     # ---- 自动保存：每 5 分钟静默保存 ----
     _now = time.time()
     if _now - st.session_state.get("consol_last_auto_save", _now) >= 300:
@@ -252,7 +256,8 @@ def _show_consolidation_running():
     # 缓存答题统计（避免每题渲染时重复读盘），同时按 exam_type 隔离并在切换后刷新
     if ("consol_stats_cache" not in st.session_state or
             st.session_state.get("consol_stats_cache_exam_type") != _exam_type):
-        st.session_state.consol_stats_cache = load_question_stats(exam_type=_exam_type)
+        st.session_state.consol_stats_cache = load_question_stats(
+            exam_type=_exam_type, user_id=st.session_state.get("_user_id"))
         st.session_state.consol_stats_cache_exam_type = _exam_type
 
     answered = len(st.session_state.consol_answers)
@@ -502,6 +507,9 @@ def _save_consol_draft(auto_save: bool = False):
     auto_save=True: 后台静默保存，不显示提示
     """
     draft_id = st.session_state.get("consol_draft_id", str(uuid.uuid4()))
+    # 🩸 手动保存由 on_click 回调触发，而**回调先于片段体执行**（2026-10-11 实证）
+    #    → 此处必须自己先校正身份，否则草稿会写到别人的 user_id 下。
+    _uid = sync_session_identity()
     draft_data = {
         "question_ids": [q["id"] for q in st.session_state.consol_questions],
         "answers": dict(st.session_state.consol_answers),
@@ -509,7 +517,7 @@ def _save_consol_draft(auto_save: bool = False):
         "uncertain": list(st.session_state.consol_uncertain),
         "current_idx": st.session_state.consol_current,
     }
-    save_draft("consol", draft_id, draft_data)
+    save_draft("consol", draft_id, draft_data, user_id=_uid)
     st.session_state.consol_draft_id = draft_id
     if not auto_save:
         st.session_state.consol_draft_saved = True
@@ -565,7 +573,12 @@ def _submit_consolidation():
             "timestamp": now,
         })
 
-    # 2. 批量 I/O：统计 + 错题本 + 考试记录（单个事务）
+    # ---- 归属用户：显式取会话身份，绝不用进程级全局（防串号）----
+    _uid = sync_session_identity()
+    _exam_type = st.session_state.get("exam_type", "心理学会咨询师四级")
+
+    # 2. 批量 I/O：统计 + 错题本 + 考试记录 + 答题记录 + 删草稿 —— **单个事务**
+    #    上云后每次连接都要经 Session pooler 建会话，合并事务是提交提速的主要来源。
     correct_count = sum(1 for v in results.values() if v.get("correct"))
     exam_record = {
         "type": "consolidation",
@@ -574,26 +587,27 @@ def _submit_consolidation():
         "correct": correct_count,
         "accuracy": f"{correct_count/len(cq)*100:.1f}%" if len(cq) > 0 else "0%",
     }
+    _draft_id = st.session_state.pop("consol_draft_id", None)
     batch_update_wrong_and_stats(
-        wrong_qids, correct_qids, stats_updates,
-        uncertain_map, exam_record=exam_record,
+        wrong_qids, correct_qids, stats_updates, uncertain_map,
+        user_id=_uid, exam_type=_exam_type,
+        exam_record=exam_record, answer_records=answer_records,
+        delete_draft_key=("consol", _draft_id) if _draft_id else None,
     )
 
-    # 3. 批量 I/O：答题过程记录（单个连接）
-    batch_add_answer_records(answer_records, exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
+    # 刷新统计缓存（显式带 user_id）：结果页的 _get_cached_qstats 依赖它，
+    # 否则每题回查一次库（60 题 = 60 次往返），且兜底路径会用到被污染的全局身份。
+    st.session_state.consol_stats_cache = load_question_stats(
+        exam_type=_exam_type, user_id=_uid)
+    st.session_state.consol_stats_cache_exam_type = _exam_type
 
     # 标记数据已变更，触发首页统计缓存刷新
     st.session_state._data_version = st.session_state.get("_data_version", 0) + 1
-    # 清除巩固练习自身的统计缓存
-    st.session_state.pop("consol_stats_cache", None)
 
     st.session_state.consol_results = results
     st.session_state.consol_submitted = True
 
-    # 提交成功后删除对应草稿
-    draft_id = st.session_state.pop("consol_draft_id", None)
-    if draft_id:
-        delete_draft("consol", draft_id)
+    # 对应草稿已在上面的单事务里一并删除（见 batch_update_wrong_and_stats 调用）
 
 
 # ============================

@@ -466,7 +466,9 @@ class DataAccess:
 
     def batch_update_wrong_and_stats(self, wrong_qids, correct_qids, stats_updates,
                                      uncertain_map=None, exam_record=None,
-                                     exam_type=None, user_id=None) -> None:
+                                     exam_type=None, user_id=None,
+                                     answer_records=None, mock_exam_record=None,
+                                     delete_draft_key=None) -> None:
         raise NotImplementedError
 
     def get_top_wrong_questions(self, count=50, exam_type=None, user_id=None) -> list:
@@ -1580,10 +1582,17 @@ class SQLiteDataAccess(DataAccess):
 
     def batch_update_wrong_and_stats(self, wrong_qids, correct_qids, stats_updates,
                                      uncertain_map=None, exam_record=None,
-                                     exam_type=None, user_id=None) -> None:
+                                     exam_type=None, user_id=None,
+                                     answer_records=None, mock_exam_record=None,
+                                     delete_draft_key=None) -> None:
         """增量更新：只查询和写入受影响的题目统计，单个事务内完成。
 
-        可选参数 exam_record: 若提供，则在同一事务内写入考试记录，减少一次连接开销。
+        可选参数（全部在**同一连接/同一事务**内写入 —— 上云后每次连接都要经
+        Session pooler 建会话，把「提交试卷」的 4 次连接/事务压成 1 次是本方法的主要性能收益）：
+          · exam_record      考试记录 dict        → exam_records
+          · mock_exam_record 模拟考试记录 dict    → mock_exam_records
+          · answer_records   答题过程记录 list    → answer_records
+          · delete_draft_key (prefix, draft_id)   → 删除该草稿
         """
         from utils.data_manager import _recalc_mastery_fields
         uid = self._uid(user_id)
@@ -1754,6 +1763,64 @@ class SQLiteDataAccess(DataAccess):
                     "INSERT INTO exam_records (user_id, data, exam_type) VALUES (?, ?, ?)",
                     (uid, json.dumps(exam_record, ensure_ascii=False),
                      exam_type or DEFAULT_EXAM_TYPE)
+                )
+
+            # 5) 模拟考试记录（可选，同一事务内完成）
+            if mock_exam_record:
+                cur.execute(
+                    "INSERT INTO mock_exam_records (user_id, data, exam_type) VALUES (?, ?, ?)",
+                    (uid, json.dumps(mock_exam_record, ensure_ascii=False),
+                     exam_type or DEFAULT_EXAM_TYPE)
+                )
+
+            # 6) 答题过程记录（可选，同一事务内批量写入）
+            if answer_records:
+                from utils.data_manager import infer_category as _infer_cat
+                _now = datetime.now().isoformat()
+                _ar_qids = list({r.get("question_id", "") for r in answer_records
+                                 if r.get("question_id")})
+                _ar_map = {}
+                if _ar_qids:
+                    _ph_ar = ",".join("?" for _ in _ar_qids)
+                    _cur_ar = conn.cursor()
+                    _cur_ar.execute(
+                        f"SELECT id, category, source_file, exam_type FROM questions "
+                        f"WHERE id IN ({_ph_ar})",
+                        tuple(_ar_qids)
+                    )
+                    for row in _cur_ar.fetchall():
+                        _ar_map[row["id"]] = {
+                            "category": row["category"],
+                            "source_file": row["source_file"],
+                            "exam_type": row["exam_type"],
+                        }
+                _ar_rows = []
+                for _r in answer_records:
+                    _qid = _r.get("question_id", "")
+                    _info = _ar_map.get(_qid)
+                    _cat = "未知"
+                    _et = exam_type or DEFAULT_EXAM_TYPE
+                    if _info:
+                        _cat = _info.get("category") or _infer_cat(_info.get("source_file", ""))
+                        _et = _info.get("exam_type") or _et
+                    _ar_rows.append((
+                        uid, _qid, _r.get("user_answer", ""),
+                        1 if _r.get("is_correct") else 0,
+                        _r.get("mode", "mock_exam"), _r.get("session_id", ""),
+                        _cat, _r.get("timestamp", _now), _et,
+                    ))
+                cur.executemany("""
+                    INSERT INTO answer_records
+                    (user_id, question_id, user_answer, is_correct, mode, session_id, category, timestamp, exam_type)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, _ar_rows)
+
+            # 7) 删除草稿（可选，同一事务内完成）
+            if delete_draft_key:
+                _dp_prefix, _dp_id = delete_draft_key
+                cur.execute(
+                    "DELETE FROM drafts WHERE id = ?",
+                    (self._draft_pk(uid, _dp_prefix, _dp_id),)
                 )
 
             conn.commit()

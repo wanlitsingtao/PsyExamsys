@@ -6,16 +6,16 @@
 """
 import streamlit as st
 import uuid
-import time
 from datetime import datetime
 
 from utils.data_manager import (
     get_top_wrong_questions, check_answer, get_answer_display,
-    batch_update_wrong_and_stats, batch_add_answer_records,
+    batch_update_wrong_and_stats,
     remove_wrong_question, clear_all_wrong, get_wrong_stats,
     load_questions, load_question_stats, infer_category,
-    get_all_wrong_with_stats, save_exam_record, save_draft,
+    get_all_wrong_with_stats,
     get_question_stats, get_top_wrong_by_history,
+    sync_session_identity,
 )
 from utils.answer_card import render_answer_card
 
@@ -436,13 +436,17 @@ def _show_wrong_practice():
     返回/提交等状态切换内部 st.rerun() 仍为整页，行为不变。
     """
     _exam_type = st.session_state.get("exam_type", "心理学会咨询师四级")
+    # 🩸 片段入口必须重新校正用户身份：fragment 重跑不执行 app.py，
+    # 而 _current_user_id 是模块级全局，可能被同进程其他 session 覆盖（串号）。
+    sync_session_identity()
     # 缓存答题统计（避免每题渲染时重复读盘），同时按 exam_type 隔离并在切换后刷新
     if ("wb_stats_cache" not in st.session_state or
             st.session_state.get("wb_stats_cache_exam_type") != _exam_type):
-        st.session_state.wb_stats_cache = load_question_stats(exam_type=_exam_type)
+        st.session_state.wb_stats_cache = load_question_stats(
+            exam_type=_exam_type, user_id=st.session_state.get("_user_id"))
         st.session_state.wb_stats_cache_exam_type = _exam_type
 
-    wrong_stats = get_wrong_stats(_exam_type)
+    wrong_stats = get_wrong_stats(_exam_type, user_id=st.session_state.get("_user_id"))
     config = st.session_state.config
     type_labels = {"single": "🔵 单选题", "multi": "🟢 多选题", "judge": "🟠 判断题", "案例题": "🟣 案例题", "indefinite": "🟡 不定项选择题"}
 
@@ -463,7 +467,7 @@ def _show_wrong_practice():
     if ("wb_questions" not in st.session_state or st.session_state.get("wb_regenerate")) \
             and not st.session_state.get("wb_submitted"):
         count = config["wrongbook_extract_count"]
-        top_wrong = get_top_wrong_questions(count, _exam_type)
+        top_wrong = get_top_wrong_questions(count, _exam_type, user_id=st.session_state.get("_user_id"))
 
         if not top_wrong:
             st.warning("⚠️ 没有可提取的错题")
@@ -475,7 +479,7 @@ def _show_wrong_practice():
         st.session_state.wb_answers = {}
         st.session_state.wb_marked = set()
         # 预填不确定开关：历史标记为不确定的题目默认打开
-        _wb_stats = load_question_stats(exam_type=_exam_type)
+        _wb_stats = load_question_stats(exam_type=_exam_type, user_id=st.session_state.get("_user_id"))
         _wb_pre_uncertain = {qid for qid, s in _wb_stats.items() if s.get("self_uncertainty", 0) > 0}
         st.session_state.wb_uncertain = {q["id"] for q in st.session_state.wb_questions if q["id"] in _wb_pre_uncertain}
         st.session_state.wb_submitted = False
@@ -483,7 +487,6 @@ def _show_wrong_practice():
         st.session_state.wb_regenerate = False
         st.session_state.wb_cached_total = wrong_stats["total"]
         st.session_state.wb_confirm_submit = False
-        st.session_state.wb_last_auto_save = time.time()  # 自动保存计时起点
 
     wq = st.session_state.get("wb_questions")
     if not wq:
@@ -495,14 +498,6 @@ def _show_wrong_practice():
     q = wq[idx]
     qid = q["id"]
     is_submitted = st.session_state.wb_submitted
-    # ---- 自动保存：每 5 分钟静默保存（仅答题中） ----
-    if not is_submitted:
-        if "wb_last_auto_save" not in st.session_state:
-            st.session_state.wb_last_auto_save = time.time()
-        _now = time.time()
-        if _now - st.session_state.wb_last_auto_save >= 300:
-            _save_wrongbook_draft(auto_save=True)
-            st.session_state.wb_last_auto_save = _now
     wrong_count = st.session_state.wb_wrong_counts.get(qid, 0)
     correct_count = sum(1 for v in st.session_state.wb_results.values() if v.get("correct", False))
 
@@ -529,10 +524,6 @@ def _show_wrong_practice():
                          "wb_card_filter"]:
                 st.session_state.pop(key, None)
             st.rerun()
-
-    # 保存成功提示
-    if st.session_state.pop("wb_draft_saved", False):
-        st.success("✅ 进度已保存，下次可在首页继续作答。", icon="💾")
 
     st.markdown("---")
 
@@ -782,8 +773,8 @@ def _show_wrong_practice():
 
         st.markdown("---")
 
-        # ---- 导航按钮（上一题、下一题、保存、提交按钮同行） ----
-        nav_cols = st.columns([1, 1, 1, 1])
+        # ---- 导航按钮（上一题、下一题、提交按钮同行） ----
+        nav_cols = st.columns([1, 1, 1])
 
         def _go_prev():
             st.session_state.wb_current = idx - 1
@@ -798,9 +789,7 @@ def _show_wrong_practice():
                            disabled=(idx >= total_q - 1), on_click=_go_next)
 
         if not is_submitted:
-            nav_cols[2].button("💾 保存", key="nav_save", use_container_width=True,
-                               on_click=_save_wrongbook_draft)
-            nav_cols[3].button("📤 提交全部答案", key="nav_submit", use_container_width=True, type="primary",
+            nav_cols[2].button("📤 提交全部答案", key="nav_submit", use_container_width=True, type="primary",
                                on_click=lambda: st.session_state.update(wb_confirm_submit=True))
 
         if st.session_state.get("wb_confirm_submit"):
@@ -938,30 +927,10 @@ def _show_wrong_practice():
                        "wb_answers", "wb_wrong_counts", "wb_current",
                        "wb_marked", "wb_uncertain", "wb_regenerate",
                        "wb_confirm_submit", "wb_confirm_clear",
-                       "wb_session_id", "wb_cached_total",
+                       "wb_cached_total",
                        "wb_card_filter"):
                 st.session_state.pop(k, None)
             st.rerun()
-
-
-def _save_wrongbook_draft(auto_save: bool = False):
-    """保存错题练习草稿
-    
-    auto_save=True: 后台静默保存，不显示提示
-    """
-    draft_id = st.session_state.get("wb_session_id", str(uuid.uuid4()))
-    if "wb_session_id" not in st.session_state:
-        st.session_state.wb_session_id = draft_id
-    save_draft("wrongbook", draft_id, {
-        "questions": st.session_state.wb_questions,
-        "current": st.session_state.wb_current,
-        "answers": st.session_state.wb_answers,
-        "marked": list(st.session_state.wb_marked),
-        "uncertain": list(st.session_state.wb_uncertain),
-        "wrong_counts": st.session_state.wb_wrong_counts,
-    })
-    if not auto_save:
-        st.session_state.wb_draft_saved = True
 
 
 def _submit_wrongbook():
@@ -1004,26 +973,34 @@ def _submit_wrongbook():
             "timestamp": now,
         })
 
-    # 2. 批量 I/O：统计 + 错题本（1 次读 + 1 次写）
-    batch_update_wrong_and_stats(wrong_qids, correct_qids, stats_updates, uncertain_map)
+    # ---- 归属用户：显式取会话身份，绝不用进程级全局（防串号）----
+    _uid = sync_session_identity()
+    _exam_type = st.session_state.get("exam_type", "心理学会咨询师四级")
 
-    # 3. 批量 I/O：答题过程记录（1 次读 + 1 次写）
-    batch_add_answer_records(answer_records, exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
+    # 2. 批量 I/O：统计 + 错题本 + 考试记录 + 答题记录 —— **单个事务**
+    #    上云后每次连接都要经 Session pooler 建会话，合并事务是提交提速的主要来源。
+    correct_count = sum(1 for v in results.values() if v.get("correct"))
+    exam_record = {
+        "type": "wrongbook",
+        "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "total": len(wq),
+        "correct": correct_count,
+        "accuracy": f"{correct_count/len(wq)*100:.1f}%" if len(wq) > 0 else "0%",
+    }
+    batch_update_wrong_and_stats(
+        wrong_qids, correct_qids, stats_updates, uncertain_map,
+        user_id=_uid, exam_type=_exam_type,
+        exam_record=exam_record, answer_records=answer_records,
+    )
+
+    # 刷新统计缓存（显式带 user_id）：结果页的 _get_cached_qstats 依赖它，
+    # 否则每题回查一次库，且兜底路径会用到被污染的全局身份。
+    st.session_state.wb_stats_cache = load_question_stats(
+        exam_type=_exam_type, user_id=_uid)
+    st.session_state.wb_stats_cache_exam_type = _exam_type
 
     st.session_state.wb_results = results
     st.session_state.wb_submitted = True
 
     # 标记数据已变更，触发首页统计缓存刷新
     st.session_state._data_version = st.session_state.get("_data_version", 0) + 1
-    # 清除错题本自身的统计缓存
-    st.session_state.pop("wb_stats_cache", None)
-
-    # 保存考试记录到数据库
-    correct_count = sum(1 for v in results.values() if v.get("correct"))
-    save_exam_record({
-        "type": "wrongbook",
-        "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-        "total": len(wq),
-        "correct": correct_count,
-        "accuracy": f"{correct_count/len(wq)*100:.1f}%" if len(wq) > 0 else "0%",
-    }, exam_type=st.session_state.get("exam_type", "心理学会咨询师四级"))
