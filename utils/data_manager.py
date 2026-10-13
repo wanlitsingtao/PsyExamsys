@@ -545,10 +545,13 @@ def batch_update_wrong_and_stats(wrong_qids, correct_qids, stats_updates,
     - exam_type: 可选，exam_records / mock_exam_records / answer_records 的题库归属
       （缺省时由 DAO 回退 DEFAULT_EXAM_TYPE 或按题目自身的 exam_type 推断）
     - answer_records / mock_exam_record / delete_draft_key: 可选，同事务内一并写入，
-      把「提交试卷」的 4 次连接/事务压成 1 次（上云后每次连接都要经 pooler，收益明显）。
+      把「提交试卷」的 4 次连接/事务压成 1 次。
+
+    返回值：本次写库后**受影响题目**的统计 {question_id: stats}，字段与
+    load_question_stats 同形 —— 交给 refresh_stats_cache_after_submit() 增量刷新页面缓存。
     """
     global _rerun_cache_stats
-    _get_dao().batch_update_wrong_and_stats(
+    _updated = _get_dao().batch_update_wrong_and_stats(
         wrong_qids, correct_qids, stats_updates,
         uncertain_map=uncertain_map,
         exam_record=exam_record,
@@ -561,6 +564,30 @@ def batch_update_wrong_and_stats(wrong_qids, correct_qids, stats_updates,
     # 🩸 必须清空统计缓存：片段重跑不会执行 app.py 里的 invalidate_rerun_cache()，
     # 缓存会跨片段帧存活 → 不清的话提交后的「刷新统计缓存」读到的还是旧值。
     _rerun_cache_stats = {}
+    return _updated
+
+
+def refresh_stats_cache_after_submit(session_state, cache_key, exam_type_key,
+                                     exam_type, updated_stats, user_id=None):
+    """提交后刷新**页面级**统计缓存：能用增量就增量，拿不到才回退全量重读。
+
+    四个答题页（模拟考 / 专项训练 / 巩固练习 / 错题本）提交后都要刷新自己的
+    stats_cache —— 结果页依赖它，否则每题回查一次库。原来是 `load_question_stats()`
+    全量重读（该用户该题库上千行 + 逐行 json.loads，云端实测 0.3~0.6 秒）。
+
+    现在 batch_update_wrong_and_stats 直接把「本次刚写进库的那 N 条统计」返回，
+    字段与全量读同形（含动态算出的 retention_due），所以：
+      · 缓存存在 + exam_type 一致 + 有增量 → 只 update 这 N 条
+        （与全量读等价：本次写库只改动了这 N 条，其余行没动）
+      · 缓存缺失 / 题库不一致 / 没有增量 → 回退全量重读（行为与改造前完全一致）
+    """
+    cache = session_state.get(cache_key)
+    if cache is not None and session_state.get(exam_type_key) == exam_type and updated_stats:
+        cache.update(updated_stats)
+        return cache
+    session_state[cache_key] = load_question_stats(exam_type=exam_type, user_id=user_id)
+    session_state[exam_type_key] = exam_type
+    return session_state[cache_key]
 
 
 def _recalc_mastery_fields(stats_entry):

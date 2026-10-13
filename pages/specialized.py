@@ -17,7 +17,7 @@ from utils.data_manager import (
     load_config, get_category_training_stats, load_question_stats,
     save_draft, load_drafts, delete_draft,
     extract_case_questions, get_case_group_count,
-    sync_session_identity,
+    sync_session_identity, refresh_stats_cache_after_submit,
 )
 from utils.answer_card import render_answer_card
 
@@ -801,7 +801,7 @@ def _finish_specialized():
         "category": category,
     }
     stats_updates = [(qid, True) for qid in correct_qids] + [(qid, False) for qid, _ in wrong_qids]
-    batch_update_wrong_and_stats(
+    _updated_stats = batch_update_wrong_and_stats(
         wrong_qids, correct_qids, stats_updates, uncertain_map,
         user_id=_uid,
         exam_type=_exam_type,
@@ -811,10 +811,10 @@ def _finish_specialized():
     )
     st.session_state.pop("spec_draft_id", None)
 
-    # 刷新统计缓存（显式带 user_id：per-rerun 缓存按全局 user 校验，可能已被污染）
-    st.session_state.spec_stats_cache = load_question_stats(
-        exam_type=_exam_type, user_id=_uid)
-    st.session_state.spec_stats_cache_exam_type = _exam_type
+    # 刷新统计缓存：用本次事务刚写好的那 N 条增量 merge（不再全量重读上千行统计）
+    refresh_stats_cache_after_submit(
+        st.session_state, "spec_stats_cache", "spec_stats_cache_exam_type",
+        _exam_type, _updated_stats, user_id=_uid)
 
     # 标记数据已变更，触发首页统计缓存刷新
     st.session_state._data_version = st.session_state.get("_data_version", 0) + 1

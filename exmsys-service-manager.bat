@@ -9,7 +9,7 @@ title Exmsys 考试系统服务管理面板
 ::  可随项目文件夹迁移到其他机器
 :: ============================================
 
-set "SERVICE_NAME=ExmsysStudy"
+set "SERVICE_NAME=ExmsysStudy-MultiUser"
 set "BASE_DIR=%~dp0"
 set "BASE_DIR=%BASE_DIR:~0,-1%"
 set "APP_PORT=8511"

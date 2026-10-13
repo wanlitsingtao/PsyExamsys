@@ -14,7 +14,7 @@ from utils.data_manager import (
     get_mastery_distribution, load_uncertain_questions,
     save_draft, load_drafts, delete_draft, get_question_stats,
     load_config,
-    sync_session_identity,
+    sync_session_identity, refresh_stats_cache_after_submit,
 )
 from utils.answer_card import render_answer_card
 
@@ -588,18 +588,18 @@ def _submit_consolidation():
         "accuracy": f"{correct_count/len(cq)*100:.1f}%" if len(cq) > 0 else "0%",
     }
     _draft_id = st.session_state.pop("consol_draft_id", None)
-    batch_update_wrong_and_stats(
+    _updated_stats = batch_update_wrong_and_stats(
         wrong_qids, correct_qids, stats_updates, uncertain_map,
         user_id=_uid, exam_type=_exam_type,
         exam_record=exam_record, answer_records=answer_records,
         delete_draft_key=("consol", _draft_id) if _draft_id else None,
     )
 
-    # 刷新统计缓存（显式带 user_id）：结果页的 _get_cached_qstats 依赖它，
-    # 否则每题回查一次库（60 题 = 60 次往返），且兜底路径会用到被污染的全局身份。
-    st.session_state.consol_stats_cache = load_question_stats(
-        exam_type=_exam_type, user_id=_uid)
-    st.session_state.consol_stats_cache_exam_type = _exam_type
+    # 刷新统计缓存：结果页的 _get_cached_qstats 依赖它，否则每题回查一次库
+    # （60 题 = 60 次往返）。改用本次事务刚写好的那 N 条增量 merge，不再全量重读。
+    refresh_stats_cache_after_submit(
+        st.session_state, "consol_stats_cache", "consol_stats_cache_exam_type",
+        _exam_type, _updated_stats, user_id=_uid)
 
     # 标记数据已变更，触发首页统计缓存刷新
     st.session_state._data_version = st.session_state.get("_data_version", 0) + 1

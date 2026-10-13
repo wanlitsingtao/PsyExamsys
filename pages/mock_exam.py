@@ -13,7 +13,7 @@ from utils.data_manager import (
     batch_update_wrong_and_stats, infer_category, load_question_stats,
     save_draft, load_drafts, delete_draft,
     load_case_studies, get_case_sub_questions, get_question_stats,
-    sync_session_identity,
+    sync_session_identity, refresh_stats_cache_after_submit,
 )
 from utils.answer_card import render_answer_card
 
@@ -843,7 +843,7 @@ def _finish_subject(subject_key):
     #   压成 1 次，是「提交试卷慢」的主要提速来源。
     _draft_id = st.session_state.get("mock_draft_id")
     stats_updates = [(qid, True) for qid in correct_qids] + [(qid, False) for qid, _ in wrong_qids]
-    batch_update_wrong_and_stats(
+    _updated_stats = batch_update_wrong_and_stats(
         wrong_qids, correct_qids, stats_updates, uncertain_map,
         user_id=_uid,
         exam_type=_exam_type,
@@ -856,10 +856,11 @@ def _finish_subject(subject_key):
     # 标记数据已变更，触发首页统计缓存刷新
     st.session_state._data_version = st.session_state.get("_data_version", 0) + 1
 
-    # 刷新统计缓存（显式带 user_id：per-rerun 缓存按全局 user 校验，可能已被污染）
-    st.session_state.mock_stats_cache = load_question_stats(
-        exam_type=_exam_type, user_id=_uid)
-    st.session_state.mock_stats_cache_exam_type = _exam_type
+    # 刷新统计缓存：用本次事务刚写好的那 N 条增量 merge（显式带 user_id —— per-rerun
+    # 缓存按全局 user 校验，可能已被污染），不再全量重读上千行统计
+    refresh_stats_cache_after_submit(
+        st.session_state, "mock_stats_cache", "mock_stats_cache_exam_type",
+        _exam_type, _updated_stats, user_id=_uid)
 
     st.session_state.mock_result = result
     st.session_state.mock_state = f"{subject_key}_finished"

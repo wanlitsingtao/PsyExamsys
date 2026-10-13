@@ -15,7 +15,7 @@ from utils.data_manager import (
     load_questions, load_question_stats, infer_category,
     get_all_wrong_with_stats,
     get_question_stats, get_top_wrong_by_history,
-    sync_session_identity,
+    sync_session_identity, refresh_stats_cache_after_submit,
 )
 from utils.answer_card import render_answer_card
 
@@ -987,17 +987,17 @@ def _submit_wrongbook():
         "correct": correct_count,
         "accuracy": f"{correct_count/len(wq)*100:.1f}%" if len(wq) > 0 else "0%",
     }
-    batch_update_wrong_and_stats(
+    _updated_stats = batch_update_wrong_and_stats(
         wrong_qids, correct_qids, stats_updates, uncertain_map,
         user_id=_uid, exam_type=_exam_type,
         exam_record=exam_record, answer_records=answer_records,
     )
 
-    # 刷新统计缓存（显式带 user_id）：结果页的 _get_cached_qstats 依赖它，
-    # 否则每题回查一次库，且兜底路径会用到被污染的全局身份。
-    st.session_state.wb_stats_cache = load_question_stats(
-        exam_type=_exam_type, user_id=_uid)
-    st.session_state.wb_stats_cache_exam_type = _exam_type
+    # 刷新统计缓存：结果页的 _get_cached_qstats 依赖它，否则每题回查一次库。
+    # 改用本次事务刚写好的那 N 条增量 merge，不再全量重读上千行统计。
+    refresh_stats_cache_after_submit(
+        st.session_state, "wb_stats_cache", "wb_stats_cache_exam_type",
+        _exam_type, _updated_stats, user_id=_uid)
 
     st.session_state.wb_results = results
     st.session_state.wb_submitted = True

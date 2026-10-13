@@ -282,6 +282,50 @@ def translate_sql(sql: str, schema: str = DEFAULT_PG_SCHEMA):
 
 
 # ==========================================================
+# 批量写：让 executemany 真的「批量」
+# ==========================================================
+
+# 一次网络往返里塞多少行。
+# psycopg2 的 executemany 是**逐行 execute** 的循环实现 —— 写 300 行 = 300 次往返
+# （本机 → Supabase 首尔实测单次往返 120 ms → 光这一项就是 36 秒）。
+# 换成 `execute_values`（N 行拼成一条多值 INSERT）后实测 210 行：25.6 s → 0.13 s。
+# 500 行 ≈ 6500 个绑定参数，远低于 PG 单语句 65535 个参数的上限；
+# 实测 page_size 500 与 1000 已无差别（往返次数触底），故取 500。
+# 基准脚本：scripts/bench_pg_roundtrip.py、scripts/bench_submit_roundtrips.py
+PG_BATCH_PAGE_SIZE = 500
+
+# `INSERT INTO t (cols) VALUES (%s, %s, ...)`；列清单可选
+_INSERT_VALUES_RE = re.compile(
+    r"^\s*INSERT\s+INTO\s+[A-Za-z_][A-Za-z0-9_]*\s*(?:\([^)]*\))?\s*VALUES\s*(\([^)]*\))",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def as_multirow_insert(sql: str):
+    """把 `INSERT ... VALUES (%s, %s)` 归一化成 execute_values 要求的 `VALUES %s`。
+
+    psycopg2.extras.execute_values 的口径是「SQL 里只能有**一个** %s 占位符，
+    它代表整段多行 VALUES 列表」（每行的模板由 execute_values 按行长度自动生成），
+    所以「一行一组占位符」的写法必须先归一化，否则剩下的 %s 会被当成额外参数。
+
+    返回改写后的 SQL；**不满足条件时返回 None**，由调用方退回 execute_batch：
+      · 不是 INSERT（如 `DELETE ... WHERE id = ?`、`UPDATE ... WHERE id = ?`）
+      · VALUES 组里的占位符不是清一色的 %s（混了字面量之类）
+      · VALUES 组之外还有 %s（额外参数，execute_values 处理不了）
+    """
+    m = _INSERT_VALUES_RE.match(sql)
+    if not m:
+        return None
+    items = [x.strip() for x in m.group(1)[1:-1].split(",")]
+    if not items or any(x != "%s" for x in items):
+        return None
+    if sql.count("%s") != len(items):
+        return None
+    start, end = m.span(1)
+    return sql[:start] + "%s" + sql[end:]
+
+
+# ==========================================================
 # 连接池
 # ==========================================================
 
@@ -491,11 +535,38 @@ class PgCursor:
         return self
 
     def executemany(self, sql, seq_of_params):
+        """批量写入 —— **真正合并成批量语句**，不是 psycopg2 原生的逐行 execute。
+
+        改造前这里直接转发给 psycopg2 的 executemany，而它是「循环调 execute」的实现：
+        写 N 行就是 N 次网络往返。云端（Session pooler，单次往返 120 ms）下，
+        一次 300 题的提交光两条 executemany 就要 600 行 × 120 ms ≈ 72 秒。
+
+        现在的分工：
+          · 简单 INSERT（占位符全在 VALUES 组里）→ execute_values：
+            N 行合成 1 条多值 INSERT，每 PG_BATCH_PAGE_SIZE 行一次往返
+          · 其它语句（UPDATE / DELETE ...）→ execute_batch：
+            语句仍逐条，但整批合并到一次往返
+
+        ⚠️ 与 psycopg2 原生 executemany 的差异只有 rowcount：批量执行后
+        `cur.rowcount` 只反映**最后一条**语句，不是累计行数。
+        目前全项目两处读 rowcount（data_access.py 的 clear_questions / clear_user_data）
+        都紧跟在普通 execute 之后，不读 executemany 的 rowcount。
+        """
         t = translate_sql(sql, self._schema)
         if t.extra_params:
             raise NotImplementedError("带额外参数的语句不支持 executemany")
-        self._cur.executemany(str(t), [_normalize_params(p) for p in seq_of_params])
+        rows = [_normalize_params(p) for p in seq_of_params]
         self._cols = None
+        if not rows:
+            return self
+        s = str(t)
+        multi = as_multirow_insert(s)
+        if multi is not None:
+            psycopg2.extras.execute_values(self._cur, multi, rows,
+                                           page_size=PG_BATCH_PAGE_SIZE)
+        else:
+            psycopg2.extras.execute_batch(self._cur, s, rows,
+                                          page_size=PG_BATCH_PAGE_SIZE)
         return self
 
     # ---- 取行 ----

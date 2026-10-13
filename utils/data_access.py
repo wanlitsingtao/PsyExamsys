@@ -468,7 +468,7 @@ class DataAccess:
                                      uncertain_map=None, exam_record=None,
                                      exam_type=None, user_id=None,
                                      answer_records=None, mock_exam_record=None,
-                                     delete_draft_key=None) -> None:
+                                     delete_draft_key=None) -> dict:
         raise NotImplementedError
 
     def get_top_wrong_questions(self, count=50, exam_type=None, user_id=None) -> list:
@@ -1584,15 +1584,23 @@ class SQLiteDataAccess(DataAccess):
                                      uncertain_map=None, exam_record=None,
                                      exam_type=None, user_id=None,
                                      answer_records=None, mock_exam_record=None,
-                                     delete_draft_key=None) -> None:
+                                     delete_draft_key=None) -> dict:
         """增量更新：只查询和写入受影响的题目统计，单个事务内完成。
 
-        可选参数（全部在**同一连接/同一事务**内写入 —— 上云后每次连接都要经
-        Session pooler 建会话，把「提交试卷」的 4 次连接/事务压成 1 次是本方法的主要性能收益）：
+        可选参数（全部在**同一连接/同一事务**内写入）：
           · exam_record      考试记录 dict        → exam_records
           · mock_exam_record 模拟考试记录 dict    → mock_exam_records
           · answer_records   答题过程记录 list    → answer_records
           · delete_draft_key (prefix, draft_id)   → 删除该草稿
+
+        返回值：本次写库后**受影响题目**的统计 {question_id: stats}，字段与
+        load_question_stats 完全同形（含动态算出的 retention_due）。调用方可直接
+        merge 进页面级统计缓存，省掉提交后那次「全量读 question_stats（该用户该题库
+        上千行）+ 逐行 json.loads」。
+
+        ⚠️ 关于「把 4 次连接压成 1 次」：方向对，但它**不是**主要性能收益来源 ——
+        上线连接池后取连接已接近免费，真正的开销是语句条数与行数
+        （psycopg2 的 executemany 是逐行 execute，一行一次网络往返）。见 PgCursor.executemany。
         """
         from utils.data_manager import _recalc_mastery_fields
         uid = self._uid(user_id)
@@ -1612,7 +1620,7 @@ class SQLiteDataAccess(DataAccess):
         affected_qids.update(correct_qids_set)
 
         if not affected_qids:
-            return
+            return {}
 
         conn = self._get_conn()
         try:
@@ -1690,14 +1698,31 @@ class SQLiteDataAccess(DataAccess):
 
                 _recalc_mastery_fields(stats[qid])
 
-            # 2) 批量 upsert 受影响的统计行（带 exam_type）
-            _placeholders = ",".join("?" for _ in affected_qids)
+            # 2) 一次查全题库信息：exam_type（统计与错题本用）+ category / source_file（答题记录用）
+            #    ⚠️ 改造前这里、错题本新增、答题记录各查一次 questions —— 同一批 id 查了 3 遍
+            #       （云端 = 3 次往返）。合并成 1 次，后面两处直接复用。
+            #    查询范围取 affected_qids ∪ 答题记录里的题：模拟考会给**未作答**的题也写
+            #    answer_records，那些题不在 affected_qids 里，但同样要补 category。
+            _need_qids = set(affected_qids)
+            if answer_records:
+                _need_qids.update(r.get("question_id") for r in answer_records
+                                  if r.get("question_id"))
+            _placeholders = ",".join("?" for _ in _need_qids)
             _cur2 = conn.cursor()
             _cur2.execute(
-                f"SELECT id, exam_type FROM questions WHERE id IN ({_placeholders})",
-                tuple(affected_qids)
+                f"SELECT id, exam_type, category, source_file FROM questions "
+                f"WHERE id IN ({_placeholders})",
+                tuple(_need_qids)
             )
-            _type_map = {row["id"]: row["exam_type"] for row in _cur2.fetchall()}
+            _qinfo = {
+                row["id"]: {
+                    "exam_type": row["exam_type"],
+                    "category": row["category"],
+                    "source_file": row["source_file"],
+                }
+                for row in _cur2.fetchall()
+            }
+            _type_map = {qid: info["exam_type"] for qid, info in _qinfo.items()}
 
             cur.executemany("""
                 INSERT OR REPLACE INTO question_stats
@@ -1743,18 +1768,12 @@ class SQLiteDataAccess(DataAccess):
                     [(qid, uid) for qid in to_remove]
                 )
             # 只插入新增的错题（带 exam_type）
+            # exam_type 复用上面第 2 步的 _type_map（to_add ⊆ affected_qids，无需再查一次）
             to_add = new_wrong - old_qids
             if to_add:
-                _ph = ",".join("?" for _ in to_add)
-                _cur3 = conn.cursor()
-                _cur3.execute(
-                    f"SELECT id, exam_type FROM questions WHERE id IN ({_ph})",
-                    tuple(to_add)
-                )
-                _et_map = {row["id"]: row["exam_type"] for row in _cur3.fetchall()}
                 cur.executemany(
                     "INSERT INTO wrong_questions (question_id, user_id, exam_type) VALUES (?, ?, ?)",
-                    [(qid, uid, _et_map.get(qid) or exam_type or DEFAULT_EXAM_TYPE) for qid in to_add]
+                    [(qid, uid, _type_map.get(qid) or exam_type or DEFAULT_EXAM_TYPE) for qid in to_add]
                 )
 
             # 4) 考试记录（可选，同一事务内完成）
@@ -1777,23 +1796,9 @@ class SQLiteDataAccess(DataAccess):
             if answer_records:
                 from utils.data_manager import infer_category as _infer_cat
                 _now = datetime.now().isoformat()
-                _ar_qids = list({r.get("question_id", "") for r in answer_records
-                                 if r.get("question_id")})
-                _ar_map = {}
-                if _ar_qids:
-                    _ph_ar = ",".join("?" for _ in _ar_qids)
-                    _cur_ar = conn.cursor()
-                    _cur_ar.execute(
-                        f"SELECT id, category, source_file, exam_type FROM questions "
-                        f"WHERE id IN ({_ph_ar})",
-                        tuple(_ar_qids)
-                    )
-                    for row in _cur_ar.fetchall():
-                        _ar_map[row["id"]] = {
-                            "category": row["category"],
-                            "source_file": row["source_file"],
-                            "exam_type": row["exam_type"],
-                        }
+                # category / source_file / exam_type 复用第 2 步的 _qinfo（结构同形，
+                # 且已覆盖未作答的题 —— 它们没有统计，但同样要写答题记录）
+                _ar_map = _qinfo
                 _ar_rows = []
                 for _r in answer_records:
                     _qid = _r.get("question_id", "")
@@ -1823,12 +1828,20 @@ class SQLiteDataAccess(DataAccess):
                     (self._draft_pk(uid, _dp_prefix, _dp_id),)
                 )
 
+            # 8) 组装本次的增量统计作为返回值（合并进页面缓存用，免掉提交后的全量重读）
+            #    口径与 load_question_stats 同源：retention_due 是现算的动态值
+            updated_stats = {
+                qid: self._apply_retention_due(stats[qid], uid)
+                for qid in affected_qids
+            }
+
             conn.commit()
         except Exception:
             conn.rollback()
             raise
         finally:
             conn.close()
+        return updated_stats
 
     def get_top_wrong_questions(self, count=50, exam_type=None, user_id=None) -> list:
         wrong_qids = self.load_wrong_questions(user_id=user_id)
@@ -1993,6 +2006,27 @@ class SQLiteDataAccess(DataAccess):
 
     # ---------- 答题统计 ----------
 
+    def _apply_retention_due(self, s: dict, uid, now=None, threshold=None) -> dict:
+        """按「距上次答对 > 阈值天数」动态算出 retention_due（原地写入并返回 s）。
+
+        只读库、不写库：retention_due **不是 question_stats 的列**，每次读出来都现算。
+        提交后的增量 merge 必须给出与 load_question_stats 逐字一致的字段，
+        所以口径收在这一处共用 —— 三处（全量读 / 单题读 / 提交增量）必须同源。
+        """
+        if now is None:
+            now = datetime.now()
+        if threshold is None:
+            threshold = get_retention_threshold(self.db_path, uid)
+        if s.get("last_correct") is True and s.get("last_answer_time"):
+            try:
+                last_time = datetime.fromisoformat(s["last_answer_time"])
+                s["retention_due"] = (now - last_time).days > threshold
+            except (ValueError, TypeError):
+                s["retention_due"] = False
+        else:
+            s["retention_due"] = False
+        return s
+
     def load_question_stats(self, exam_type=None, user_id=None) -> dict:
         uid = self._uid(user_id)
         conn = self._get_conn()
@@ -2020,16 +2054,8 @@ class SQLiteDataAccess(DataAccess):
                     "self_uncertainty": row["self_uncertainty"],
                     "first_answer_time": row["first_answer_time"],
                 }
-                # 动态计算 retention_due
-                if s["last_correct"] is True and s["last_answer_time"]:
-                    try:
-                        last_time = datetime.fromisoformat(s["last_answer_time"])
-                        days_since = (now - last_time).days
-                        s["retention_due"] = days_since > threshold
-                    except (ValueError, TypeError):
-                        s["retention_due"] = False
-                else:
-                    s["retention_due"] = False
+                # 动态计算 retention_due（与「提交后增量 merge」共用同一处口径）
+                self._apply_retention_due(s, uid, now, threshold)
                 stats[qid] = s
             return stats
         finally:
@@ -2121,16 +2147,7 @@ class SQLiteDataAccess(DataAccess):
                 "self_uncertainty": row["self_uncertainty"],
                 "first_answer_time": row["first_answer_time"],
             }
-            now = datetime.now()
-            threshold = get_retention_threshold(self.db_path, uid)
-            if s["last_correct"] is True and s["last_answer_time"]:
-                try:
-                    last_time = datetime.fromisoformat(s["last_answer_time"])
-                    s["retention_due"] = (now - last_time).days > threshold
-                except (ValueError, TypeError):
-                    s["retention_due"] = False
-            else:
-                s["retention_due"] = False
+            self._apply_retention_due(s, uid)
             return s
         finally:
             conn.close()
