@@ -360,87 +360,100 @@ def _show_tab_users():
 # ============================
 
 def _show_tab_config():
-    """系统设置标签页（配置按用户隔离，改的是你自己的设置）"""
+    """系统设置标签页（配置按用户隔离，改的是你自己的设置）
+
+    🩸 所有输入控件都包在 `st.form` 内：Streamlit 的默认行为是「任一控件值变化 →
+    整脚本重跑」，配置页有 13 个控件，裸露在页面上就会「每改一项刷新一次」
+    （整页重绘 + 每次重跑还多读一次 `load_config()`）。
+    放进表单后，表单内的改动只暂存在浏览器端，**不触发重跑**；
+    点「💾 保存设置」时才重跑一次并一次性写库。
+    """
     st.markdown("### ⚙️ 系统设置")
     st.caption("以下配置保存在你自己的用户配置里，不影响其他用户。")
+    st.caption("改动统一点最下方的「💾 保存设置」才会生效；编辑过程中页面不会刷新。")
     config = load_config()
 
-    st.markdown("---")
-    st.markdown("**专项训练设置**")
-    st.markdown("专项训练按题型分别出题，可在此调整各题型题数配置。"
-                "（知识板块专项训练不出案例题，案例题只在综合训练中出现）")
+    with st.form("cfg_system_form"):
+        st.markdown("---")
+        st.markdown("**专项训练设置**")
+        st.markdown("专项训练按题型分别出题，可在此调整各题型题数配置。"
+                    "（知识板块专项训练不出案例题，案例题只在综合训练中出现）")
 
-    spec_per_round = st.number_input(
-        "每轮专项训练总数", min_value=10, max_value=200, value=config.get("spec_per_round", 60),
-        help="专项训练每轮抽取的总题数", key="cfg_spec_total")
-    spec_single = st.number_input(
-        "其中单选题数", min_value=0, max_value=100, value=config.get("spec_single_count", 30),
-        key="cfg_spec_single")
-    spec_multi = st.number_input(
-        "其中多选题数", min_value=0, max_value=100, value=config.get("spec_multi_count", 20),
-        key="cfg_spec_multi")
-    spec_judge = st.number_input(
-        "其中判断题数", min_value=0, max_value=100, value=config.get("spec_judge_count", 10),
-        key="cfg_spec_judge")
+        spec_per_round = st.number_input(
+            "每轮专项训练总数", min_value=10, max_value=200, value=config.get("spec_per_round", 60),
+            help="专项训练每轮抽取的总题数", key="cfg_spec_total")
+        spec_single = st.number_input(
+            "其中单选题数", min_value=0, max_value=100, value=config.get("spec_single_count", 30),
+            key="cfg_spec_single")
+        spec_multi = st.number_input(
+            "其中多选题数", min_value=0, max_value=100, value=config.get("spec_multi_count", 20),
+            key="cfg_spec_multi")
+        spec_judge = st.number_input(
+            "其中判断题数", min_value=0, max_value=100, value=config.get("spec_judge_count", 10),
+            key="cfg_spec_judge")
 
-    st.markdown("---")
-    st.markdown("**综合训练设置**")
-    st.markdown("综合训练从全部知识板块混合抽题，可在此调整各题型题数配置。")
+        st.markdown("---")
+        st.markdown("**综合训练设置**")
+        st.markdown("综合训练从全部知识板块混合抽题，可在此调整各题型题数配置。")
 
-    comp_per_round = st.number_input(
-        "每轮综合训练总数", min_value=10, max_value=300, value=config.get("comp_per_round", 60),
-        help="综合训练每轮抽取的总题数", key="cfg_comp_total")
-    comp_single = st.number_input(
-        "其中单选题数", min_value=0, max_value=200, value=config.get("comp_single_count", 30),
-        key="cfg_comp_single")
-    comp_multi = st.number_input(
-        "其中多选题数", min_value=0, max_value=200, value=config.get("comp_multi_count", 20),
-        key="cfg_comp_multi")
-    comp_judge = st.number_input(
-        "其中判断题数", min_value=0, max_value=200, value=config.get("comp_judge_count", 10),
-        key="cfg_comp_judge")
-    comp_case_enabled = st.checkbox(
-        "综合训练中出案例题",
-        value=bool(config.get("comp_case_enabled", False)),
-        help="勾选后，综合训练会额外抽案例题追加到卷末；该题库无案例题时不会报错，自动不出",
-        key="cfg_comp_case")
-    # 勾选后才出现"案例题数量"（数量 = 案例**个数**，不是子题数）
-    comp_case_count = config.get("comp_case_count", 1)
-    if comp_case_enabled:
+        comp_per_round = st.number_input(
+            "每轮综合训练总数", min_value=10, max_value=300, value=config.get("comp_per_round", 60),
+            help="综合训练每轮抽取的总题数", key="cfg_comp_total")
+        comp_single = st.number_input(
+            "其中单选题数", min_value=0, max_value=200, value=config.get("comp_single_count", 30),
+            key="cfg_comp_single")
+        comp_multi = st.number_input(
+            "其中多选题数", min_value=0, max_value=200, value=config.get("comp_multi_count", 20),
+            key="cfg_comp_multi")
+        comp_judge = st.number_input(
+            "其中判断题数", min_value=0, max_value=200, value=config.get("comp_judge_count", 10),
+            key="cfg_comp_judge")
+        comp_case_enabled = st.checkbox(
+            "综合训练中出案例题",
+            value=bool(config.get("comp_case_enabled", False)),
+            help="勾选后，综合训练会额外抽案例题追加到卷末；该题库无案例题时不会报错，自动不出",
+            key="cfg_comp_case")
+        # 数量框常显（数量 = 案例**个数**，不是子题数）；未勾选时置灰。
+        # ⚠️ 表单内勾选不触发重跑，故「灰/亮」状态要点保存后才随勾选框一起更新。
         comp_case_count = st.number_input(
             "案例题数量",
-            min_value=1, max_value=20, value=max(1, int(comp_case_count)),
+            min_value=1, max_value=20,
+            value=max(1, int(config.get("comp_case_count", 1))),
             help="按**案例个数**配置：填 1 表示抽 1 个案例，该案例下有多少道子题就出多少道"
                  "（子题数不设限制，依题库中案例题的实际情况）；填 2 表示抽 2 个案例，以此类推",
+            disabled=not comp_case_enabled,
             key="cfg_comp_case_count")
 
-    st.markdown("---")
-    st.markdown("**巩固练习设置**")
-    st.markdown("巩固练习从「不稳固题目」（消退型 / 波动型 / 遗忘预警 / 不确定题目）中"
-                "按优先级抽题，**各题型数量由题库实况决定**，故此处只配总题数。")
-    consol_per_round = st.number_input(
-        "每轮巩固练习总数", min_value=10, max_value=200,
-        value=config.get("consol_per_round", 60),
-        help="巩固练习每轮抽取的最大题数；不稳固题目不足时按实际数量出题，不报错",
-        key="cfg_consol_total")
+        st.markdown("---")
+        st.markdown("**巩固练习设置**")
+        st.markdown("巩固练习从「不稳固题目」（消退型 / 波动型 / 遗忘预警 / 不确定题目）中"
+                    "按优先级抽题，**各题型数量由题库实况决定**，故此处只配总题数。")
+        consol_per_round = st.number_input(
+            "每轮巩固练习总数", min_value=10, max_value=200,
+            value=config.get("consol_per_round", 60),
+            help="巩固练习每轮抽取的最大题数；不稳固题目不足时按实际数量出题，不报错",
+            key="cfg_consol_total")
 
-    st.markdown("---")
-    st.markdown("**错题本设置**")
-    wrong_count = st.number_input(
-        "每次提取错题数", min_value=10, max_value=200, value=config["wrongbook_extract_count"],
-        help="从错题库中优先提取答错次数最多的N道题", key="cfg_wrong_count")
+        st.markdown("---")
+        st.markdown("**错题本设置**")
+        wrong_count = st.number_input(
+            "每次提取错题数", min_value=10, max_value=200, value=config["wrongbook_extract_count"],
+            help="从错题库中优先提取答错次数最多的N道题", key="cfg_wrong_count")
 
-    st.markdown("---")
-    st.markdown("**遗忘预警设置**")
-    retention_threshold = st.number_input(
-        "遗忘预警阈值（天）", min_value=1, max_value=30,
-        value=config.get("retention_days_threshold", 5),
-        help="距上次答对超过此天数后，触发遗忘预警标签，提示需要复习",
-        key="cfg_retention_threshold")
+        st.markdown("---")
+        st.markdown("**遗忘预警设置**")
+        retention_threshold = st.number_input(
+            "遗忘预警阈值（天）", min_value=1, max_value=30,
+            value=config.get("retention_days_threshold", 5),
+            help="距上次答对超过此天数后，触发遗忘预警标签，提示需要复习",
+            key="cfg_retention_threshold")
 
-    st.markdown("---")
+        st.markdown("---")
+        # 表单提交按钮：点它才触发重跑 + 写库（表单内其它交互一律不重跑）
+        _submitted = st.form_submit_button(
+            "💾 保存设置", use_container_width=True, type="primary")
 
-    if st.button("💾 保存设置", use_container_width=True, type="primary"):
+    if _submitted:
         config.update({
             "spec_per_round": spec_per_round,
             "spec_single_count": spec_single,
