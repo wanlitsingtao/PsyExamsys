@@ -325,8 +325,11 @@ def _resume_mock_draft(draft: dict):
     st.session_state.mock_current = draft.get("current_idx", 0)
     st.session_state.mock_session_id = draft.get("session_id", "")
     st.session_state.mock_type_boundaries = draft.get("type_boundaries", {"single_end": 0, "multi_end": 0, "judge_end": 0})
+    # 🩸 这里把开始时间重置成「现在」——所以**绝不能用它算用时**（只会得到最后一段）。
+    #    用时统一走 `_elapsed_seconds()`：总时长 − 剩余时间（跨段累计，暂停不计）。
+    #    本行仅保留以兼容清理列表/旧状态，不参与任何统计。
     st.session_state.mock_start_time = time.time()
-    # 恢复剩余时间：end_time = 当前时间 + 剩余秒数
+    # 恢复剩余时间：end_time = 当前时间 + 剩余秒数（不足 60 秒按 60 秒保底，用户确认保留）
     st.session_state.mock_end_time = time.time() + max(remaining_seconds, 60)
     st.session_state.mock_last_auto_save = time.time()  # 自动保存计时起点
     st.session_state.mock_confirm_submit = False
@@ -535,7 +538,7 @@ def _show_exam_subject(subject_key):
                 st.toggle("不确定",
                           key=toggle_key,
                           value=qid in st.session_state.mock_uncertain,
-                          help="标记此题为不确定",
+                          help="标记此题为不确定，可在助学助记模块中，统一汇总复习。",
                           on_change=_on_mock_uncertain_toggle)
         with title_col3:
             marked = qid in st.session_state.mock_marked
@@ -707,14 +710,47 @@ def _save_mock_draft(subject_key: str, auto_save: bool = False):
     # 回调内 st.rerun() 是 no-op 且会弹警告；回调结束后 Streamlit 自动重跑。
 
 
+def _elapsed_seconds(cfg, end_time, now, paused_at=None, remaining_at_pause=None):
+    """累计答题用时（秒）= 该科总时长 − 当前剩余，保存期间不计时。
+
+    「剩余时间」的唯一权威来源是 `mock_end_time`：
+      · 手动保存 → 冻结倒计时，当时剩余写入 `mock_remaining_at_pause`；
+      · 继续作答 → 片段顶部把暂停时长加回 `mock_end_time`（等价于暂停不计时）；
+      · 从草稿恢复 → `end_time = 现在 + 草稿里的 remaining_seconds`，
+        跨会话累计自动成立。
+
+    因此「总时长 − 剩余」恰好等于各段答题时长之和。
+    🩸 **不能用 `time.time() - mock_start_time`**：`_resume_mock_draft`
+    会把 `mock_start_time` 重置成恢复时刻（v2.9.12 修复），
+    用它只能算出「最后一次恢复 → 提交」这一段。
+
+    超时后继续作答：剩余为负数 → 结果大于总时长，按实际用时如实显示（用户口径）。
+    """
+    total = float(cfg["time_minutes"]) * 60
+    if paused_at is not None:
+        # 暂停中提交：剩余时间取冻结快照，不随时间流逝
+        remaining = remaining_at_pause
+        if remaining is None:
+            remaining = total
+    else:
+        remaining = float(end_time) - float(now)
+    return max(0.0, total - float(remaining))
+
+
 def _finish_subject(subject_key):
     """结束某一科考试，计算成绩"""
     cfg = MOCK_EXAM_CONFIG[subject_key]
     eq = st.session_state.mock_questions
     total_q = len(eq)
     answers = st.session_state.mock_answers
-    start_time = st.session_state.mock_start_time
-    duration = time.time() - start_time
+    # 用时 = 总时长 − 提交时剩余（各段累计、保存期间不计时）
+    duration = _elapsed_seconds(
+        cfg,
+        end_time=st.session_state.get("mock_end_time", time.time()),
+        now=time.time(),
+        paused_at=st.session_state.get("mock_paused_at"),
+        remaining_at_pause=st.session_state.get("mock_remaining_at_pause"),
+    )
 
     # 计分
     correct_count = 0

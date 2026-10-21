@@ -342,7 +342,7 @@ def _show_consolidation_running():
                 st.toggle("不确定",
                           key=toggle_key,
                           value=qid in st.session_state.consol_uncertain,
-                          help="标记此题为不确定",
+                          help="标记此题为不确定，可在助学助记模块中，统一汇总复习。",
                           on_change=_on_consol_uncertain_toggle)
         with type_col3:
             marked = qid in st.session_state.consol_marked
