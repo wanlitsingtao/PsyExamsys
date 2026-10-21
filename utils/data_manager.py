@@ -1057,11 +1057,16 @@ def _priority_sample(question_list, count, wrong_ids=None, stats=None):
     按优先级从题目列表中抽取 count 道题。
     四级分组：
       Group 0（答错≥答对，仍在错题本）> Group 1（从未答过）> Group 2（仅答对1次/猜对防护）> Group 3（其余）
-      Group 3 内部四级子排序：
-        sub=0 遗忘预警（retention_due=True，距上次答对>=阈值天）> 
-        sub=1 不稳定（消退型/波动型）> 
-        sub=2 上次答错 > 
-        sub=3 普通
+      Group 3 内部五级子排序（2026-10-20 插入「不确定」一档，排在遗忘预警之后）：
+        sub=0 遗忘预警（retention_due=True，距上次答对>=阈值天）>
+        sub=1 不确定（self_uncertainty > 0，答题者自评没把握）>
+        sub=2 不稳定（消退型/波动型）>
+        sub=3 上次答错 >
+        sub=4 普通
+
+    ⚠️「不确定」只在 Group 3 内部生效：它**不改变四个 group 的归属**，
+    所以错题本成员（Group 0）、新题（Group 1）、猜对防护（Group 2）的内部次序不受影响。
+    一题同时命中多档时取**最高的那一档**（先判遗忘预警，再判不确定，……）。
 
     同级内部排序：正确率升序（低优先） → 答题次数升序（少优先） → wrong降序 → random
     """
@@ -1091,20 +1096,23 @@ def _priority_sample(question_list, count, wrong_ids=None, stats=None):
         else:
             group = 3  # 其余
 
-        # Group 3 内部子排序
-        sub = 3  # 默认普通
+        # Group 3 内部子排序（五级，命中多档时取最高一档）
+        sub = 4  # 默认普通
         if group == 3:
             retention_due = s.get("retention_due", False)
+            uncertain = (s.get("self_uncertainty") or 0) > 0
             unstable = s.get("unstable", False)
             last_correct = s.get("last_correct")
             if retention_due:
                 sub = 0  # 遗忘预警最高
+            elif uncertain:
+                sub = 1  # 自评不确定（v2.9.11：蒙对了但心里没底的题）
             elif unstable:
-                sub = 1  # 不稳定次之
+                sub = 2  # 不稳定
             elif last_correct is False:
-                sub = 2  # 上次答错
+                sub = 3  # 上次答错
             else:
-                sub = 3
+                sub = 4
 
         accuracy = correct / total_ans if total_ans > 0 else 0.0
 
