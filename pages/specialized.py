@@ -887,10 +887,13 @@ def _show_spec_result():
         # 分题型统计
         st.markdown("---")
         st.markdown("### 分题型统计")
-        type_names = {"single": "单选题", "multi": "多选题", "judge": "判断题"}
+        # 🩸 必须覆盖库里全部题型（含案例题/不定项），且一律用 .get(..., tp) 兜底：
+        # 综合训练勾选「出案例题」后 type_stats 会出现 "案例题" 键，写死下标会 KeyError。
+        type_names = {"single": "单选题", "multi": "多选题", "judge": "判断题",
+                      "案例题": "案例题", "indefinite": "不定项选择题"}
         for tp, stats in type_stats.items():
             pct = stats["correct"] / stats["total"] * 100 if stats["total"] > 0 else 0
-            st.markdown(f"**{type_names[tp]}**: {stats['correct']}/{stats['total']} 正确 ({pct:.1f}%)")
+            st.markdown(f"**{type_names.get(tp, tp)}**: {stats['correct']}/{stats['total']} 正确 ({pct:.1f}%)")
             st.progress(stats["correct"] / max(stats["total"], 1))
         # 知识板块统计（综合训练时展示各板块正确率）
         if cat_stats and mode == "comprehensive":
@@ -909,7 +912,8 @@ def _show_spec_result():
             for i, qi in enumerate(review_idxs):
                 d = details[qi]
                 wn = qi + 1
-                tp_label = {"single": "单选", "multi": "多选", "judge": "判断"}[d["type"]]
+                tp_label = {"single": "单选", "multi": "多选", "judge": "判断",
+                            "案例题": "案例题", "indefinite": "不定项选择题"}.get(d["type"], d["type"])
                 user_label = d.get("user_answer", "未答") or "未答"
                 correct_display = get_answer_display(
                     d["type"], d["correct_answer"], d.get("options", {})
