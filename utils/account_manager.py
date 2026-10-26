@@ -25,6 +25,7 @@ import hashlib
 import hmac
 import os
 import re
+import uuid
 from typing import Optional, Tuple
 
 from utils.data_access import get_data_access
@@ -151,6 +152,12 @@ def verify_user_token(token: str) -> Optional[str]:
     return user_id
 
 
+def _token_cookie_pair(token: str, max_age: int = _IDENTITY_COOKIE_MAX_AGE) -> str:
+    """拼出身份令牌的 document.cookie 赋值串（含 path / max-age / SameSite）。"""
+    return (f"{IDENTITY_COOKIE_NAME}={token};path=/;"
+            f"max-age={max_age};SameSite=Lax")
+
+
 def identity_cookie_script(token: str) -> Optional[str]:
     """生成「把身份令牌写进浏览器 Cookie」的 HTML/JS 片段；令牌不合法则返回 None。
 
@@ -159,9 +166,92 @@ def identity_cookie_script(token: str) -> Optional[str]:
     """
     if not token or not _IDENTITY_TOKEN_RE.match(token):
         return None
-    value = (f"{IDENTITY_COOKIE_NAME}={token};path=/;"
-             f"max-age={_IDENTITY_COOKIE_MAX_AGE};SameSite=Lax")
+    value = _token_cookie_pair(token)
     return f"<script>try{{document.cookie={value!r};}}catch(e){{}}</script>"
+
+
+# ============================
+# 身份 v2：浏览器持久化随机 ID（bid），2026-10-26
+# ============================
+# 要解决的问题（线上 Supabase 实证）：
+#   v1 设备指纹 = md5(User-Agent|Sec-CH-UA-Platform)，而 UA 里带着浏览器大版本号，
+#   浏览器自动升级 / Client Hints 策略变化都会让它漂移 → 落到**新的匿名用户**，
+#   表现为"昨天做的题今天显示没做过"。
+#   生产证据：主账号 ee9dad99522c 一个月内累计 **8 个不同指纹**（9-24 ~ 10-26），
+#   并在 users 表留下 11 个零业务数据的空壳用户。
+#
+# 方案（与 bid-buddy-dev 的 IDENTITY v2 对齐 —— 2026-10-26 横向对比后采纳）：
+#   身份主键改为**浏览器端持久化随机 ID**（cookie `exmsys_bid`，UUID4，2 年），
+#   设备指纹 = md5("exs2|" + bid)，与 UA 彻底解耦。由此同时修掉：
+#     · 漂移 —— 浏览器/系统升级不再换号
+#     · 撞车 —— 不同用户必得不同 bid，不会再共用一行 users
+#   ⚠️ 刻意**不动** `user_id_for()` 的派生算法：老用户的 user_id 仍是
+#   md5("exmsys_device_" + v1 指纹)，该算法是老库契约，改了等于给所有人换号。
+#   切换期靠「历史账号认领」（见 app.py）：首次带 bid 访问时，用本次 UA 的 v1 指纹
+#   查到老 user_id，再把 v2 指纹绑到它上面 —— **老用户零迁移、数据一条不丢**。
+#
+# 灰度：`IDENTITY_MODE`
+#   · "v1"   —— 完全回到旧行为（不读 bid），紧急回滚用
+#   · "dual" —— 默认。有 bid 用 v2 指纹；无 bid 本次仍按 v1 指纹跑完（保证老用户本次
+#               不丢数据），同时写入 bid，下次访问即切到 v2 并认领历史账号
+
+IDENTITY_BID_COOKIE_NAME = "exmsys_bid"
+_IDENTITY_BID_MAX_AGE = 63072000  # 2 年（秒）
+_BID_RE = re.compile(r"^[0-9a-f]{32}$")
+_V2_FP_PREFIX = "exs2|"
+
+IDENTITY_MODE = "v1"      # "dual" | "v1"
+IDENTITY_MODE_V1 = "v1"
+
+
+def new_bid() -> str:
+    """生成浏览器持久化 ID（32 位小写 hex，即 UUID4 去掉连字符）。"""
+    return uuid.uuid4().hex
+
+
+def is_valid_bid(value) -> bool:
+    """bid 白名单校验：32 位**小写**十六进制。**先校验再拼进 JS**，防 cookie 注入。
+
+    ⚠️ 刻意**不**做 lower() 宽容处理：与令牌的 `_IDENTITY_TOKEN_RE` 同一标准。
+    万一浏览器把 cookie 值变了大小写，宁可当作「没有 bid」（回落本次 UA 指纹），
+    也不能让 `fingerprint_from_bid` 算出另一个指纹 → 那才是真的换号。
+    """
+    return isinstance(value, str) and bool(_BID_RE.match(value))
+
+
+def fingerprint_from_bid(bid: str) -> str:
+    """v2 指纹：md5("exs2|" + bid)。与 User-Agent 完全解耦，浏览器升级也不变。"""
+    return hashlib.md5((_V2_FP_PREFIX + (bid or "")).encode("utf-8")).hexdigest()[:32]
+
+
+def _bid_cookie_pair(value: str, max_age: int = _IDENTITY_BID_MAX_AGE) -> str:
+    """拼出 bid 的 document.cookie 赋值串。不设 Secure：本机 http 与云端 https 都要能写。"""
+    return (f"{IDENTITY_BID_COOKIE_NAME}={value};path=/;"
+            f"max-age={max_age};SameSite=Lax")
+
+
+def identity_bid_script(bid: str, max_age: int = _IDENTITY_BID_MAX_AGE) -> Optional[str]:
+    """生成「把 bid 写进浏览器 Cookie」的 HTML/JS 片段；bid 不合法则返回 None。"""
+    if not is_valid_bid(bid):
+        return None
+    value = _bid_cookie_pair(bid, max_age)
+    return f"<script>try{{document.cookie={value!r};}}catch(e){{}}</script>"
+
+
+def identity_cookies_script(token: str = None, bid: str = None) -> Optional[str]:
+    """把「身份令牌 + bid」合成**一个** <script>：一次组件渲染即可，不多一个 iframe。
+
+    ⚠️ 两个值都要先过白名单才拼接 —— 绝不把未校验内容注入脚本。
+    """
+    assigns = []
+    if token and _IDENTITY_TOKEN_RE.match(token):
+        assigns.append(f"document.cookie={_token_cookie_pair(token)!r};")
+    if bid and _BID_RE.match(bid):
+        assigns.append(f"document.cookie={_bid_cookie_pair(bid)!r};")
+    if not assigns:
+        return None
+    body = "".join(assigns)
+    return f"<script>try{{{body}}}catch(e){{}}</script>"
 
 
 def device_bound_user_id(device_fingerprint: str) -> Optional[str]:
@@ -176,6 +266,33 @@ def device_bound_user_id(device_fingerprint: str) -> Optional[str]:
         return _dao().get_device_user(device_fingerprint) or None
     except Exception:
         return None
+
+
+def claim_legacy_identity(v2_fingerprint: str, raw_ua: str) -> Optional[str]:
+    """身份 v2 切换期的「历史账号认领」：把 v2 指纹挂到老 user_id 上。
+
+    为什么必须有这一步：
+        老用户的 user_id = md5("exmsys_device_" + v1 指纹)，而 `user_id_for()` 是
+        **老库契约、不能改**。切到 v2 后设备指纹变成 md5("exs2|" + bid)，
+        若直接拿它去建号，就会派生出一个全新的 user_id → 老数据全部失联。
+        所以首次带着 bid 访问时，先用本次 UA 的 v1 指纹查出老 user_id，
+        再把 v2 指纹绑到它上面 —— **老用户零迁移、数据一条不丢**。
+
+    「恰好一次」怎么保证：绑上之后 v2 指纹即为「已登记」，
+    下次进来本函数在第一步就直接返回 None，不会重复绑、也不会改绑。
+
+    Returns:
+        认领到的 user_id；没有可认领的老账号（新访客 / UA 取不到）则返回 None。
+    """
+    if not v2_fingerprint or not raw_ua:
+        return None
+    if device_bound_user_id(v2_fingerprint):
+        return None                                  # v2 指纹已登记 → 无需认领
+    legacy_uid = device_bound_user_id(generate_device_fingerprint(raw_ua))
+    if not legacy_uid:
+        return None                                  # 新访客 → 交给调用方按指纹建号
+    bind_device_if_absent(v2_fingerprint, legacy_uid)
+    return legacy_uid
 
 
 def bind_device_if_absent(device_fingerprint: str, user_id: str) -> bool:

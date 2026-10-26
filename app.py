@@ -5,6 +5,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import sys
+import uuid
 from pathlib import Path
 
 # 将项目根目录加入路径
@@ -618,7 +619,11 @@ from utils.account_manager import (
     is_admin_password_default, ROLE_ADMIN,
     # 身份持久化令牌（Cookie 承载）：修复指纹漂移 / 会话回收导致的身份丢失
     sign_user_id, verify_user_token, device_bound_user_id, bind_device_if_absent,
-    identity_cookie_script, IDENTITY_COOKIE_NAME, IDENTITY_TOKEN_PARAM,
+    IDENTITY_COOKIE_NAME, IDENTITY_TOKEN_PARAM,
+    # 身份 v2（浏览器持久化随机 ID）：指纹不再随 User-Agent 漂移
+    new_bid, is_valid_bid, fingerprint_from_bid, claim_legacy_identity,
+    identity_cookies_script, IDENTITY_BID_COOKIE_NAME,
+    IDENTITY_MODE, IDENTITY_MODE_V1,
 )
 from utils.answer_card import CARD_CSS
 
@@ -642,6 +647,28 @@ def _identity_token_from_cookie():
         return None
 
 
+def _identity_bid_from_cookie():
+    """读浏览器 Cookie 里的持久化随机 ID（bid）；读不到 / 不合法则返回 None。"""
+    try:
+        raw = (st.context.cookies or {}).get(IDENTITY_BID_COOKIE_NAME)
+    except Exception:
+        return None
+    return raw if is_valid_bid(raw) else None
+
+
+def _fallback_fingerprint():
+    """取不到 User-Agent 时的兜底指纹：**会话级随机盐**。
+
+    ⚠️ 绝不能再退回 md5("unknown-device") —— 那会让所有取不到 UA 的访问
+    共用同一行 users（v1 的"共用桶"缺陷，与 bid-buddy-dev 同源）。
+    """
+    salt = st.session_state.get("_identity_salt")
+    if not salt:
+        salt = uuid.uuid4().hex
+        st.session_state._identity_salt = salt
+    return generate_device_fingerprint(f"fallback|{salt}")
+
+
 def _clear_url_identity_param():
     """把历史遗留的 `?u=` 身份令牌从地址栏清掉（身份已改由 Cookie 承载）。
 
@@ -656,35 +683,36 @@ def _clear_url_identity_param():
 
 
 def _sync_identity_cookie():
-    """把当前身份写进浏览器 Cookie（**不再往地址栏写任何东西**）。
+    """把「身份令牌 + 浏览器持久化 ID(bid)」写进 Cookie（**不再往地址栏写任何东西**）。
 
     与 _resolve_current_user 配合：解析身份 → 回写 Cookie，这样「刷新 / 断线重连 /
-    浏览器会话被回收」都能恢复到同一身份，且**不依赖指纹稳定性**（Cookie 不随
-    User-Agent 变化，比设备指纹更稳）。
+    浏览器会话被回收」都能恢复到同一身份，且**不依赖指纹稳定性**。
 
-    只在该写的时候渲染一次写入组件，避免每帧多一个元素：
-      · 本会话已经写过同一令牌 → 跳过；
-      · 上一次页面刷新已把 Cookie 带回来（服务端已能读到）→ 记下并跳过。
+    2026-10-26 身份 v2（对齐 bid-buddy-dev 的 IDENTITY v2），两点变化：
+      1. 多写一个 `exmsys_bid`（浏览器持久化随机 ID）。令牌管"你是谁"，bid 管
+         "你是哪台浏览器" —— 令牌丢了（被清/隐私模式）还能靠 bid 找回同一身份。
+      2. **有效期改为滑动续期**。浏览器对 cookie 有效期有 **400 天上限**
+         （Chrome / Edge / Firefox 皆如此），而 max-age 只在**写入那一刻**开始计时，
+         不会因"用户又来了一次"而自动延长 —— 不续期的话，天天用的用户也会在第
+         400 天突然变成新用户。所以**每个新会话都重写一次**。
+
+    去重粒度是「每会话一次」（不是每帧一次），避免每帧多一个隐藏 iframe。
     """
+    if st.session_state.get("_cookie_synced"):
+        return
     try:
         token = sign_user_id(st.session_state.get("_user_id"))
     except Exception:
-        return
-    if not token:
-        return
-    if st.session_state.get("_cookie_synced_token") == token:
-        return
-    if _identity_token_from_cookie() == token:
-        st.session_state._cookie_synced_token = token
-        return
-    script = identity_cookie_script(token)
+        token = None
+    bid = st.session_state.get("_identity_bid")
+    script = identity_cookies_script(token, bid)
     if not script:
         return
     try:
         # height=0 的隐藏组件：其 iframe 与主页面**同源**，document.cookie 才写得到本站点
         # （2026-10-11 实测：写入后刷新页面，服务端 st.context.cookies 能读到该值）
         components.html(script, height=0)
-        st.session_state._cookie_synced_token = token
+        st.session_state._cookie_synced = True
     except Exception:
         pass
 
@@ -702,15 +730,19 @@ def _resolve_current_user():
     于是后续所有读库都落到「无用户」上下文 → 页面报"题库为空"。
 
     现在拆成三段：
-      1) 身份解析 —— 仅首次执行。**身份令牌优先（Cookie 为主，URL `?u=` 仅兼容历史
-         链接），设备指纹兜底**（2026-10-11；v2.9.6 曾把令牌写进 URL，因地址栏泄漏
-         身份凭证 → 已改为 Cookie 承载）；
+      1) 身份解析 —— 仅首次执行。优先级链（2026-10-26 起为三层）：
+         **① 身份令牌（Cookie 承载，服务端签名）→ ② 浏览器持久化 ID（bid）
+         → ③ UA 设备指纹兜底**；
       2) 数据路由同步 —— 每帧无条件执行（set_current_user 已幂等，无额外开销）；
       3) 回写 Cookie + 清除地址栏遗留令牌 —— 每帧无条件执行（均幂等）。
 
-    为什么令牌优先：设备指纹是 md5(User-Agent|Sec-CH-UA-Platform)，浏览器升级 /
-    Client Hints 策略变化就会漂移，同一人先后会算出多个指纹 → 落到不同匿名用户，
-    表现为「昨天做的题今天显示没做过」。令牌由服务端签名，不受 UA 变化影响；
+    为什么令牌与 bid 都排在 UA 指纹前面：
+      · UA 指纹 = md5(User-Agent|Sec-CH-UA-Platform)，浏览器自动升级 / Client Hints
+        策略变化就会漂移。线上实证（2026-10-26）：主账号一个月内累计 **8 个不同指纹**，
+        并在 users 表留下 11 个零业务数据的空壳用户。
+      · 令牌由服务端签名、bid 是随机 UUID，两者**都不随 UA 变化**；
+      · 令牌还能防定向冒充（签名 + 校验用户存在 → 拿不到签名就造不出管理员令牌），
+        bid 负责"令牌也没了（被清 / 隐私模式）"时的兜底。
     存 Cookie 而非 URL：不出现在地址栏 / 分享链接 / 浏览器历史里（分享链接≠分享身份）。
     """
     if "_user_id" not in st.session_state:
@@ -722,7 +754,26 @@ def _resolve_current_user():
         except Exception:
             ua, platform = "", ""
         raw_ua = f"{ua}|{platform}".strip("|")
-        fingerprint = generate_device_fingerprint(raw_ua)
+
+        # ---- ① 身份主键：浏览器持久化随机 ID（bid）优先，UA 指纹兜底 ----
+        # v2：有 bid → 指纹 = md5("exs2|"+bid)，与 UA 解耦，浏览器升级也不变；
+        #     无 bid（首次访问 / 浏览器清了 cookie）→ 本次仍按 v1 UA 指纹跑完
+        #     （保证老用户本次不丢数据），同时把新 bid 写进 Cookie，
+        #     下一次访问即切到 v2 并完成历史账号认领。
+        _fresh_bid = None
+        if IDENTITY_MODE == IDENTITY_MODE_V1:
+            _bid = None                     # 紧急回滚档：完全回到旧行为
+        else:
+            _bid = _identity_bid_from_cookie()
+        if _bid:
+            fingerprint = fingerprint_from_bid(_bid)
+            st.session_state._identity_bid = _bid
+        else:
+            fingerprint = (generate_device_fingerprint(raw_ua) if raw_ua
+                           else _fallback_fingerprint())
+            # 新 bid 也要存进 session：本会话后续帧与 Cookie 回写都要用它
+            _fresh_bid = new_bid()
+            st.session_state._identity_bid = _fresh_bid
         # 设备指纹始终记录：绑定/解绑设备、账号面板都要用（与身份决定解耦）
         st.session_state._device_fp = fingerprint
 
@@ -752,10 +803,32 @@ def _resolve_current_user():
                 except Exception:
                     pass
         else:
-            # ---- ② 无令牌 / 令牌不可用 → 老路径：设备指纹自动建号 ----
+            # ---- ② 无令牌 / 令牌不可用 → 按当前指纹识别（先认领，再决定是否建号）----
+            # 历史账号认领（详见 utils/account_manager.claim_legacy_identity）：
+            #   首次带着 bid 访问时，v2 指纹在库里必然没登记过 → 先把它挂到本次 UA 的
+            #   v1 指纹所指向的老 user_id 上。不做这步就会按 v2 指纹派生新号 → 丢数据。
+            if _bid and (not _bound_uid):
+                try:
+                    claim_legacy_identity(fingerprint, raw_ua)
+                except Exception:
+                    pass
             user = get_or_create_user(fingerprint, raw_ua)
             st.session_state._user_id = user["user_id"]
             st.session_state._role = user.get("role") or "user"
+
+        # ---- ③ 本次刚拿到新 bid → 立刻把 v2 指纹登记到当前身份 ----
+        # 为什么必须「现绑」而不是等下次：
+        #   下次带 bid 进来时，UA 很可能已经变了（浏览器刚自动升级），
+        #   那时再用 v1 指纹去认领，查到的只会是空 → 又换号。
+        #   现在就把 fp_v2 绑到当前 user_id，下次访问直接命中 fp_v2，
+        #   **与 UA 变没变、令牌还在不在都无关** —— 这是根治「UA 一升就换号」的关键一步。
+        #   本会话的 _device_fp 仍是本次算出的指纹（本次行为不变）。
+        if _fresh_bid:
+            try:
+                bind_device_if_absent(fingerprint_from_bid(_fresh_bid),
+                                      st.session_state._user_id)
+            except Exception:
+                pass
         # 首次进入/切换用户：强制重载可见题库与配置
         for key in ["questions", "config", "_cache_available_exams",
                     "_db_questions_version", "_data_version", "_mnemonic_data"]:
@@ -941,7 +1014,7 @@ def _switch_user(new_user_id):
     # 身份变了 → 清掉本会话的「已写 Cookie」标记，让**下一个渲染帧**把新身份写进 Cookie。
     # ⚠️ 此处不能直接渲染写入组件：紧随其后的 st.rerun() 会在组件 JS 执行前把它丢弃，
     #    于是 Cookie 仍是旧身份 → 下次刷新被带回旧账号。
-    st.session_state.pop("_cookie_synced_token", None)
+    st.session_state.pop("_cookie_synced", None)
     _reset_exam_states_for_switch()
     # 切账号后导航回首页。⚠️ sidebar.radio(key="nav") 在本帧已实例化，
     # 不能直接 st.session_state.nav = ...（会触发 StreamlitAPIException）。
