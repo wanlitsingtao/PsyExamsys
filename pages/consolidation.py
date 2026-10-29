@@ -176,7 +176,9 @@ def _show_consol_start():
         st.rerun()
 
     # ---- 未完成的练习 ----
-    drafts = load_drafts("consol")
+    # 🩸 必须按当前题库过滤（v2.9.14）：草稿里的题号属于抽题时的那个题库，
+    #    跨题库列出来会让用户在三级题库里点到初级的题（用户手机实测的同一个 bug）。
+    drafts = load_drafts("consol", exam_type=st.session_state.get("exam_type"))
     if drafts:
         st.markdown("---")
         st.markdown("### 📂 未完成的巩固练习（点击继续作答）")
@@ -199,7 +201,11 @@ def _show_consol_start():
 def _resume_consol_draft(draft: dict):
     """从草稿恢复巩固练习状态"""
     _clear_consol_show_ans()  # 恢复草稿：清空残留的答案展开状态（与专项训练一致）
-    q_map = {q["id"]: q for q in load_questions()}
+    # 只从**当前题库**取题：历史草稿（v2.9.14 之前没有 exam_type 隔离）里可能混着
+    # 别的题库的题号，按 id 直接恢复会把它们带进当前题库的练习里。
+    _exam_type = st.session_state.get("exam_type")
+    q_map = {q["id"]: q for q in load_questions()
+             if q.get("exam_type") == _exam_type}
     restored_questions = [q_map[qid] for qid in draft.get("question_ids", []) if qid in q_map]
     if not restored_questions:
         st.error("❌ 草稿中的题目已不存在于题库中，无法恢复。")
@@ -517,7 +523,9 @@ def _save_consol_draft(auto_save: bool = False):
         "uncertain": list(st.session_state.consol_uncertain),
         "current_idx": st.session_state.consol_current,
     }
-    save_draft("consol", draft_id, draft_data, user_id=_uid)
+    # exam_type 必须写入：草稿列表按题库过滤，否则换库后还能点到别库的草稿。
+    save_draft("consol", draft_id, draft_data,
+               exam_type=st.session_state.get("exam_type"), user_id=_uid)
     st.session_state.consol_draft_id = draft_id
     if not auto_save:
         st.session_state.consol_draft_saved = True

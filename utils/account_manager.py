@@ -200,7 +200,7 @@ _IDENTITY_BID_MAX_AGE = 63072000  # 2 年（秒）
 _BID_RE = re.compile(r"^[0-9a-f]{32}$")
 _V2_FP_PREFIX = "exs2|"
 
-IDENTITY_MODE = "v1"      # "dual" | "v1"
+IDENTITY_MODE = "dual"      # "dual" | "v1"
 IDENTITY_MODE_V1 = "v1"
 
 

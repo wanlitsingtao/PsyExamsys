@@ -59,6 +59,14 @@ st.markdown(f"""
     }}
     /* 无 st.logo 时隐藏占位块，标题区更紧凑 */
     [data-testid="stLogoSpacer"] {{ display: none !important; }}
+    /* ============ 隐藏 Streamlit Cloud 宿主注入的工具栏按钮 ============ */
+    /* 右上角的「✏️ 编辑应用 / 🐙 GitHub 源码」不是本应用渲染的：社区云外壳通过
+       hostToolbarItems 推给前端，落在 [data-testid="stToolbarActions"] 容器里，
+       因此只能从 CSS 层面隐藏（与 bid-buddy-dev 的做法一致）。
+       ⚠️ 不要整块隐藏 [data-testid="stToolbar"] —— 侧边栏折叠后出现的
+       「展开侧边栏」按钮（stExpandSidebarButton）也在其中，会被一并隐藏。 */
+    [data-testid="stToolbarActions"],
+    [data-testid="stToolbarActionButton"] {{ display: none !important; }}
     /* header 固定顶部；stSidebarUserContent 单独滚动（内容超高不裁底、不滚动走头部） */
     [data-testid="stSidebarContent"] {{
         display: flex !important;
@@ -612,6 +620,19 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
+# 隐藏社区云外壳右下角的「Manage app」入口。
+# 它由外壳文档渲染（在应用 iframe 之外），CSS 碰不到，只能注入脚本跨文档隐藏。
+# 每个会话只注入一次：脚本自带 MutationObserver，外壳重渲染时会自动再次隐藏。
+# ⚠️ 该入口本来就只对「已登录 Community Cloud 的开发者」显示，普通访客看不到；
+#    这里主要是让自己平时使用时界面干净（与「✏️/GitHub」图标一并隐藏）。
+if "_cloud_chrome_hidden" not in st.session_state:
+    try:
+        from utils.cloud_chrome import hide_manage_app
+        hide_manage_app()
+    except Exception:
+        pass
+    st.session_state._cloud_chrome_hidden = True
+
 # 初始化 session_state
 from utils.data_manager import load_config, save_config, load_questions, get_available_exam_types, DEFAULT_EXAM_TYPE, invalidate_rerun_cache, get_questions_version, set_current_user
 from utils.account_manager import (
@@ -931,13 +952,42 @@ def _save_active_exam_drafts():
 
 
 def _reset_exam_states_for_switch():
-    """题库切换时彻底清理模拟考试/专项训练的全部会话状态"""
+    """题库切换 / 换账号时彻底清理答题类会话状态
+
+    覆盖：模拟考试（mock_*）、专项/综合训练（spec_*）、巩固练习（consol_*）。
+    为什么巩固练习也要清（v2.9.14）：它的题目是**按题库抽的**，但状态只存在
+    session_state 里、不认题库归属 —— 在初级题库答到一半切到三级，
+    `consol_state` 仍是 "running"，页面会继续渲染初级题库的题（用户手机实测）。
+    同一题库下切换模块不经过本函数（那只是 nav 变化），所以「同库切模块保留页面」
+    的行为不受影响。
+    """
     for k in [k for k in list(st.session_state) if k.startswith("mock_")]:
         del st.session_state[k]
     st.session_state.mock_state = "idle"
     for k in [k for k in list(st.session_state) if k.startswith("spec_")]:
         del st.session_state[k]
     st.session_state.spec_state = "idle"
+    for k in [k for k in list(st.session_state) if k.startswith("consol_")]:
+        del st.session_state[k]
+    st.session_state.consol_state = "idle"
+
+
+def _save_consol_draft_before_switch():
+    """跨题库切换前，把进行中的巩固练习静默存成草稿（不丢已答内容）。
+
+    ⚠️ 必须在 `exam_type` 被改写**之前**调用：草稿要盖「旧题库」的章，
+    否则切回来时它会被当成新题库的草稿（题号对不上）。
+    """
+    if st.session_state.get("consol_state") != "running":
+        return
+    if not st.session_state.get("consol_questions"):
+        return
+    try:
+        from pages.consolidation import _save_consol_draft
+        _save_consol_draft(auto_save=True)
+    except Exception:
+        # 存草稿失败不能阻断切库（避免用户被卡在旧题库）
+        pass
 
 
 def _reset_stats_caches_for_switch():
@@ -975,6 +1025,8 @@ def _perform_exam_switch(new_code):
     """
     # 1) 记录当前模块（与 2) 的恢复是双重保险）
     _preserved_nav = st.session_state.get("nav", "首页")
+    # 1b) 巩固练习进行中 → 先按**旧题库**存草稿（切回来可在「未完成的练习」里续答）
+    _save_consol_draft_before_switch()
     # 2) 切换题库
     st.session_state.exam_type = new_code
     # 记住用户最后使用的题库（首页默认值用它，避免每次登录都跳回名字排序第一个）
