@@ -87,11 +87,12 @@ def main():
             f"{label} 的页面级标题没删掉（{fn} 里仍在渲染 {heading}）"
         ok(f"{label}：{fn} 不再渲染页面级标题")
 
-    # 阴性对照：把标题塞回各函数体首行
+    # 阴性对照：把标题塞回函数体（2026-11-10 说明文案扩写成多行 markdown，
+    # 锚点改用取配置那一行，避免在字符串拼接中间插语句导致语法错误）
     nc = consol_src.replace(
-        '    st.markdown("针对掌握不牢靠（消退型/波动型）、遗忘预警以及自标记不确定的题目进行专项巩固。")',
+        '    _per_round = int(load_config().get("consol_per_round", 60) or 60)',
         '    st.markdown("# 🎯 巩固练习")\n'
-        '    st.markdown("针对掌握不牢靠（消退型/波动型）、遗忘预警以及自标记不确定的题目进行专项巩固。")',
+        '    _per_round = int(load_config().get("consol_per_round", 60) or 60)',
         1,
     )
     assert nc != consol_src, "阴性对照锚点没匹配上（巩固练习首行变了？）"
