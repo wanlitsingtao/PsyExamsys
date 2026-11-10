@@ -762,7 +762,6 @@ def _render_uncertain_tab():
 
 def show_mnemonic():
     """助记助学主页面 — 数字相关 / 人名相关 双 Tab"""
-    st.title("🧠 助记助学")
     st.markdown("将题库中涉及**数字答案**和**人名答案**的题目整理为速查表格，便于考前集中记忆。")
 
     # 使用缓存数据，避免每次 toggle 都重新筛选分类

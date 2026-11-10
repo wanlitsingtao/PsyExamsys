@@ -48,8 +48,6 @@ def _get_cached_qstats(qid):
 def show_specialized():
     questions = st.session_state.questions
     if not questions:
-        st.markdown("# 🎯 专项训练")
-        st.markdown("---")
         st.warning("⚠️ 题库为空，请先在配置管理中导入题库！")
         return
 
@@ -57,11 +55,7 @@ def show_specialized():
     if "spec_state" not in st.session_state:
         st.session_state.spec_state = "idle"
 
-    # 只在非答题状态显示总标题
-    if st.session_state.spec_state != "running":
-        st.markdown("# 🎯 专项训练")
-        st.markdown("---")
-
+    # 页面标题已移除（左侧栏已高亮当前模块，重复标题占屏且与主内容顶不齐）
     # ======== 状态路由 ========
     if st.session_state.spec_state == "idle":
         _show_spec_start(questions)
@@ -878,7 +872,7 @@ def _show_spec_result():
 
     # ---- 成绩报告 + 错题回顾（单列浏览，结果页不使用答题卡）----
     with st.container():
-        st.markdown(f"# 📊 {mode_label}报告：**{category}**")
+        st.markdown(f"### 📊 {mode_label}报告：**{category}**")
         st.markdown("---")
         cols = st.columns(3)
         cols[0].metric("✅ 正确", f"{correct}/{total}")

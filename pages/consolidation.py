@@ -164,11 +164,9 @@ def _generate_consol_questions():
 
 def _show_consol_start():
     """巩固练习开始页面 — 开始练习 + 未完成草稿列表"""
-    st.markdown("# 🎯 巩固练习")
     st.markdown("针对掌握不牢靠（消退型/波动型）、遗忘预警以及自标记不确定的题目进行专项巩固。")
 
     # ---- 开始练习 ----
-    st.markdown("---")
     if st.session_state.pop("consol_no_candidates", False):
         st.info("当前题库暂无需要巩固的题目（消退型/波动型/遗忘预警/不确定题目均为空）。先去答题积累一些记录吧！")
     if st.button("🚀 开始巩固练习", use_container_width=True, type="primary", key="consol_start_new"):
@@ -632,7 +630,7 @@ def _show_consolidation_result():
 
     # ---- 成绩报告 + 错题回顾（单列浏览，结果页不使用答题卡）----
     with st.container():
-        st.markdown("# 🎯 巩固练习 - 成绩报告")
+        st.markdown("### 🎯 巩固练习 - 成绩报告")
         cq = st.session_state.consol_questions
         total_q = len(cq)
         results = st.session_state.consol_results

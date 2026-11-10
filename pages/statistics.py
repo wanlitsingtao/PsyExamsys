@@ -46,7 +46,7 @@ def _get_cached_stats(exam_type):
 
 
 def show_statistics():
-    st.markdown("# 📊 数据统计")
+    st.markdown("### 📊 数据统计")
     st.markdown("---")
 
     # 加载所有数据（使用缓存，仅在版本变化时重新读盘）

@@ -47,9 +47,6 @@ def show_wrongbook():
 # ============================
 
 def _show_wrongbook_home():
-    st.markdown("# 📕 错题本")
-    st.markdown("---")
-
     # ---- 错题本状态 ----
     wrong_stats = get_wrong_stats(st.session_state.get("exam_type"))
 

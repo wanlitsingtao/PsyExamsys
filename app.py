@@ -35,10 +35,31 @@ st.markdown(f"""
         max-width: min({MAX_CONTENT_WIDTH_PX}px, {CONTENT_WIDTH_RATIO * 100:.0f}vw) !important;
         width: min(100%, {MAX_CONTENT_WIDTH_PX}px);
         margin: 0 auto;
-        /* 主内容区顶部留白：默认 6rem(=108px@18px根字号) 过大，对齐侧边栏头部 46px */
-        padding-top: 46px !important;
+        /* 主内容区顶部留白：默认 6rem(=108px@18px根字号) 过大。
+           2026-11-09 实测（1440×900）：侧栏首行标题文字顶端 = 64.8px。
+           下面那条「隐藏空 style 容器」的规则去掉了 3 个 0 高度容器所占的 gap，
+           主内容整体上移 18px，故这里补到 62px，首行文字落在 ~64.5px。 */
+        padding-top: 62px !important;
         padding-left: clamp(0.75rem, 2vw, 1.25rem);
         padding-right: clamp(0.75rem, 2vw, 1.25rem);
+    }}
+    /* 主内容标题去掉 Streamlit 的 13.5px「锚点偏移」内边距。
+       🩸 为什么不能用 :first-child 精确命中首个标题：主内容 stVerticalBlock 的前
+       5 个 stElementContainer 是高度为 0 的注入容器（身份 Cookie 写入 iframe、
+       云宿主净化脚本等），真正的标题排在第 6 个 → `:first-child` 永远不匹配。
+       统一取消后：标题页与正文页的首行文字顶端都落在 ~65px，
+       与侧栏首行标题（64.8px）对齐；顺带让页内标题与上文的间距更紧凑。 */
+    .block-container h1,
+    .block-container h2,
+    .block-container h3,
+    .block-container h4 {{
+        padding-top: 0 !important;
+    }}
+    /* 只含 <style> 的空容器不参与布局：它高度为 0，却仍占一个 flex gap（6.3px/个），
+       把首行内容整体下推 —— 专项训练页有 4 个（app.py 3 个全局样式 + 页内按钮样式），
+       实测首行比侧栏标题低 24px。:not(:has(p/h1..h4)) 保证带可见文字的同块不被误藏。 */
+    .block-container [data-testid="stElementContainer"]:has(style):not(:has(p, h1, h2, h3, h4)) {{
+        display: none !important;
     }}
     /* ============ 侧边栏整体布局（适配 Streamlit 1.57 DOM） ============ */
     /* 说明：不再强制 width，保留原生 300px 默认 + 拖拽记忆（localStorage sidebarWidth） */

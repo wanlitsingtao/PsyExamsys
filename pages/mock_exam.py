@@ -101,7 +101,6 @@ def _show_mock_start_junior():
     """心理协会咨询师初级 — 单科制模拟考试开始界面"""
     jcfg = MOCK_EXAM_CONFIG["junior_psychology"]
 
-    st.markdown("---")
     st.markdown("### 🚀 心理协会咨询师初级 — 模拟考试")
 
     j_total = jcfg["single_count"] + jcfg["multi_count"]
@@ -120,7 +119,6 @@ def _show_mock_start_four():
     psy = MOCK_EXAM_CONFIG["psychology"]
     cou = MOCK_EXAM_CONFIG["counseling"]
 
-    st.markdown("---")
     st.markdown("### 🚀 选择考试科目")
     st.markdown("请选择先考的科目（两科独立计时、独立提交）：")
 
@@ -931,7 +929,7 @@ def _show_subject_result(subject_key):
 
     # ---- 成绩报告 + 错题回顾（单列浏览，结果页不使用答题卡）----
     with st.container():
-        st.markdown(f"# 📊 {cfg['name']} - 成绩报告")
+        st.markdown(f"### 📊 {cfg['name']} - 成绩报告")
         st.markdown("---")
         cols = st.columns([1.2, 1.8, 1, 1])
         cols[0].metric("✅ 正确", f"{correct}/{total}", f"{accuracy:.1f}%")
@@ -1071,7 +1069,7 @@ def _show_final_result():
     """显示总成绩"""
     results = st.session_state.mock_final_results
 
-    st.markdown("# 🏆 模拟考试 - 总成绩")
+    st.markdown("### 🏆 模拟考试 - 总成绩")
     st.markdown("---")
 
     total_score = 0
