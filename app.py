@@ -38,8 +38,14 @@ st.markdown(f"""
         /* 主内容区顶部留白：默认 6rem(=108px@18px根字号) 过大。
            2026-11-09 实测（1440×900）：侧栏首行标题文字顶端 = 64.8px。
            下面那条「隐藏空 style 容器」的规则去掉了 3 个 0 高度容器所占的 gap，
-           主内容整体上移 18px，故这里补到 62px，首行文字落在 ~64.5px。 */
-        padding-top: 62px !important;
+           主内容整体上移 18px，故最初补到 62px（首行文字落在 ~64.5px）—— 该值不够，见下。
+           🩸 2026-11-10 用户反馈「右侧顶部遮挡一点文字/卡片边框」：Streamlit 的
+           [data-testid="stHeader"] 是 position:absolute + z-index:999990 + **白底**，
+           高度 = 3.75rem —— 本项目根字号 18px ⇒ **67.5px**（不是默认 16px 的 60px）。
+           62px < 67.5px，首个元素（专项训练/巩固练习的首屏卡片，top=62）有 5.5px
+           被白条盖住，卡片顶边框直接消失。故改为「头部高度 + 4px 余量」，
+           用 rem 表达：根字号换成手机端的 16px 时头高同步变 60px，仍然对得上。 */
+        padding-top: calc(3.75rem + 4px) !important;
         padding-left: clamp(0.75rem, 2vw, 1.25rem);
         padding-right: clamp(0.75rem, 2vw, 1.25rem);
     }}
@@ -47,8 +53,8 @@ st.markdown(f"""
        🩸 为什么不能用 :first-child 精确命中首个标题：主内容 stVerticalBlock 的前
        5 个 stElementContainer 是高度为 0 的注入容器（身份 Cookie 写入 iframe、
        云宿主净化脚本等），真正的标题排在第 6 个 → `:first-child` 永远不匹配。
-       统一取消后：标题页与正文页的首行文字顶端都落在 ~65px，
-       与侧栏首行标题（64.8px）对齐；顺带让页内标题与上文的间距更紧凑。 */
+       统一取消后：标题页与正文页的首行文字顶端同基线（差 14px 的问题消失），
+       顺带让页内标题与上文的间距更紧凑。 */
     .block-container h1,
     .block-container h2,
     .block-container h3,

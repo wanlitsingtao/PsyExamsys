@@ -163,15 +163,15 @@ def _generate_consol_questions():
 
 
 def _show_consol_start():
-    """巩固练习开始页面 — 开始练习 + 未完成草稿列表"""
-    st.markdown("针对掌握不牢靠（消退型/波动型）、遗忘预警以及自标记不确定的题目进行专项巩固。")
-
+    """巩固练习开始页面 — 开始练习 + 未完成草稿列表"""   
     # ---- 开始练习 ----
     if st.session_state.pop("consol_no_candidates", False):
         st.info("当前题库暂无需要巩固的题目（消退型/波动型/遗忘预警/不确定题目均为空）。先去答题积累一些记录吧！")
     if st.button("🚀 开始巩固练习", use_container_width=True, type="primary", key="consol_start_new"):
         _generate_consol_questions()
         st.rerun()
+
+    st.markdown("针对掌握不牢靠（消退型/波动型）、遗忘预警以及自标记不确定的题目进行专项巩固。")
 
     # ---- 未完成的练习 ----
     # 🩸 必须按当前题库过滤（v2.9.14）：草稿里的题号属于抽题时的那个题库，
