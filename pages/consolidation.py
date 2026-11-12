@@ -606,6 +606,8 @@ def _submit_consolidation():
         "total": len(cq),
         "correct": correct_count,
         "accuracy": f"{correct_count/len(cq)*100:.1f}%" if len(cq) > 0 else "0%",
+        # v2.9.17：带上 session_id，数据统计「考试记录」可精确回溯当次错题
+        "session_id": session_id,
     }
     _draft_id = st.session_state.pop("consol_draft_id", None)
     _updated_stats = batch_update_wrong_and_stats(

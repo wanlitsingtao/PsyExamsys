@@ -12,6 +12,10 @@ from utils.data_manager import (
     get_mastery_distribution, MASTERY_LABELS, get_retention_threshold,
 )
 
+# 考试记录「错题回顾」的 URL 锚点：?review=<节前缀>:<记录序号>
+# （spec / consol / wb / mock 四节各一个前缀；与身份参数 ?u= 互不干扰）
+REVIEW_PARAM = "review"
+
 
 def _get_cached_stats(exam_type):
     """缓存所有统计数据，仅在 _data_version 变化或 exam_type 变化时重新加载（减少 8→1 次 JSON 读取）"""
@@ -54,6 +58,9 @@ def show_statistics():
     questions = st.session_state.questions
     wrong_list, wrong_stats, exam_records, mock_records, answer_records, question_stats = \
         _get_cached_stats(exam_type)
+
+    # 🩸 错题回顾面板必须渲染在 tabs 之外（详见 _render_active_review 的注释）
+    _render_active_review(exam_records, mock_records, answer_records, questions)
 
     # 使用 Tab 组织各类统计
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -436,7 +443,15 @@ def _show_mastery_analysis(questions, exam_type=None):
 
 
 def _show_exam_stats(exam_records, mock_records):
-    """考试记录统计 — 四类记录：专项训练、模拟考试、巩固练习、错题练习"""
+    """考试记录统计 — 四类记录：专项训练、模拟考试、巩固练习、错题练习
+
+    v2.9.17：每条记录后附「错题回顾」链接（?review=<节>:<序号>，新标签页打开）。
+    回顾面板由 show_statistics 调 _render_active_review 渲染在 tabs 上方
+    （不能放本函数里 —— 本函数的输出在「考试记录」tab 内，新页面重载后
+    tabs 停在第一个，用户看不见）。逐题明细来自 answer_records：
+    新记录带 session_id 精确关联；老记录按 mode + 提交时间（分钟）匹配
+    （见 _match_session_records）。
+    """
 
     TYPE_LABELS = {
         "exam": "综合训练",
@@ -451,6 +466,11 @@ def _show_exam_stats(exam_records, mock_records):
     for r in exam_records:
         if "type" not in r:
             r["type"] = "exam"
+
+    def _review_link(key):
+        return (f'<a href="?{REVIEW_PARAM}={key}" '
+                f'style="color:#2563eb;text-decoration:none;font-size:13px;white-space:nowrap;">'
+                f'错题回顾</a>')
 
     # 全局表格样式（mock + 其他三类共用）
     st.markdown("""
@@ -472,7 +492,8 @@ def _show_exam_stats(exam_records, mock_records):
     st.markdown("### 🎯 专项训练记录（含综合训练）")
 
     spec_records = [r for r in exam_records if r.get("type") in ("exam", "specialized", "comprehensive")]
-    _render_record_section(spec_records, TYPE_LABELS, default_label="综合训练")
+    _render_record_section(spec_records, TYPE_LABELS, default_label="综合训练",
+                           section_key="spec", review_link=_review_link)
 
     # ================================================================
     #  2. 模拟考试记录
@@ -494,15 +515,11 @@ def _show_exam_stats(exam_records, mock_records):
         cols[0].metric("🎯 模拟考试次数", len(exam_sessions))
         cols[1].metric("📋 科目记录数", len(mock_records))
 
-        recent_sessions = sorted(
-            exam_sessions.items(),
-            key=lambda x: max(r.get("date", "") for r in x[1]),
-            reverse=True
-        )[:5]
+        recent_sessions = _recent_mock_sessions(mock_records)
 
         if recent_sessions:
             rows_html = ""
-            for sid, records in recent_sessions:
+            for i, (sid, records) in enumerate(recent_sessions):
                 date = max(r.get("date", "") for r in records)
                 psy = next((r for r in records if r.get("subject") == "psychology"), None)
                 cou = next((r for r in records if r.get("subject") == "counseling"), None)
@@ -534,6 +551,7 @@ def _show_exam_stats(exam_records, mock_records):
                     f'<td style="white-space:nowrap;padding:12px 16px;color:#555;font-size:14px;">{date[:16] if date else ""}</td>'
                     f'<td style="padding:12px 16px;font-weight:500;">{type_str}</td>'
                     f'<td style="padding:12px 16px;">{total_html}</td>'
+                    f'<td style="padding:12px 16px;text-align:right;">{_review_link(f"mock:{i}")}</td>'
                     f'</tr>'
                 )
 
@@ -543,6 +561,7 @@ def _show_exam_stats(exam_records, mock_records):
                 <th style="width:150px;">考试日期</th>
                 <th style="width:200px;">类型</th>
                 <th>总分</th>
+                <th style="width:90px;">错题回顾</th>
             </tr></thead>
             <tbody>{rows_html}</tbody>
             </table>
@@ -558,7 +577,8 @@ def _show_exam_stats(exam_records, mock_records):
     st.markdown("### 🔁 巩固练习记录")
 
     consol_records = [r for r in exam_records if r.get("type") == "consolidation"]
-    _render_record_section(consol_records, TYPE_LABELS, default_label="巩固练习")
+    _render_record_section(consol_records, TYPE_LABELS, default_label="巩固练习",
+                           section_key="consol", review_link=_review_link)
 
     # ================================================================
     #  4. 错题练习记录
@@ -567,11 +587,13 @@ def _show_exam_stats(exam_records, mock_records):
     st.markdown("### 📕 错题练习记录")
 
     wb_records = [r for r in exam_records if r.get("type") == "wrongbook"]
-    _render_record_section(wb_records, TYPE_LABELS, default_label="错题练习")
+    _render_record_section(wb_records, TYPE_LABELS, default_label="错题练习",
+                           section_key="wb", review_link=_review_link)
 
 
-def _render_record_section(records, type_labels, default_label="训练"):
-    """渲染一段考试记录：汇总指标 + 最近记录表格"""
+def _render_record_section(records, type_labels, default_label="训练",
+                           section_key="", review_link=None):
+    """渲染一段考试记录：汇总指标 + 最近记录表格（附「错题回顾」链接列）"""
     if not records:
         st.info(f"暂无{default_label}记录。")
         return
@@ -589,11 +611,11 @@ def _render_record_section(records, type_labels, default_label="训练"):
     )
     cols[2].metric("🏆 最高正确率", f"{best:.1f}%")
 
-    # 最近 10 条记录
-    recent = sorted(records, key=lambda r: r.get("date", ""), reverse=True)[:10]
+    # 最近 10 条记录（与 _render_active_review 用同一个 _recent_records，保证链接序号一致）
+    recent = _recent_records(records)
 
     rows_html = ""
-    for r in recent:
+    for i, r in enumerate(recent):
         date = r.get("date", "")[:16]
         rtype = r.get("type", "")
         # 展开类型标签
@@ -608,6 +630,8 @@ def _render_record_section(records, type_labels, default_label="训练"):
         correct = r.get("correct", 0)
         total = r.get("total", 0)
         color = "#22c55e" if pct_val >= 60 else "#ef4444"
+        link_html = f'<td style="padding:12px 16px;text-align:right;">{review_link(f"{section_key}:{i}")}</td>' \
+            if review_link else ""
 
         rows_html += (
             f'<tr>'
@@ -617,17 +641,221 @@ def _render_record_section(records, type_labels, default_label="训练"):
             f'<span style="color:{color};font-weight:600;">{correct}/{total}</span>'
             f'<span style="color:#999;margin-left:8px;font-size:13px;">{accuracy}</span>'
             f'</td>'
+            f'{link_html}'
             f'</tr>'
         )
 
+    review_head = '<th style="width:90px;">错题回顾</th>' if review_link else ""
     table_html = f"""
     <table class="exam-records-table">
     <thead><tr>
         <th style="width:150px;">日期</th>
         <th style="width:220px;">类型</th>
         <th>正确率</th>
+        {review_head}
     </tr></thead>
     <tbody>{rows_html}</tbody>
     </table>
     """
     st.markdown(table_html, unsafe_allow_html=True)
+
+
+# ---- 错题回顾：定位当次明细 + 渲染（v2.9.17）----
+
+def _recent_records(records):
+    """考试记录表格展示的「最近 10 条」（链接里的序号以它为准，勿改排序口径）。"""
+    return sorted(records, key=lambda r: r.get("date", ""), reverse=True)[:10]
+
+
+def _recent_mock_sessions(mock_records):
+    """模拟考按 session 聚合后的「最近 5 场」（链接里的序号以它为准）。"""
+    sessions = {}
+    for r in mock_records:
+        sessions.setdefault(r.get("session_id", ""), []).append(r)
+    return sorted(
+        sessions.items(),
+        key=lambda x: max(r.get("date", "") for r in x[1]),
+        reverse=True,
+    )[:5]
+
+
+def _render_active_review(exam_records, mock_records, answer_records, questions):
+    """?review=<节>:<序号> 激活时，在 tabs 上方渲染错题回顾面板。
+
+    🩸 面板必须渲染在 st.tabs **之外**（本函数由 show_statistics 在建 tabs 前调用）：
+    Streamlit 会把 markdown 里的链接强制改写成 target="_blank"（新标签页打开）→
+    新页面整页重载后 tabs 永远停在第一个，藏在「考试记录」tab 里的面板用户看不见。
+    序号解析必须与表格用的是同一套「最近 N 条」函数（_recent_records /
+    _recent_mock_sessions），否则链接点开的不是那一行。
+    """
+    param = st.query_params.get(REVIEW_PARAM, "")
+    if not param or ":" not in param:
+        return
+    section, _, idx_s = param.partition(":")
+    try:
+        idx = int(idx_s)
+    except ValueError:
+        return
+
+    # 与 _show_exam_stats 相同的归一化 + 分节
+    for r in exam_records:
+        if "type" not in r:
+            r["type"] = "exam"
+    type_labels = {
+        "exam": "综合训练", "specialized": "专项训练", "comprehensive": "综合训练",
+        "consolidation": "巩固练习", "wrongbook": "错题练习",
+    }
+
+    # entries = [(子标题或 None, record)]；模拟考一场含多科
+    entries = []
+    title_type = ""
+    if section == "mock":
+        recent = _recent_mock_sessions(mock_records)
+        if not (0 <= idx < len(recent)):
+            return
+        _sid, recs = recent[idx]
+        date = max(r.get("date", "") for r in recs)
+        entries = [(r.get("subject_name", "科目"), r)
+                   for r in sorted(recs, key=lambda x: x.get("date", ""))]
+        title_type = "模拟考试"
+        title_date = date
+    else:
+        section_types = {
+            "spec": ("exam", "specialized", "comprehensive"),
+            "consol": ("consolidation",),
+            "wb": ("wrongbook",),
+        }
+        if section not in section_types:
+            return
+        records = [r for r in exam_records if r.get("type") in section_types[section]]
+        recent = _recent_records(records)
+        if not (0 <= idx < len(recent)):
+            return
+        rec = recent[idx]
+        title_type = type_labels.get(rec.get("type", ""), "训练")
+        title_date = rec.get("date", "")
+        # 老的综合训练记录 category 存的就是"综合训练"本身，拼接会重复
+        if (rec.get("type") in ("specialized", "comprehensive")
+                and rec.get("category") and rec["category"] not in ("综合训练", "专项训练")):
+            title_type += f" · {rec['category']}"
+        entries = [(None, rec)]
+
+    with st.container(border=True):
+        st.markdown(f"#### 📌 错题回顾 · {str(title_date)[:16]} {title_type}")
+        for sub, rec in entries:
+            if len(entries) > 1:
+                st.markdown(f"**{sub}**（答对 {rec.get('correct', 0)}/{rec.get('total', 0)}）")
+            rows = _match_session_records(rec, answer_records)
+            _render_record_review(rec, rows, questions, key_prefix=f"rv_{section}{idx}")
+            if len(entries) > 1:
+                st.markdown("---")
+        if st.button("收起错题回顾", key=f"close_review_{section}"):
+            del st.query_params[REVIEW_PARAM]
+            st.rerun()
+
+
+# ---- 错题回顾：定位当次明细 + 渲染（v2.9.17）----
+
+# 考试记录 type → answer_records.mode 的候选（老记录 type="exam" 的明细 mode 可能是
+# exam/study/或综合训练；v2.9.17 之前提交的记录没有 session_id，只能按 mode+时间匹配）
+_RECORD_MODES = {
+    "specialized": ("specialized",),
+    "comprehensive": ("comprehensive",),
+    "consolidation": ("consolidation",),
+    "wrongbook": ("wrongbook",),
+    "exam": ("exam", "comprehensive", "study"),
+}
+
+
+def _match_session_records(record, answer_records):
+    """定位一条考试记录对应的逐题答题明细（answer_records 的行）。
+
+    优先级：
+    ① v2.9.17 起四类提交都把 session_id 写进了考试记录 → 直接按 session_id 取
+       （模拟考同一 session 的两科共用 session_id，需再按提交分钟切到本科）；
+    ② 老记录没有 session_id → 按 mode + 提交时间（分钟）匹配；同一分钟内同类型
+       提交了多次时，再按 total/错题数挑出最吻合的一组。
+    匹配不到返回空列表（调用方提示「无法回顾」）。
+    """
+    rtype = record.get("type") or ("mock" if record.get("subject") else "")
+    if rtype == "mock":
+        modes = ("mock_exam",)
+    else:
+        modes = _RECORD_MODES.get(rtype, (rtype,))
+    sid = record.get("session_id", "")
+    date = (record.get("date") or "")[:16]
+
+    def _minute_of(ts):
+        """timestamp(ISO 带 T) → 与记录 date 同格式的 'YYYY-MM-DD HH:MM'（空格分隔）。"""
+        return (ts or "")[:16].replace("T", " ")
+
+    # ① session_id 直连
+    if sid:
+        rows = [r for r in answer_records if r.get("session_id") == sid]
+        if rtype == "mock" and date:
+            rows = [r for r in rows if _minute_of(r.get("timestamp")) == date]
+        if rows:
+            return rows
+
+    # ② 老记录回退：mode + 分钟
+    if not date:
+        return []
+    rows = [r for r in answer_records
+            if r.get("mode") in modes and _minute_of(r.get("timestamp")) == date]
+    # 同一分钟内同类型多次提交：按 total/错题数挑最吻合的一组（按 session_id 分组）
+    if rows and len({r.get("session_id") for r in rows}) > 1:
+        want_total = record.get("total")
+        want_wrong = (want_total - record.get("correct", 0)) if want_total else None
+        groups = {}
+        for r in rows:
+            groups.setdefault(r.get("session_id"), []).append(r)
+        for g in groups.values():
+            if (want_total is not None and len(g) == want_total
+                    and want_wrong is not None
+                    and sum(1 for x in g if not x.get("is_correct")) == want_wrong):
+                return g
+    return rows
+
+
+def _fmt_review_answer(qtype, ans):
+    """把存储的作答（A/B/ABD 之类的串）转成可读文本。"""
+    if ans is None or str(ans).strip() == "":
+        return "未作答"
+    s = str(ans).strip()
+    if qtype == "judge":
+        return "正确" if s[:1].upper() == "A" else "错误"
+    if qtype in ("multi", "案例题"):
+        return "、".join(sorted(s.upper()))
+    return s.upper()
+
+
+def _render_record_review(record, rows, questions, key_prefix="rv"):
+    """渲染一次训练/考试的错题回顾：题干 + 选项 + 你的答案 + 正确答案 + 解析。"""
+    if not rows:
+        st.info("未能定位本次的逐题答题明细（记录较早或明细已被清空），无法回顾错题。")
+        return
+    q_map = {q["id"]: q for q in questions}
+    wrong_rows = [r for r in rows if not r.get("is_correct")]
+    if not wrong_rows:
+        st.success("🎉 本次全对，没有错题！")
+        return
+    st.markdown(f"**本次答错 {len(wrong_rows)} 题**（点击题目展开题干、选项与解析）")
+    for i, r in enumerate(wrong_rows, 1):
+        q = q_map.get(r.get("question_id"))
+        if q is None:
+            with st.expander(f"❌ 第{i}题 · 题目已不在当前题库"):
+                st.markdown(f"你的答案：{_fmt_review_answer('', r.get('user_answer'))}（题目已被删除，无从比对）")
+            continue
+        tp = q.get("type", "")
+        tp_name = {"single": "单选题", "multi": "多选题", "judge": "判断题",
+                   "案例题": "案例题", "indefinite": "不定项选择题"}.get(tp, tp)
+        yours = _fmt_review_answer(tp, r.get("user_answer"))
+        correct = _fmt_review_answer(tp, q.get("answer", ""))
+        with st.expander(f"❌ 第{i}题 · {tp_name} · 你答「{yours}」，正确「{correct}」"):
+            if q.get("case_background"):
+                st.markdown(f"**案例背景**：{q['case_background']}")
+            st.markdown(q.get("question", ""))
+            for opt_key in sorted((q.get("options") or {}).keys()):
+                st.markdown(f"- **{opt_key}**. {q['options'][opt_key]}")
+            st.markdown(f"**你的答案**：{yours}　｜　**正确答案**：{correct}")
+            st.markdown(f"**解析**：{q.get('explanation') or '（暂无解析）'}")

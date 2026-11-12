@@ -983,6 +983,8 @@ def _submit_wrongbook():
         "total": len(wq),
         "correct": correct_count,
         "accuracy": f"{correct_count/len(wq)*100:.1f}%" if len(wq) > 0 else "0%",
+        # v2.9.17：带上 session_id，数据统计「考试记录」可精确回溯当次错题
+        "session_id": session_id,
     }
     _updated_stats = batch_update_wrong_and_stats(
         wrong_qids, correct_qids, stats_updates, uncertain_map,

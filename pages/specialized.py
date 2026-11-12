@@ -793,6 +793,9 @@ def _finish_specialized():
         "correct": correct_count,
         "accuracy": f"{correct_count/total_q*100:.1f}%",
         "category": category,
+        # v2.9.17：带上 session_id，数据统计「考试记录」可精确回溯当次错题
+        # （与 answer_records.session_id 同源；老记录无此字段，靠 mode+时间兜底匹配）
+        "session_id": st.session_state.get("spec_session_id", ""),
     }
     stats_updates = [(qid, True) for qid in correct_qids] + [(qid, False) for qid, _ in wrong_qids]
     _updated_stats = batch_update_wrong_and_stats(
